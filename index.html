@@ -1,0 +1,247 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>TreeVision AI Annotated Estimate</title>
+  <meta name="description" content="TreeVision AI preliminary canopy trimming estimator with record photo annotations and human review safeguards." />
+  <link rel="stylesheet" href="styles.css" />
+</head>
+<body>
+  <main class="app-shell">
+    <header class="hero">
+      <div>
+        <p class="eyebrow">TreeVision AI • Version 2A</p>
+        <h1>Annotated Tree Canopy Estimate</h1>
+        <p class="hero-copy">
+          Upload one full-framed record photo, answer six simple questions, place visual annotation pins,
+          and generate a preliminary canopy-trimming estimate for human review.
+        </p>
+      </div>
+      <div class="hero-card">
+        <strong>Preliminary only</strong>
+        <span>Final scope, price, pruning method, and visual result require authorized human approval.</span>
+      </div>
+    </header>
+
+    <section class="notice">
+      <strong>Safety note:</strong>
+      This tool does not diagnose disease, confirm hidden decay, approve utility clearance, or replace an on-site inspection.
+      Any power-line, storm damage, severe lean, hanging limb, tight access, public right-of-way, or structure-risk item is flagged for review.
+    </section>
+
+    <form id="estimateForm" class="workspace">
+      <section class="panel form-panel">
+        <div class="section-heading">
+          <p class="eyebrow">Step 1</p>
+          <h2>Client Intake</h2>
+        </div>
+
+        <div class="grid two">
+          <label>
+            Customer name
+            <input id="customerName" type="text" placeholder="Jane Smith" />
+          </label>
+          <label>
+            Phone
+            <input id="phone" type="tel" placeholder="555-555-5555" />
+          </label>
+          <label>
+            Email
+            <input id="email" type="email" placeholder="customer@email.com" />
+          </label>
+          <label>
+            Urgency
+            <select id="urgency">
+              <option>Flexible</option>
+              <option>Soon</option>
+              <option>Urgent</option>
+              <option>Emergency</option>
+            </select>
+          </label>
+        </div>
+
+        <label>
+          Job address / GPS
+          <input id="address" type="text" placeholder="Street address or GPS pin" />
+        </label>
+
+        <label>
+          Upload record photo
+          <input id="photoInput" type="file" accept="image/*" />
+        </label>
+
+        <div class="photo-checks">
+          <p>Record photo shows:</p>
+          <label><input id="fullTreeVisible" type="checkbox" checked /> Full tree from base to top</label>
+          <label><input id="trunkBaseVisible" type="checkbox" checked /> Trunk and base/ground area</label>
+          <label><input id="workAreaVisible" type="checkbox" checked /> Work area / access area</label>
+          <label><input id="targetsVisible" type="checkbox" checked /> Nearby targets or open drop zone</label>
+        </div>
+
+        <div class="section-heading compact">
+          <p class="eyebrow">Step 2</p>
+          <h2>Three Customer Questions</h2>
+        </div>
+
+        <label>
+          1. What do you want done?
+          <select id="requestedWork">
+            <option>Trim away from house</option>
+            <option>Raise canopy</option>
+            <option>Shape / light trim</option>
+            <option>Reduce overhang</option>
+            <option>Cut back from driveway or sidewalk</option>
+            <option>Remove dead or hanging limbs</option>
+            <option>Not sure - need recommendation</option>
+          </select>
+        </label>
+
+        <label>
+          2. What cleanup do you want?
+          <select id="cleanupPreference">
+            <option>Haul everything away</option>
+            <option>Chip brush and haul logs</option>
+            <option>Stack wood onsite</option>
+            <option>Leave debris onsite</option>
+            <option>Customer handles cleanup</option>
+            <option>Not sure</option>
+          </select>
+        </label>
+
+        <label>
+          3. Any access, utility, or safety concerns?
+          <textarea id="concerns" rows="4" placeholder="Power lines, roof contact, fence/gate, tight access, sidewalk, road, storm damage, hanging limbs, irrigation, gas, septic, fiber, neighbor property, etc."></textarea>
+        </label>
+
+        <div class="section-heading compact">
+          <p class="eyebrow">Step 3</p>
+          <h2>Three Pricing Questions</h2>
+        </div>
+
+        <div class="grid two">
+          <label>
+            4. Tree size class
+            <select id="treeSize">
+              <option>Small</option>
+              <option selected>Medium</option>
+              <option>Large</option>
+              <option>Very Large</option>
+            </select>
+          </label>
+
+          <label>
+            5. Access class
+            <select id="accessClass">
+              <option>Easy</option>
+              <option selected>Moderate</option>
+              <option>Tight</option>
+            </select>
+          </label>
+        </div>
+
+        <label>
+          6. Approx. nearest target distance in feet
+          <input id="targetDistance" type="number" min="0" step="1" placeholder="Example: 15" />
+          <small>Targets include house, roof, fence, driveway, sidewalk, road, pool, shed, vehicle, neighbor property, etc.</small>
+        </label>
+
+        <details class="rate-editor">
+          <summary>Company rate table</summary>
+          <p class="muted">Adjust these numbers to match your market. The estimate is only as accurate as these rates.</p>
+          <div class="grid two">
+            <label>Labor per crew hour <input id="laborRate" type="number" value="185" /></label>
+            <label>Travel base charge <input id="travelCharge" type="number" value="65" /></label>
+            <label>Fuel charge <input id="fuelCharge" type="number" value="35" /></label>
+            <label>Equipment base charge <input id="equipmentCharge" type="number" value="75" /></label>
+            <label>Disposal per cubic yard <input id="disposalRate" type="number" value="45" /></label>
+            <label>Minimum job charge <input id="minimumCharge" type="number" value="350" /></label>
+            <label>Overhead % <input id="overheadPercent" type="number" value="18" /></label>
+            <label>Profit margin % <input id="profitPercent" type="number" value="22" /></label>
+          </div>
+        </details>
+
+        <div class="button-row">
+          <button type="submit" class="primary">Generate Estimate</button>
+          <button id="resetBtn" type="button" class="secondary">Reset</button>
+        </div>
+      </section>
+
+      <section class="panel annotation-panel">
+        <div class="section-heading">
+          <p class="eyebrow">Step 4</p>
+          <h2>Photo Annotation Preview</h2>
+        </div>
+
+        <p class="muted">
+          Upload a photo, choose an annotation label, then click on the image to place pins.
+          Pins are communication notes only, not guaranteed cut locations.
+        </p>
+
+        <div class="annotation-tools">
+          <label>
+            Annotation label
+            <select id="annotationLabel">
+              <option>Crown Raising Zone</option>
+              <option>Clearance Pruning Area</option>
+              <option>Crown Cleaning / Deadwood Review</option>
+              <option>Selective Reduction Area</option>
+              <option>Target / Obstacle Area</option>
+              <option>Access Route</option>
+              <option>Drop Zone / Work Zone</option>
+              <option>Safety Review Flag</option>
+              <option>Stump / Ground Area</option>
+              <option>Other</option>
+            </select>
+          </label>
+
+          <label>
+            Optional note
+            <input id="annotationNote" type="text" placeholder="Example: raise limbs over sidewalk" />
+          </label>
+        </div>
+
+        <div class="canvas-wrap">
+          <canvas id="photoCanvas" aria-label="Annotated tree photo preview"></canvas>
+          <div id="canvasPlaceholder" class="canvas-placeholder">
+            Upload a record photo to start annotating.
+          </div>
+        </div>
+
+        <div class="button-row small">
+          <button id="undoAnnotation" type="button" class="secondary">Undo Pin</button>
+          <button id="clearAnnotations" type="button" class="secondary">Clear Pins</button>
+          <button id="downloadAnnotated" type="button" class="secondary">Download Annotated PNG</button>
+        </div>
+
+        <div class="annotation-list">
+          <h3>Annotation Notes</h3>
+          <ol id="annotationList"></ol>
+        </div>
+
+        <div class="preview-policy">
+          <strong>Illustrative Preview - Final result may vary after field inspection.</strong>
+          <span>Do not use this preview to guarantee cuts, tree health, structural safety, or final appearance.</span>
+        </div>
+      </section>
+    </form>
+
+    <section id="resultPanel" class="panel results hidden">
+      <div class="result-header">
+        <div>
+          <p class="eyebrow">Step 5</p>
+          <h2>Preliminary Estimate Report</h2>
+        </div>
+        <div class="button-row small">
+          <button id="copyCustomerMessage" type="button" class="secondary">Copy Customer Message</button>
+          <button id="printReport" type="button" class="secondary">Print / Save PDF</button>
+          <button id="downloadJson" type="button" class="secondary">Download JSON</button>
+        </div>
+      </div>
+      <div id="estimateOutput"></div>
+    </section>
+  </main>
+
+  <script src="script.js"></script>
+</body>
+</html>
