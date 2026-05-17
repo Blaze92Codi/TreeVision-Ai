@@ -1,0 +1,153 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>TreeVision Canopy Trim Estimator</title>
+  <meta name="description" content="A preliminary tree canopy trimming estimate intake tool using one record photo, simple questions, and human-review safeguards." />
+  <link rel="stylesheet" href="styles.css" />
+</head>
+<body>
+  <main class="app-shell">
+    <section class="hero">
+      <div>
+        <p class="eyebrow">TreeVision AI</p>
+        <h1>Canopy Trim Pre-Estimator</h1>
+        <p class="hero-copy">
+          Start a preliminary tree trimming estimate with one record photo, three customer questions,
+          and three estimating questions. Final pricing still requires authorized human approval.
+        </p>
+      </div>
+      <div class="status-card">
+        <span class="status-dot"></span>
+        <strong>Preliminary tool</strong>
+        <p>Built for screening, scope notes, crew notes, and an 80% confidence estimate range.</p>
+      </div>
+    </section>
+
+    <section class="notice">
+      <strong>Important:</strong>
+      This is not a final arborist inspection, utility clearance approval, insurance determination,
+      or final quote. Hidden decay, root issues, utility conflicts, access limits, and field conditions
+      require human review.
+    </section>
+
+    <form id="estimateForm" class="card form-grid">
+      <h2>1. Record Photo</h2>
+
+      <div class="field full">
+        <label for="photoUpload">Upload one full-framed tree photo</label>
+        <input id="photoUpload" name="photoUpload" type="file" accept="image/*" required />
+        <small>The best photo shows the full tree, trunk/base, work zone, access route, and nearby targets.</small>
+      </div>
+
+      <div class="preview-wrap full">
+        <img id="photoPreview" alt="Uploaded tree preview" hidden />
+      </div>
+
+      <h2>2. Three Customer Questions</h2>
+
+      <div class="field">
+        <label for="requestedWork">What do you want done?</label>
+        <select id="requestedWork" required>
+          <option value="">Choose one</option>
+          <option>Trim away from house</option>
+          <option>Raise canopy</option>
+          <option>Shape / light trim</option>
+          <option>Reduce overhang</option>
+          <option>Cut back from driveway or sidewalk</option>
+          <option>Remove dead or hanging limbs</option>
+          <option>Not sure - need recommendation</option>
+        </select>
+      </div>
+
+      <div class="field">
+        <label for="cleanupPreference">What cleanup do you want?</label>
+        <select id="cleanupPreference" required>
+          <option value="">Choose one</option>
+          <option>Haul everything away</option>
+          <option>Chip brush and haul logs</option>
+          <option>Stack wood onsite</option>
+          <option>Leave debris onsite</option>
+          <option>Customer handles cleanup</option>
+          <option>Not sure</option>
+        </select>
+      </div>
+
+      <div class="field full">
+        <label for="concerns">Any access, utility, or safety concerns?</label>
+        <textarea id="concerns" rows="4" placeholder="Examples: power lines, roof contact, tight gate, fence, road, pool, storm damage, hanging limbs, underground utilities, no known concerns" required></textarea>
+      </div>
+
+      <h2>3. Three Estimating Questions</h2>
+
+      <div class="field">
+        <label for="treeSizeClass">Tree size class</label>
+        <select id="treeSizeClass" required>
+          <option value="">Choose one</option>
+          <option>Small</option>
+          <option>Medium</option>
+          <option>Large</option>
+          <option>Very Large</option>
+        </select>
+      </div>
+
+      <div class="field">
+        <label for="accessClass">Crew access</label>
+        <select id="accessClass" required>
+          <option value="">Choose one</option>
+          <option>Easy</option>
+          <option>Moderate</option>
+          <option>Tight</option>
+        </select>
+      </div>
+
+      <div class="field">
+        <label for="nearestTargetDistanceFeet">Nearest target distance</label>
+        <input id="nearestTargetDistanceFeet" type="number" min="0" step="1" placeholder="Feet" required />
+      </div>
+
+      <div class="field">
+        <label for="photoScore">Record photo quality</label>
+        <select id="photoScore" required>
+          <option>Excellent</option>
+          <option selected>Usable</option>
+          <option>Limited</option>
+          <option>Not Quote-Ready</option>
+        </select>
+      </div>
+
+      <h2>4. Optional Customer Info</h2>
+
+      <div class="field">
+        <label for="customerName">Customer name</label>
+        <input id="customerName" type="text" placeholder="Optional" />
+      </div>
+
+      <div class="field">
+        <label for="phone">Phone</label>
+        <input id="phone" type="tel" placeholder="Optional" />
+      </div>
+
+      <div class="field">
+        <label for="email">Email</label>
+        <input id="email" type="email" placeholder="Optional" />
+      </div>
+
+      <div class="field">
+        <label for="address">Job address</label>
+        <input id="address" type="text" placeholder="Optional" />
+      </div>
+
+      <div class="button-row full">
+        <button type="submit" class="primary">Generate Preliminary Estimate</button>
+        <button type="button" id="resetButton" class="secondary">Reset</button>
+      </div>
+    </form>
+
+    <section id="results" class="results" hidden></section>
+  </main>
+
+  <script src="script.js"></script>
+</body>
+</html>
