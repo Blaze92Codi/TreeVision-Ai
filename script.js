@@ -183,8 +183,20 @@ function guessSpecies(input) {
 }
 
 // ============================================================
-// ANNOTATION ENGINE
+// ANNOTATION ENGINE — ISA/ANSI A300 · Knowledge Base aligned
+// Visual Preview Policy: Illustrative only. Preserves structure.
+// Zones use ISA BMP language. Risk colors match Risk Rating Matrix.
+// Never implies guaranteed cuts, tree health, or structural safety.
 // ============================================================
+
+// Risk Rating Matrix colors (Knowledge Base p.8)
+const RISK_COLOR = {
+  "Low":              { fill: "rgba(40,160,70,0.13)",  stroke: "rgba(30,130,55,0.72)",  badge: "rgba(30,130,55,0.90)"  },
+  "Medium":           { fill: "rgba(255,165,0,0.15)",  stroke: "rgba(200,120,0,0.78)",  badge: "rgba(190,110,0,0.90)"  },
+  "High":             { fill: "rgba(210,70,20,0.18)",  stroke: "rgba(185,45,10,0.82)",  badge: "rgba(180,40,10,0.90)"  },
+  "Site Visit Required":{ fill:"rgba(190,30,30,0.18)", stroke: "rgba(165,15,15,0.88)",  badge: "rgba(160,10,10,0.94)"  },
+};
+
 function drawAnnotations(canvas, imgEl, input, servicePreset, riskLevel) {
   const ctx = canvas.getContext("2d");
   const maxW = canvas.parentElement.clientWidth || 560;
@@ -193,158 +205,322 @@ function drawAnnotations(canvas, imgEl, input, servicePreset, riskLevel) {
   canvas.height = Math.round(canvas.width * ratio);
   const W = canvas.width, H = canvas.height;
 
+  // Draw photo
   ctx.drawImage(imgEl, 0, 0, W, H);
-  ctx.fillStyle = "rgba(0,0,0,0.07)";
+  // Subtle dark vignette so labels pop
+  ctx.fillStyle = "rgba(0,0,0,0.06)";
   ctx.fillRect(0, 0, W, H);
 
+  // Build and draw all zones
   const zones = buildAnnotationZones(input, servicePreset, riskLevel, W, H);
   zones.forEach(z => drawZone(ctx, z));
 
+  // ISA cut-point markers (where lateral cuts apply)
   const cuts = buildCutPoints(servicePreset, W, H);
   if (cuts.length) drawCutPoints(ctx, cuts);
 
-  // Branding / disclaimer
-  const disclaimerY = H - 2;
-  ctx.font = "bold 11px Arial";
-  const brandW = ctx.measureText("TreeVision AI · Dynamic Tree").width;
-  ctx.fillStyle = "rgba(0,0,0,0.5)";
-  ctx.fillRect(0, H - 32, W, 32);
-  ctx.fillStyle = "rgba(255,255,255,0.92)";
-  ctx.fillText("TreeVision AI · Dynamic Tree", 10, H - 18);
+  // ISA method banner — top-right corner chip
+  const isaMethod = ISA_METHOD_LABEL[servicePreset] || "Canopy Review";
+  drawChip(ctx, `ISA: ${isaMethod}`, W - 8, 8, "right",
+    "rgba(34,84,49,0.90)", "#fff");
+
+  // Bottom disclaimer bar — Knowledge Base Visual Preview Policy
+  ctx.fillStyle = "rgba(0,0,0,0.54)";
+  ctx.fillRect(0, H - 36, W, 36);
+  ctx.font = "bold 10.5px Arial";
+  ctx.fillStyle = "rgba(255,255,255,0.95)";
+  ctx.fillText("🌳 TreeVision AI · Dynamic Tree Services", 10, H - 21);
   ctx.font = "9px Arial";
-  ctx.fillStyle = "rgba(255,255,255,0.72)";
-  ctx.fillText("Illustrative Preview — Final result may vary after field inspection.", 10, H - 6);
+  ctx.fillStyle = "rgba(255,255,255,0.75)";
+  ctx.fillText("Illustrative Preview — Final result may vary. Not a final arborist inspection, utility clearance, or guaranteed outcome.", 10, H - 7);
 }
+
+// ISA BMP pruning method per service preset (Knowledge Base p.15)
+const ISA_METHOD_LABEL = {
+  "Light Trim":                  "Crown Cleaning · Canopy Balancing",
+  "Structural / Clearance Trim": "Clearance Pruning · Crown Raising",
+  "Reduction / Cutback":         "Selective Reduction · End-Weight Removal",
+  "Small Tree Removal":          "Full Removal — Low Complexity",
+  "Medium / Large Tree Removal": "Full Removal — Rigging / Staging",
+  "Hazard / Storm Damage Review":"Hazard Assessment — Human Review",
+  "Stump Grinding":              "Stump Grinding — Below Grade",
+  "Shrub Trim / Shrub Removal":  "Shrub Pruning · Ornamental Cleanup",
+  "Site Visit Required":         "Site Visit Required — No Remote Estimate",
+};
 
 function buildAnnotationZones(input, servicePreset, riskLevel, W, H) {
   const zones = [];
-  const concerns = (input.customerAnswers.accessUtilitySafetyConcerns || "").toLowerCase();
-  const access = input.estimateAnswers.accessClass;
-  const work = (input.customerAnswers.requestedWork || "").toLowerCase();
+  const c      = (input.customerAnswers.accessUtilitySafetyConcerns || "").toLowerCase();
+  const work   = (input.customerAnswers.requestedWork || "").toLowerCase();
+  const access = input.estimateAnswers.accessClass || "Moderate";
+  const size   = input.estimateAnswers.treeSizeClass || "Medium";
+  const dist   = parseFloat(input.estimateAnswers.nearestTargetDistanceFeet) || 15;
+  const rc     = RISK_COLOR[riskLevel] || RISK_COLOR["Medium"];
 
-  // Always: trunk zone
-  zones.push({ x: W*0.38, y: H*0.62, w: W*0.24, h: H*0.28,
-    fill: "rgba(120,75,35,0.18)", stroke: "rgba(90,55,20,0.65)",
-    label: "TRUNK ZONE", lpos: "bottom", dash: false });
+  // ── Canopy depth by size class (Knowledge Base: size class definitions) ──
+  const canopyH = { Small: 0.45, Medium: 0.55, Large: 0.64, "Very Large": 0.72 }[size] || 0.55;
+  const trunkY  = H * (0.58 + (canopyH - 0.55) * 0.2);
+  const trunkH  = H * 0.30;
 
-  // Always: root zone
-  zones.push({ x: W*0.18, y: H*0.87, w: W*0.64, h: H*0.10,
+  // ════════════════════════════════════════════════════════
+  // ALWAYS-PRESENT: TRUNK ZONE (Visible Trunk Review — KB p.6)
+  // ════════════════════════════════════════════════════════
+  const trunkLabel = /co.?dominant|split|included bark|crack|lean/.test(c)
+    ? "TRUNK — INSPECT CO-DOMINANT STEMS"
+    : /cavity|decay|mushroom/.test(c)
+    ? "TRUNK — DECAY INDICATORS NOTED"
+    : "TRUNK ZONE — BRANCH COLLAR CUTS";
+  zones.push({ x: W*0.38, y: trunkY, w: W*0.24, h: trunkH,
+    fill: "rgba(120,75,35,0.16)", stroke: "rgba(90,55,20,0.65)",
+    label: trunkLabel, lpos: "bottom", dash: false });
+
+  // ════════════════════════════════════════════════════════
+  // ALWAYS-PRESENT: ROOT ZONE (Visible Root Zone Review — KB p.6)
+  // ════════════════════════════════════════════════════════
+  const rootLabel = /underground|irrigation|septic|gas|fiber|invisible fence/.test(c)
+    ? "ROOT ZONE — UNDERGROUND UTILITIES NOTED"
+    : "CRITICAL ROOT ZONE — PROTECT FROM COMPACTION";
+  zones.push({ x: W*0.14, y: H*0.87, w: W*0.72, h: H*0.09,
     fill: "rgba(120,75,35,0.10)", stroke: "rgba(90,55,20,0.40)",
-    label: "ROOT ZONE — PROTECT", lpos: "bottom", dash: true });
+    label: rootLabel, lpos: "bottom", dash: true });
 
-  // Service-specific work zones
+  // ════════════════════════════════════════════════════════
+  // SERVICE-SPECIFIC CANOPY ZONES — ISA BMP terminology
+  // ════════════════════════════════════════════════════════
   switch (servicePreset) {
+
     case "Light Trim":
-      zones.push({ x: W*0.07, y: H*0.04, w: W*0.86, h: H*0.54,
-        fill: "rgba(255,165,0,0.10)", stroke: "rgba(255,140,0,0.60)",
-        label: "LIGHT TRIM — OUTER CANOPY ONLY", lpos: "top", dash: true });
+      // Crown cleaning + canopy balancing — outer ring only, max 25% live crown
+      zones.push({ x: W*0.06, y: H*0.04, w: W*0.88, h: H*canopyH,
+        fill: "rgba(40,160,70,0.09)", stroke: "rgba(30,130,55,0.58)",
+        label: "CROWN CLEANING · OUTER CANOPY ONLY", lpos: "top", dash: true });
+      // Inner "do not enter" zone — protect live crown interior
+      zones.push({ x: W*0.20, y: H*0.12, w: W*0.60, h: H*(canopyH*0.55),
+        fill: "rgba(40,160,70,0.04)", stroke: "rgba(30,130,55,0.28)",
+        label: "LIVE CROWN INTERIOR — DO NOT REMOVE", lpos: "top", dash: true });
       break;
 
     case "Structural / Clearance Trim":
-      zones.push({ x: W*0.06, y: H*0.03, w: W*0.88, h: H*0.56,
-        fill: "rgba(255,165,0,0.16)", stroke: "rgba(255,140,0,0.72)",
-        label: "CANOPY WORK ZONE — CLEARANCE PRUNING", lpos: "top", dash: false });
-      if (concerns.includes("house") || concerns.includes("roof") || work.includes("house") || work.includes("trim away")) {
-        zones.push({ x: W*0.66, y: H*0.08, w: W*0.30, h: H*0.52,
-          fill: "rgba(30,110,210,0.10)", stroke: "rgba(30,100,200,0.70)",
-          label: "CLEARANCE TARGET", lpos: "top", dash: true });
+      // Main clearance pruning zone
+      zones.push({ x: W*0.05, y: H*0.03, w: W*0.90, h: H*canopyH,
+        fill: rc.fill, stroke: rc.stroke,
+        label: "CLEARANCE PRUNING ZONE", lpos: "top", dash: false });
+      // Crown raising sub-zone (lower canopy lifted)
+      zones.push({ x: W*0.12, y: H*(canopyH*0.55), w: W*0.76, h: H*0.14,
+        fill: "rgba(30,110,210,0.10)", stroke: "rgba(30,100,200,0.65)",
+        label: "CROWN RAISING — LOWER LIMB REMOVAL", lpos: "bottom", dash: true });
+      // Roof or house clearance target
+      if (/house|roof|garage|trim away/.test(work + " " + c)) {
+        zones.push({ x: W*0.64, y: H*0.06, w: W*0.32, h: H*0.50,
+          fill: "rgba(30,110,210,0.09)", stroke: "rgba(20,90,190,0.72)",
+          label: "ROOF CLEARANCE TARGET", lpos: "top", dash: true });
       }
-      if (concerns.includes("driveway") || concerns.includes("sidewalk")) {
-        zones.push({ x: W*0.04, y: H*0.72, w: W*0.40, h: H*0.20,
-          fill: "rgba(30,110,210,0.08)", stroke: "rgba(30,100,200,0.60)",
-          label: "PAVEMENT CLEARANCE", lpos: "bottom", dash: true });
+      // Driveway / sidewalk clearance
+      if (/driveway|sidewalk|road/.test(c)) {
+        zones.push({ x: W*0.03, y: H*0.74, w: W*0.38, h: H*0.16,
+          fill: "rgba(30,110,210,0.08)", stroke: "rgba(30,100,200,0.55)",
+          label: "PAVEMENT CLEARANCE ZONE", lpos: "bottom", dash: true });
       }
       break;
 
     case "Reduction / Cutback":
-      zones.push({ x: W*0.04, y: H*0.02, w: W*0.92, h: H*0.62,
-        fill: "rgba(255,140,0,0.20)", stroke: "rgba(220,100,0,0.78)",
-        label: "SELECTIVE REDUCTION ZONE — END-WEIGHT REMOVAL", lpos: "top", dash: false });
+      // Selective reduction — lateral cuts to live branches only
+      zones.push({ x: W*0.03, y: H*0.02, w: W*0.94, h: H*canopyH,
+        fill: rc.fill, stroke: rc.stroke,
+        label: "SELECTIVE REDUCTION — LATERAL CUTS TO LIVE BRANCHES", lpos: "top", dash: false });
+      // End-weight reduction sub-zone — tips/outer canopy
+      zones.push({ x: W*0.06, y: H*0.04, w: W*0.88, h: H*(canopyH*0.38),
+        fill: "rgba(220,130,0,0.10)", stroke: "rgba(190,105,0,0.60)",
+        label: "END-WEIGHT REMOVAL — OUTER TIPS", lpos: "top", dash: true });
+      // Preserve: live crown interior
+      zones.push({ x: W*0.22, y: H*(canopyH*0.38), w: W*0.56, h: H*(canopyH*0.40),
+        fill: "rgba(40,160,70,0.05)", stroke: "rgba(30,130,55,0.30)",
+        label: "LIVE CROWN — PRESERVE LATERAL STRUCTURE", lpos: "bottom", dash: true });
       break;
 
     case "Small Tree Removal":
-    case "Medium / Large Tree Removal":
-      zones.push({ x: W*0.05, y: H*0.02, w: W*0.90, h: H*0.62,
-        fill: "rgba(190,40,40,0.14)", stroke: "rgba(170,25,25,0.68)",
-        label: servicePreset === "Small Tree Removal" ? "REMOVAL ZONE — SMALL TREE" : "REMOVAL ZONE — LARGE TREE · RIGGING LIKELY",
-        lpos: "top", dash: false });
-      zones.push({ x: W*0.08, y: H*0.58, w: W*0.84, h: H*0.18,
-        fill: "rgba(190,190,0,0.10)", stroke: "rgba(160,160,0,0.55)",
-        label: "CONTROLLED DROP ZONE", lpos: "bottom", dash: true });
+      zones.push({ x: W*0.06, y: H*0.03, w: W*0.88, h: H*(canopyH + 0.06),
+        fill: "rgba(190,40,40,0.15)", stroke: "rgba(165,20,20,0.72)",
+        label: "FULL REMOVAL ZONE — SMALL TREE", lpos: "top", dash: false });
+      // Drop zone — size depends on target distance
+      _pushDropZone(zones, dist, W, H, "Small Tree Removal");
       break;
 
-    case "Hazard / Storm Damage Review":
-      zones.push({ x: W*0.04, y: H*0.02, w: W*0.92, h: H*0.62,
-        fill: "rgba(200,40,40,0.18)", stroke: "rgba(190,0,0,0.80)",
-        label: "HAZARD REVIEW ZONE — SITE VISIT REQUIRED", lpos: "top", dash: true });
+    case "Medium / Large Tree Removal":
+      zones.push({ x: W*0.04, y: H*0.02, w: W*0.92, h: H*(canopyH + 0.06),
+        fill: rc.fill, stroke: rc.stroke,
+        label: size === "Very Large"
+          ? "FULL REMOVAL — CRANE / RIGGING LIKELY"
+          : "FULL REMOVAL ZONE — RIGGING / STAGING",
+        lpos: "top", dash: false });
+      // Section cuts indicator
+      zones.push({ x: W*0.28, y: H*(canopyH*0.25), w: W*0.44, h: H*(canopyH*0.50),
+        fill: "rgba(190,40,40,0.08)", stroke: "rgba(165,20,20,0.42)",
+        label: "SECTION CUTS — TOP-DOWN", lpos: "bottom", dash: true });
+      _pushDropZone(zones, dist, W, H, "Medium / Large Tree Removal");
       break;
+
+    case "Hazard / Storm Damage Review": {
+      // Main hazard review zone
+      zones.push({ x: W*0.04, y: H*0.02, w: W*0.92, h: H*(canopyH + 0.04),
+        fill: "rgba(200,35,35,0.17)", stroke: "rgba(185,0,0,0.84)",
+        label: "HAZARD ASSESSMENT ZONE — HUMAN REVIEW REQUIRED", lpos: "top", dash: true });
+      // Hanging / dead limb sub-zone
+      if (/hanging|dead|broken|deadwood/.test(c)) {
+        zones.push({ x: W*0.10, y: H*0.05, w: W*0.55, h: H*(canopyH*0.45),
+          fill: "rgba(190,40,40,0.12)", stroke: "rgba(170,15,15,0.72)",
+          label: "HANGING / DEAD LIMB ZONE", lpos: "top", dash: true });
+      }
+      // Split or crack sub-zone
+      if (/split|crack|lean/.test(c)) {
+        zones.push({ x: W*0.35, y: H*(canopyH*0.35), w: W*0.30, h: H*(canopyH*0.35),
+          fill: "rgba(200,80,0,0.14)", stroke: "rgba(180,60,0,0.78)",
+          label: "SPLIT / CRACK — STRUCTURAL CONCERN", lpos: "bottom", dash: true });
+      }
+      // Storm damage cleanup area
+      if (/storm|uproot|broken top/.test(c)) {
+        zones.push({ x: W*0.04, y: H*0.60, w: W*0.92, h: H*0.20,
+          fill: "rgba(190,40,40,0.08)", stroke: "rgba(165,20,20,0.50)",
+          label: "STORM DEBRIS CLEANUP AREA", lpos: "bottom", dash: true });
+      }
+      break;
+    }
 
     case "Stump Grinding":
-      zones.push({ x: W*0.32, y: H*0.68, w: W*0.36, h: H*0.22,
-        fill: "rgba(255,165,0,0.22)", stroke: "rgba(200,110,0,0.78)",
-        label: "STUMP GRIND ZONE", lpos: "bottom", dash: false });
+      zones.push({ x: W*0.30, y: H*0.65, w: W*0.40, h: H*0.25,
+        fill: "rgba(255,165,0,0.22)", stroke: "rgba(195,110,0,0.82)",
+        label: "STUMP GRIND — BELOW GRADE", lpos: "bottom", dash: false });
+      // Underground utility warning if mentioned
+      if (/underground|irrigation|septic|gas|fiber|invisible fence/.test(c)) {
+        zones.push({ x: W*0.10, y: H*0.83, w: W*0.80, h: H*0.09,
+          fill: "rgba(190,30,30,0.12)", stroke: "rgba(170,10,10,0.70)",
+          label: "⚠ UNDERGROUND UTILITIES — HAND DIG / LOCATE FIRST", lpos: "bottom", dash: true });
+      }
       break;
 
     case "Shrub Trim / Shrub Removal":
-      zones.push({ x: W*0.08, y: H*0.28, w: W*0.84, h: H*0.50,
-        fill: "rgba(80,180,60,0.12)", stroke: "rgba(40,140,40,0.62)",
-        label: "SHRUB WORK ZONE", lpos: "top", dash: false });
+      zones.push({ x: W*0.07, y: H*0.25, w: W*0.86, h: H*0.52,
+        fill: "rgba(80,180,60,0.12)", stroke: "rgba(40,140,40,0.65)",
+        label: "SHRUB WORK ZONE — ORNAMENTAL PRUNING", lpos: "top", dash: false });
+      // Natural form guidance
+      zones.push({ x: W*0.14, y: H*0.30, w: W*0.72, h: H*0.38,
+        fill: "rgba(40,160,70,0.05)", stroke: "rgba(30,130,55,0.28)",
+        label: "MAINTAIN NATURAL FORM", lpos: "bottom", dash: true });
+      break;
+
+    case "Site Visit Required":
+      zones.push({ x: W*0.03, y: H*0.02, w: W*0.94, h: H*(canopyH + 0.06),
+        fill: "rgba(190,30,30,0.16)", stroke: "rgba(165,10,10,0.86)",
+        label: "SITE VISIT REQUIRED — PHOTO ESTIMATE NOT SAFE", lpos: "top", dash: true });
       break;
 
     default:
-      zones.push({ x: W*0.07, y: H*0.04, w: W*0.86, h: H*0.54,
-        fill: "rgba(255,165,0,0.14)", stroke: "rgba(255,140,0,0.65)",
-        label: "CANOPY WORK ZONE", lpos: "top", dash: false });
+      zones.push({ x: W*0.06, y: H*0.04, w: W*0.88, h: H*canopyH,
+        fill: rc.fill, stroke: rc.stroke,
+        label: "CANOPY WORK ZONE — PENDING CLASSIFICATION", lpos: "top", dash: false });
   }
 
-  // Drop zone (not stump/shrub)
-  if (!["Stump Grinding","Shrub Trim / Shrub Removal"].includes(servicePreset) &&
-      !["Small Tree Removal","Medium / Large Tree Removal"].includes(servicePreset)) {
-    zones.push({ x: W*0.06, y: H*0.57, w: W*0.88, h: H*0.14,
-      fill: "rgba(190,190,0,0.08)", stroke: "rgba(160,160,0,0.50)",
-      label: "DROP ZONE", lpos: "bottom", dash: true });
+  // ════════════════════════════════════════════════════════
+  // DROP ZONE (trimming presets — based on target distance)
+  // ════════════════════════════════════════════════════════
+  const noDropPresets = ["Stump Grinding","Shrub Trim / Shrub Removal",
+    "Small Tree Removal","Medium / Large Tree Removal","Site Visit Required"];
+  if (!noDropPresets.includes(servicePreset)) {
+    _pushDropZone(zones, dist, W, H, servicePreset);
   }
 
-  // Access corridor
+  // ════════════════════════════════════════════════════════
+  // ACCESS CORRIDOR (Knowledge Base: access class)
+  // ════════════════════════════════════════════════════════
+  const accessColor = access === "Open"
+    ? { fill:"rgba(40,160,70,0.10)", stroke:"rgba(30,130,55,0.55)" }
+    : access === "Tight"
+    ? { fill:"rgba(200,80,0,0.12)",  stroke:"rgba(175,55,0,0.68)"  }
+    : { fill:"rgba(255,200,0,0.10)", stroke:"rgba(190,145,0,0.60)" };
   zones.push({
-    x: access === "Tight" ? W*0.40 : W*0.04,
-    y: H*0.73,
-    w: access === "Tight" ? W*0.20 : W*0.28,
-    h: H*0.24,
-    fill: "rgba(40,160,70,0.10)", stroke: "rgba(30,130,55,0.60)",
-    label: `ACCESS: ${access.toUpperCase()}`, lpos: "bottom",
-    dash: access === "Tight",
+    x: access === "Tight" ? W*0.38 : W*0.03,
+    y: H*0.74,
+    w: access === "Tight" ? W*0.24 : W*0.30,
+    h: H*0.22,
+    fill: accessColor.fill, stroke: accessColor.stroke,
+    label: `CREW ACCESS — ${access.toUpperCase()}`,
+    lpos: "bottom", dash: access === "Tight",
   });
 
-  // Structure protection zone
-  if (/roof|house|pool|fence|garage|shed/.test(concerns)) {
-    zones.push({ x: W*0.63, y: H*0.04, w: W*0.33, h: H*0.38,
-      fill: "rgba(200,40,40,0.10)", stroke: "rgba(180,25,25,0.68)",
+  // ════════════════════════════════════════════════════════
+  // STRUCTURE PROTECTION ZONES (KB: Safety/Risk Flags)
+  // ════════════════════════════════════════════════════════
+  if (/roof|house|garage/.test(c) || /trim away|clearance|away from house/.test(work)) {
+    zones.push({ x: W*0.63, y: H*0.04, w: W*0.33, h: H*0.36,
+      fill: "rgba(30,110,210,0.08)", stroke: "rgba(20,90,190,0.65)",
       label: "PROTECT STRUCTURE", lpos: "top", dash: true });
   }
-
-  // Risk badge
-  if (riskLevel === "Site Visit Required" || riskLevel === "High") {
-    zones.push({ type: "badge", x: W*0.02, y: H*0.02,
-      text: `⚠ ${riskLevel.toUpperCase()}`,
-      bg: riskLevel === "Site Visit Required" ? "rgba(190,30,30,0.90)" : "rgba(220,120,0,0.90)" });
+  if (/pool|car|vehicle/.test(c)) {
+    zones.push({ x: W*0.60, y: H*0.55, w: W*0.36, h: H*0.22,
+      fill: "rgba(30,110,210,0.08)", stroke: "rgba(20,90,190,0.60)",
+      label: "PROTECT POOL / VEHICLE", lpos: "bottom", dash: true });
+  }
+  if (/fence|gate/.test(c)) {
+    zones.push({ x: W*0.02, y: H*0.62, w: W*0.16, h: H*0.30,
+      fill: "rgba(30,110,210,0.06)", stroke: "rgba(20,90,190,0.50)",
+      label: "FENCE", lpos: "bottom", dash: true });
   }
 
+  // ════════════════════════════════════════════════════════
+  // UTILITY CLEARANCE ZONE — ALWAYS HIGH-PRIORITY
+  // Power lines trigger site visit (KB: Automatic Triggers p.7)
+  // ════════════════════════════════════════════════════════
+  if (includesAnyNotNegated(c, ["power line","service drop","transformer","utility pole","wire"])) {
+    zones.push({ x: W*0.04, y: H*0.01, w: W*0.92, h: H*0.12,
+      fill: "rgba(190,30,30,0.18)", stroke: "rgba(165,10,10,0.88)",
+      label: "⚡ UTILITY / POWER LINE — HUMAN REVIEW & CLEARANCE REQUIRED", lpos: "top", dash: true });
+  }
+
+  // ════════════════════════════════════════════════════════
+  // RISK BADGE (top-left) — Risk Rating Matrix
+  // ════════════════════════════════════════════════════════
+  zones.push({ type: "badge", x: W*0.02, y: H*0.02,
+    text: riskLevel === "Site Visit Required" ? "⚠ SITE VISIT REQUIRED"
+        : riskLevel === "High"   ? "⚠ HIGH RISK"
+        : riskLevel === "Medium" ? "● MEDIUM RISK"
+        : "● LOW RISK",
+    bg: rc.badge });
+
   return zones;
+}
+
+// Shared drop zone helper — width/position based on target distance
+function _pushDropZone(zones, dist, W, H, servicePreset) {
+  const isRemoval = ["Small Tree Removal","Medium / Large Tree Removal"].includes(servicePreset);
+  const tight  = dist <= 5;
+  const wide   = dist >= 20;
+  const dropX  = tight ? W*0.20 : W*0.06;
+  const dropW  = tight ? W*0.60 : wide ? W*0.92 : W*0.84;
+  const dropY  = isRemoval ? H*0.55 : H*0.58;
+  const dropH  = isRemoval ? H*0.16 : H*0.12;
+  const lbl    = tight
+    ? `TIGHT DROP — TARGET ${dist}ft AWAY`
+    : wide
+    ? "OPEN DROP ZONE — CLEAR AREA"
+    : `CONTROLLED DROP ZONE — ${dist}ft TO TARGET`;
+  const dropFill   = tight ? "rgba(210,70,20,0.12)"  : "rgba(190,190,0,0.09)";
+  const dropStroke = tight ? "rgba(185,45,10,0.72)"  : "rgba(160,160,0,0.52)";
+  zones.push({ x: dropX, y: dropY, w: dropW, h: dropH,
+    fill: dropFill, stroke: dropStroke, label: lbl, lpos: "bottom", dash: true });
 }
 
 function drawZone(ctx, z) {
   if (z.type === "badge") {
     ctx.save();
-    ctx.font = "bold 11px Arial";
+    ctx.font = "bold 10.5px Arial";
     const tw = ctx.measureText(z.text).width;
     ctx.fillStyle = z.bg;
     ctx.beginPath();
-    if (ctx.roundRect) ctx.roundRect(z.x, z.y, tw + 16, 22, 4);
-    else ctx.rect(z.x, z.y, tw + 16, 22);
+    if (ctx.roundRect) ctx.roundRect(z.x, z.y, tw + 18, 23, 5);
+    else ctx.rect(z.x, z.y, tw + 18, 23);
     ctx.fill();
     ctx.fillStyle = "#fff";
-    ctx.fillText(z.text, z.x + 8, z.y + 15);
+    ctx.fillText(z.text, z.x + 9, z.y + 16);
     ctx.restore();
     return;
   }
@@ -353,7 +529,7 @@ function drawZone(ctx, z) {
   ctx.setLineDash(z.dash ? [7, 4] : []);
   ctx.fillStyle = z.fill;
   ctx.strokeStyle = z.stroke;
-  ctx.lineWidth = 2;
+  ctx.lineWidth = z.bold ? 2.5 : 1.8;
 
   ctx.beginPath();
   if (ctx.roundRect) ctx.roundRect(z.x, z.y, z.w, z.h, 8);
@@ -363,13 +539,16 @@ function drawZone(ctx, z) {
 
   if (z.label) {
     ctx.setLineDash([]);
-    ctx.font = "bold 10px Arial";
+    ctx.font = "bold 9.5px Arial";
     const tw = ctx.measureText(z.label).width;
     const lx = z.x + z.w / 2 - tw / 2;
-    const ly = z.lpos === "top" ? z.y + 15 : z.y + z.h - 5;
-    ctx.fillStyle = "rgba(0,0,0,0.58)";
-    if (ctx.roundRect) ctx.roundRect(lx - 5, ly - 13, tw + 10, 17, 3);
-    else ctx.rect(lx - 5, ly - 13, tw + 10, 17);
+    const ly = z.lpos === "top" ? z.y + 14 : z.y + z.h - 5;
+    // Label pill background
+    const pillColor = z.label.startsWith("⚡") || z.label.startsWith("⚠")
+      ? "rgba(160,10,10,0.78)" : "rgba(0,0,0,0.56)";
+    ctx.fillStyle = pillColor;
+    if (ctx.roundRect) ctx.roundRect(lx - 6, ly - 13, tw + 12, 18, 4);
+    else ctx.rect(lx - 6, ly - 13, tw + 12, 18);
     ctx.fill();
     ctx.fillStyle = "#fff";
     ctx.fillText(z.label, lx, ly);
@@ -377,33 +556,83 @@ function drawZone(ctx, z) {
   ctx.restore();
 }
 
+// Chip label helper (used for ISA method banner)
+function drawChip(ctx, text, x, y, align, bg, fg) {
+  ctx.save();
+  ctx.font = "bold 9.5px Arial";
+  const tw = ctx.measureText(text).width;
+  const cx = align === "right" ? x - tw - 14 : x;
+  ctx.fillStyle = bg;
+  if (ctx.roundRect) ctx.roundRect(cx, y, tw + 14, 20, 5);
+  else ctx.rect(cx, y, tw + 14, 20);
+  ctx.fill();
+  ctx.fillStyle = fg;
+  ctx.fillText(text, cx + 7, y + 14);
+  ctx.restore();
+}
+
+// ISA Cut-point positions per service preset
+// Each [fx, fy, label] = fractional x/y + short ISA cut type
 function buildCutPoints(servicePreset, W, H) {
-  if (["Small Tree Removal","Medium / Large Tree Removal","Stump Grinding","Shrub Trim / Shrub Removal","Hazard / Storm Damage Review"].includes(servicePreset)) return [];
-  const pts = {
-    "Light Trim": [[0.18,0.22],[0.82,0.26],[0.50,0.08],[0.30,0.30],[0.70,0.28]],
-    "Structural / Clearance Trim": [[0.68,0.18],[0.75,0.32],[0.62,0.44],[0.72,0.50]],
-    "Reduction / Cutback": [[0.15,0.15],[0.85,0.17],[0.50,0.04],[0.28,0.38],[0.72,0.36],[0.50,0.35]],
+  const nocuts = ["Small Tree Removal","Medium / Large Tree Removal",
+                  "Stump Grinding","Shrub Trim / Shrub Removal",
+                  "Hazard / Storm Damage Review","Site Visit Required"];
+  if (nocuts.includes(servicePreset)) return [];
+
+  const defs = {
+    "Light Trim": [
+      [0.16,0.20,"CL"],[0.84,0.24,"CL"],[0.50,0.07,"CL"],
+      [0.28,0.31,"CB"],[0.72,0.28,"CB"],[0.40,0.16,"DW"],
+    ],
+    "Structural / Clearance Trim": [
+      [0.70,0.16,"CR"],[0.76,0.30,"CR"],[0.64,0.43,"CR"],
+      [0.74,0.50,"CR"],[0.68,0.60,"RL"],[0.60,0.54,"RL"],
+    ],
+    "Reduction / Cutback": [
+      [0.13,0.13,"SR"],[0.87,0.15,"SR"],[0.50,0.03,"SR"],
+      [0.26,0.38,"EW"],[0.74,0.36,"EW"],[0.50,0.33,"EW"],
+      [0.38,0.20,"SR"],[0.62,0.22,"SR"],
+    ],
   };
-  return (pts[servicePreset] || [[0.22,0.20],[0.78,0.22],[0.50,0.07]]).map(([fx,fy]) => ({ x: W*fx, y: H*fy }));
+  // Abbreviation legend: CL=Crown clean, CB=Canopy balance, DW=Deadwood,
+  //   CR=Clearance/raise, RL=Remove lower limb, SR=Selective reduction, EW=End-weight
+  return (defs[servicePreset] || [[0.22,0.20,""],[0.78,0.22,""],[0.50,0.07,""]])
+    .map(([fx, fy, lbl]) => ({ x: W*fx, y: H*fy, lbl }));
 }
 
 function drawCutPoints(ctx, pts) {
   pts.forEach(pt => {
     ctx.save();
+    // Outer glow ring
     ctx.beginPath();
-    ctx.arc(pt.x, pt.y, 9, 0, Math.PI * 2);
-    ctx.fillStyle = "rgba(210,165,0,0.28)";
+    ctx.arc(pt.x, pt.y, 11, 0, Math.PI * 2);
+    ctx.fillStyle = "rgba(210,165,0,0.22)";
     ctx.fill();
-    ctx.strokeStyle = "rgba(190,145,0,0.90)";
+    // Gold circle
+    ctx.beginPath();
+    ctx.arc(pt.x, pt.y, 8, 0, Math.PI * 2);
+    ctx.strokeStyle = "rgba(190,145,0,0.92)";
     ctx.lineWidth = 1.8;
     ctx.setLineDash([]);
     ctx.stroke();
+    // Crosshair
     ctx.beginPath();
     ctx.moveTo(pt.x - 5, pt.y); ctx.lineTo(pt.x + 5, pt.y);
     ctx.moveTo(pt.x, pt.y - 5); ctx.lineTo(pt.x, pt.y + 5);
-    ctx.strokeStyle = "rgba(180,130,0,0.95)";
+    ctx.strokeStyle = "rgba(175,125,0,0.95)";
     ctx.lineWidth = 1.5;
     ctx.stroke();
+    // ISA method abbreviation label
+    if (pt.lbl) {
+      ctx.font = "bold 8px Arial";
+      const tw = ctx.measureText(pt.lbl).width;
+      ctx.fillStyle = "rgba(34,84,49,0.88)";
+      if (ctx.roundRect) ctx.roundRect(pt.x + 10, pt.y - 9, tw + 8, 14, 3);
+      else ctx.rect(pt.x + 10, pt.y - 9, tw + 8, 14);
+      ctx.fill();
+      ctx.fillStyle = "#fff";
+      ctx.fillText(pt.lbl, pt.x + 14, pt.y + 2);
+    }
     ctx.restore();
   });
 }
