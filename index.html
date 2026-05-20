@@ -3,103 +3,182 @@
 <head>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-  <title>TreeVision AI Annotated Estimate</title>
-  <meta name="description" content="TreeVision AI preliminary canopy trimming estimator with record photo annotations and human review safeguards." />
+  <title>TreeVision AI — Dynamic Tree Canopy Estimator</title>
+  <meta name="description" content="Professional tree and shrub preliminary estimator with photo annotation, ISA arborist science, ANSI A300 standards, and complete crew documentation for Dynamic Tree." />
   <link rel="stylesheet" href="styles.css" />
 </head>
 <body>
-  <main class="app-shell">
-    <header class="hero">
-      <div>
-        <p class="eyebrow">TreeVision AI • Version 2A</p>
-        <h1>Annotated Tree Canopy Estimate</h1>
-        <p class="hero-copy">
-          Upload one full-framed record photo, answer six simple questions, place visual annotation pins,
-          and generate a preliminary canopy-trimming estimate for human review.
-        </p>
+<main class="app-shell">
+
+  <!-- HERO -->
+  <section class="hero">
+    <div>
+      <p class="eyebrow">TreeVision AI · One Photo Scope Engine</p>
+      <h1>Photo In.<br>Scope Out.</h1>
+      <p class="hero-copy">
+        Upload one photo of a tree, shrub, bush, hedge, or mixed landscape item and generate
+        an obsessed preliminary work package: annotated scope zones, ANSI/ISA pruning language,
+        site-risk gates, industry cost-plus estimate range, crew profile, exclusions,
+        approval requirements, and a ready-to-send customer message.
+        Final quote requires authorized human approval.
+      </p>
+    </div>
+    <div class="status-card">
+      <div class="status-top"><span class="status-dot"></span><strong>Arborist-Informed AI</strong></div>
+      <p>Built on ISA Best Management Practices, ANSI A300 pruning standards, CODIT theory, one-photo readiness scoring, and industry cost-plus estimating protocols.</p>
+      <div class="tag-row">
+        <span class="tag">ISA BMP</span>
+        <span class="tag">ANSI A300</span>
+        <span class="tag">CODIT</span>
+        <span class="tag">One Photo</span>
+        <span class="tag">Precise Scope</span>
+        <span class="tag">Crew Package</span>
       </div>
-      <div class="hero-card">
-        <strong>Preliminary only</strong>
-        <span>Final scope, price, pruning method, and visual result require authorized human approval.</span>
+    </div>
+  </section>
+
+  <!-- NOTICE -->
+  <section class="notice">
+    <strong>Important:</strong> Preliminary photo-based review only — not a final arborist inspection, utility clearance
+    approval, insurance determination, or final quote. Hidden decay, root issues, utility conflicts, access limitations,
+    and field conditions require on-site human review. Photo annotations are illustrative and algorithmically positioned
+    from form inputs — not computer vision. They do not replace a qualified arborist inspection.
+  </section>
+
+  <!-- FORM -->
+  <form id="estimateForm" class="card">
+
+    <!-- STEP 1: PHOTO -->
+    <div class="form-section">
+      <div class="section-label">
+        <span class="step-num">1</span>
+        <div>
+          <h2>Record Photo</h2>
+          <p class="section-desc">One full-framed photo starts the estimate. Show the entire tree base-to-top, trunk, work area, access route, and nearby targets.</p>
+        </div>
       </div>
-    </header>
-
-    <section class="notice">
-      <strong>Safety note:</strong>
-      This tool does not diagnose disease, confirm hidden decay, approve utility clearance, or replace an on-site inspection.
-      Any power-line, storm damage, severe lean, hanging limb, tight access, public right-of-way, or structure-risk item is flagged for review.
-    </section>
-
-    <form id="estimateForm" class="workspace">
-      <section class="panel form-panel">
-        <div class="section-heading">
-          <p class="eyebrow">Step 1</p>
-          <h2>Client Intake</h2>
+      <div class="form-grid">
+        <div class="field full">
+          <label for="photoUpload">Upload one full-framed tree or shrub photo</label>
+          <input id="photoUpload" name="photoUpload" type="file" accept="image/*" required />
+          <small>Best photo: full tree · trunk and ground visible · nearby house, fence, wires, road shown · crew access area visible</small>
         </div>
 
-        <div class="grid two">
-          <label>
-            Customer name
-            <input id="customerName" type="text" placeholder="Jane Smith" />
-          </label>
-          <label>
-            Phone
-            <input id="phone" type="tel" placeholder="555-555-5555" />
-          </label>
-          <label>
-            Email
-            <input id="email" type="email" placeholder="customer@email.com" />
-          </label>
-          <label>
-            Urgency
-            <select id="urgency">
-              <option>Flexible</option>
-              <option>Soon</option>
-              <option>Urgent</option>
-              <option>Emergency</option>
-            </select>
-          </label>
+        <div class="field full" id="annotationWrap" hidden>
+          <label>Photo Analysis &amp; Annotated Work Zone Preview</label>
+          <div class="photo-compare">
+            <div class="photo-panel">
+              <div class="photo-panel-label">Original Record Photo</div>
+              <img id="photoPreview" alt="Uploaded tree record photo" />
+            </div>
+            <div class="photo-panel">
+              <div class="photo-panel-label">Annotated Work Zone Preview</div>
+              <canvas id="annotationCanvas"></canvas>
+            </div>
+          </div>
+          <div class="annotation-meta">
+            <div class="annotation-legend">
+              <div class="legend-item"><span class="legend-dot" style="background:rgba(255,140,0,0.8)"></span>Canopy Work Zone</div>
+              <div class="legend-item"><span class="legend-dot" style="background:rgba(200,40,40,0.8)"></span>Protection / Risk Zone</div>
+              <div class="legend-item"><span class="legend-dot" style="background:rgba(40,160,70,0.8)"></span>Access Corridor</div>
+              <div class="legend-item"><span class="legend-dot" style="background:rgba(30,110,210,0.8)"></span>Clearance Target</div>
+              <div class="legend-item"><span class="legend-dot" style="background:rgba(190,190,0,0.85)"></span>Drop Zone</div>
+              <div class="legend-item"><span class="legend-dot" style="background:rgba(120,75,35,0.8)"></span>Trunk / Root Zone</div>
+              <div class="legend-item"><span class="legend-dot" style="background:rgba(210,165,0,0.9)"></span>ISA Cut Points</div>
+            </div>
+            <p class="annotation-disclaimer">Zones are illustrative — positioned from selected service and risk inputs, not computer vision.<br><strong>Illustrative Preview · Final result may vary after field inspection.</strong></p>
+            <button type="button" id="downloadAnnotation" class="secondary small-btn">Download Annotated Photo</button>
+          </div>
         </div>
 
-        <label>
-          Job address / GPS
-          <input id="address" type="text" placeholder="Street address or GPS pin" />
-        </label>
-
-        <label>
-          Upload record photo
-          <input id="photoInput" type="file" accept="image/*" />
-        </label>
-
-        <div class="photo-checks">
-          <p>Record photo shows:</p>
-          <label><input id="fullTreeVisible" type="checkbox" checked /> Full tree from base to top</label>
-          <label><input id="trunkBaseVisible" type="checkbox" checked /> Trunk and base/ground area</label>
-          <label><input id="workAreaVisible" type="checkbox" checked /> Work area / access area</label>
-          <label><input id="targetsVisible" type="checkbox" checked /> Nearby targets or open drop zone</label>
-        </div>
-
-        <div class="section-heading compact">
-          <p class="eyebrow">Step 2</p>
-          <h2>Three Customer Questions</h2>
-        </div>
-
-        <label>
-          1. What do you want done?
-          <select id="requestedWork">
-            <option>Trim away from house</option>
-            <option>Raise canopy</option>
-            <option>Shape / light trim</option>
-            <option>Reduce overhang</option>
-            <option>Cut back from driveway or sidewalk</option>
-            <option>Remove dead or hanging limbs</option>
-            <option>Not sure - need recommendation</option>
+        <div class="field">
+          <label for="photoScore">Photo quality score</label>
+          <select id="photoScore" required>
+            <option value="Excellent">Excellent — full tree, trunk, work area, access, and targets all clearly visible</option>
+            <option value="Usable" selected>Usable — tree and work area visible, some details missing</option>
+            <option value="Limited">Limited — tree visible but trunk, base, scale, or obstacles unclear</option>
+            <option value="Not Quote-Ready">Not Quote-Ready — full tree, base, work area, or hazards not visible</option>
           </select>
-        </label>
+        </div>
 
-        <label>
-          2. What cleanup do you want?
-          <select id="cleanupPreference">
+        <div class="field">
+          <label for="plantType">What is in the photo?</label>
+          <select id="plantType" required>
+            <option value="Tree" selected>Tree</option>
+            <option value="Shrub">Shrub</option>
+            <option value="Bush">Bush / ornamental</option>
+            <option value="Hedge">Hedge row</option>
+            <option value="Mixed">Mixed tree + shrub work</option>
+          </select>
+        </div>
+
+        <div class="field full">
+          <label for="photoChecklist">One-photo precision checklist</label>
+          <div class="check-grid">
+            <label><input type="checkbox" class="photo-check" value="Full crown visible"> Full crown visible</label>
+            <label><input type="checkbox" class="photo-check" value="Trunk or base visible"> Trunk / base visible</label>
+            <label><input type="checkbox" class="photo-check" value="Nearest target visible"> House, fence, wire, road, or target visible</label>
+            <label><input type="checkbox" class="photo-check" value="Crew access visible"> Gate, driveway, slope, or crew access visible</label>
+          </div>
+          <small>The app will grade whether one photo is enough for a responsible preliminary scope. Missing items trigger a tighter range or site visit.</small>
+        </div>
+      </div>
+    </div>
+
+    <!-- STEP 2: CUSTOMER QUESTIONS -->
+    <div class="form-section">
+      <div class="section-label">
+        <span class="step-num">2</span>
+        <div>
+          <h2>Three Customer Questions</h2>
+          <p class="section-desc">Classify the job type and flag safety concerns before any scope or pricing work begins.</p>
+        </div>
+      </div>
+      <div class="form-grid">
+        <div class="field">
+          <label for="requestedWork">What do you want done?</label>
+          <select id="requestedWork" required>
+            <option value="">Choose one</option>
+            <optgroup label="Trimming &amp; Pruning">
+              <option>Trim away from house</option>
+              <option>Raise canopy</option>
+              <option>Shape / light trim</option>
+              <option>Reduce overhang</option>
+              <option>Cut back from driveway or sidewalk</option>
+              <option>Remove dead or hanging limbs</option>
+            </optgroup>
+            <optgroup label="Tree Removal">
+              <option>Full tree removal (small)</option>
+              <option>Full tree removal (medium or large)</option>
+              <option>Stump grinding</option>
+            </optgroup>
+            <optgroup label="Shrub Work">
+              <option>Shrub trim or shaping</option>
+              <option>Shrub removal</option>
+            </optgroup>
+            <optgroup label="Other">
+              <option>Not sure - need recommendation</option>
+            </optgroup>
+          </select>
+        </div>
+
+        <div class="field">
+          <label for="workSide">Main work zone in the photo</label>
+          <select id="workSide" required>
+            <option value="House / roof side">House / roof side</option>
+            <option value="Driveway / sidewalk side">Driveway / sidewalk side</option>
+            <option value="Fence / neighbor side">Fence / neighbor side</option>
+            <option value="Road / right-of-way side">Road / right-of-way side</option>
+            <option value="Open yard side" selected>Open yard side</option>
+            <option value="Multiple sides">Multiple sides</option>
+            <option value="Utility side">Utility side / wires nearby</option>
+          </select>
+        </div>
+
+        <div class="field">
+          <label for="cleanupPreference">What cleanup do you want?</label>
+          <select id="cleanupPreference" required>
+            <option value="">Choose one</option>
             <option>Haul everything away</option>
             <option>Chip brush and haul logs</option>
             <option>Stack wood onsite</option>
@@ -107,141 +186,268 @@
             <option>Customer handles cleanup</option>
             <option>Not sure</option>
           </select>
-        </label>
-
-        <label>
-          3. Any access, utility, or safety concerns?
-          <textarea id="concerns" rows="4" placeholder="Power lines, roof contact, fence/gate, tight access, sidewalk, road, storm damage, hanging limbs, irrigation, gas, septic, fiber, neighbor property, etc."></textarea>
-        </label>
-
-        <div class="section-heading compact">
-          <p class="eyebrow">Step 3</p>
-          <h2>Three Pricing Questions</h2>
         </div>
 
-        <div class="grid two">
-          <label>
-            4. Tree size class
-            <select id="treeSize">
-              <option>Small</option>
-              <option selected>Medium</option>
-              <option>Large</option>
-              <option>Very Large</option>
-            </select>
-          </label>
-
-          <label>
-            5. Access class
-            <select id="accessClass">
-              <option>Easy</option>
-              <option selected>Moderate</option>
-              <option>Tight</option>
-            </select>
-          </label>
+        <div class="field">
+          <label for="clearanceGoal">Target clearance / finish standard</label>
+          <select id="clearanceGoal" required>
+            <option value="Standard clearance, maintain natural form" selected>Standard clearance, maintain natural form</option>
+            <option value="2-4 ft structure clearance">2–4 ft structure clearance</option>
+            <option value="6-8 ft driveway or sidewalk clearance">6–8 ft driveway / sidewalk clearance</option>
+            <option value="Lift low limbs for mowing and walking">Lift low limbs for mowing / walking</option>
+            <option value="Shape evenly without hard cutting">Shape evenly without hard cutting</option>
+            <option value="Remove to ground level">Remove to ground level</option>
+          </select>
         </div>
 
-        <label>
-          6. Approx. nearest target distance in feet
-          <input id="targetDistance" type="number" min="0" step="1" placeholder="Example: 15" />
-          <small>Targets include house, roof, fence, driveway, sidewalk, road, pool, shed, vehicle, neighbor property, etc.</small>
-        </label>
-
-        <details class="rate-editor">
-          <summary>Company rate table</summary>
-          <p class="muted">Adjust these numbers to match your market. The estimate is only as accurate as these rates.</p>
-          <div class="grid two">
-            <label>Labor per crew hour <input id="laborRate" type="number" value="185" /></label>
-            <label>Travel base charge <input id="travelCharge" type="number" value="65" /></label>
-            <label>Fuel charge <input id="fuelCharge" type="number" value="35" /></label>
-            <label>Equipment base charge <input id="equipmentCharge" type="number" value="75" /></label>
-            <label>Disposal per cubic yard <input id="disposalRate" type="number" value="45" /></label>
-            <label>Minimum job charge <input id="minimumCharge" type="number" value="350" /></label>
-            <label>Overhead % <input id="overheadPercent" type="number" value="18" /></label>
-            <label>Profit margin % <input id="profitPercent" type="number" value="22" /></label>
-          </div>
-        </details>
-
-        <div class="button-row">
-          <button type="submit" class="primary">Generate Estimate</button>
-          <button id="resetBtn" type="button" class="secondary">Reset</button>
-        </div>
-      </section>
-
-      <section class="panel annotation-panel">
-        <div class="section-heading">
-          <p class="eyebrow">Step 4</p>
-          <h2>Photo Annotation Preview</h2>
-        </div>
-
-        <p class="muted">
-          Upload a photo, choose an annotation label, then click on the image to place pins.
-          Pins are communication notes only, not guaranteed cut locations.
-        </p>
-
-        <div class="annotation-tools">
-          <label>
-            Annotation label
-            <select id="annotationLabel">
-              <option>Crown Raising Zone</option>
-              <option>Clearance Pruning Area</option>
-              <option>Crown Cleaning / Deadwood Review</option>
-              <option>Selective Reduction Area</option>
-              <option>Target / Obstacle Area</option>
-              <option>Access Route</option>
-              <option>Drop Zone / Work Zone</option>
-              <option>Safety Review Flag</option>
-              <option>Stump / Ground Area</option>
-              <option>Other</option>
-            </select>
-          </label>
-
-          <label>
-            Optional note
-            <input id="annotationNote" type="text" placeholder="Example: raise limbs over sidewalk" />
-          </label>
-        </div>
-
-        <div class="canvas-wrap">
-          <canvas id="photoCanvas" aria-label="Annotated tree photo preview"></canvas>
-          <div id="canvasPlaceholder" class="canvas-placeholder">
-            Upload a record photo to start annotating.
-          </div>
-        </div>
-
-        <div class="button-row small">
-          <button id="undoAnnotation" type="button" class="secondary">Undo Pin</button>
-          <button id="clearAnnotations" type="button" class="secondary">Clear Pins</button>
-          <button id="downloadAnnotated" type="button" class="secondary">Download Annotated PNG</button>
-        </div>
-
-        <div class="annotation-list">
-          <h3>Annotation Notes</h3>
-          <ol id="annotationList"></ol>
-        </div>
-
-        <div class="preview-policy">
-          <strong>Illustrative Preview - Final result may vary after field inspection.</strong>
-          <span>Do not use this preview to guarantee cuts, tree health, structural safety, or final appearance.</span>
-        </div>
-      </section>
-    </form>
-
-    <section id="resultPanel" class="panel results hidden">
-      <div class="result-header">
-        <div>
-          <p class="eyebrow">Step 5</p>
-          <h2>Preliminary Estimate Report</h2>
-        </div>
-        <div class="button-row small">
-          <button id="copyCustomerMessage" type="button" class="secondary">Copy Customer Message</button>
-          <button id="printReport" type="button" class="secondary">Print / Save PDF</button>
-          <button id="downloadJson" type="button" class="secondary">Download JSON</button>
+        <div class="field full">
+          <label for="concerns">Any access, utility, or safety concerns?</label>
+          <textarea id="concerns" rows="4" placeholder="Power lines or service drop · branches touching roof · fence or gate access · tight backyard · pool, shed, car, driveway, sidewalk, or road nearby · neighbor property · storm damage · hanging limbs · underground utilities, irrigation, septic, gas, fiber, or invisible fence · no known concerns" required></textarea>
         </div>
       </div>
-      <div id="estimateOutput"></div>
-    </section>
-  </main>
+    </div>
 
-  <script src="script.js"></script>
+    <!-- STEP 3: ESTIMATING QUESTIONS -->
+    <div class="form-section">
+      <div class="section-label">
+        <span class="step-num">3</span>
+        <div>
+          <h2>Three Estimating Questions</h2>
+          <p class="section-desc">Used for risk matrix, service classification, and the preliminary cost-plus estimate range calculation.</p>
+        </div>
+      </div>
+      <div class="form-grid">
+        <div class="field">
+          <label for="treeSizeClass">Tree or shrub size class</label>
+          <select id="treeSizeClass" required>
+            <option value="">Choose one</option>
+            <option value="Small">Small — under ~20 ft, easy pole-reach</option>
+            <option value="Medium">Medium — 20–45 ft, standard crew job</option>
+            <option value="Large">Large — 45–70 ft, climbing or lift likely</option>
+            <option value="Very Large">Very Large — 70+ ft, crane or rigging possible</option>
+            <option value="Shrub">Shrub — hedge, ornamental, or low growth</option>
+          </select>
+        </div>
+
+        <div class="field">
+          <label for="accessClass">Crew access to work area</label>
+          <select id="accessClass" required>
+            <option value="">Choose one</option>
+            <option value="Easy">Easy — open yard, wide gate, clear staging</option>
+            <option value="Moderate">Moderate — some obstacles, narrow gate, or mixed terrain</option>
+            <option value="Tight">Tight — very narrow access, steep slope, or blocked staging</option>
+          </select>
+        </div>
+
+        <div class="field">
+          <label for="nearestTargetDistanceFeet">Nearest target distance (feet)</label>
+          <input id="nearestTargetDistanceFeet" type="number" min="0" step="1" placeholder="e.g. 12" required />
+          <small>Distance in feet from tree to nearest structure, wire, fence, or target</small>
+        </div>
+
+        <div class="field">
+          <label for="treeSpeciesGuess">Tree or shrub species / type (optional)</label>
+          <input id="treeSpeciesGuess" type="text" placeholder="e.g. Oak, Maple, Pine, Bradford Pear, Unknown" />
+          <small>Best guess — species-specific arborist science notes will be applied if recognized</small>
+        </div>
+
+        <div class="field">
+          <label for="urgencyLevel">Urgency level</label>
+          <select id="urgencyLevel">
+            <option value="Routine">Routine — schedule within 2–4 weeks</option>
+            <option value="Priority">Priority — schedule within 1 week</option>
+            <option value="Emergency">Emergency — same day or next day required</option>
+          </select>
+        </div>
+
+        <div class="field">
+          <label for="completionWindow">Preferred completion window</label>
+          <input id="completionWindow" type="text" placeholder="e.g. Before July 4th, within 2 weeks, ASAP" />
+        </div>
+      </div>
+    </div>
+
+    <!-- STEP 4: CONTACT INFO -->
+    <div class="form-section">
+      <div class="section-label">
+        <span class="step-num">4</span>
+        <div>
+          <h2>Customer Contact Information</h2>
+          <p class="section-desc">Required before final quote or scheduling. Optional for preliminary screening only.</p>
+        </div>
+      </div>
+      <div class="form-grid">
+        <div class="field">
+          <label for="customerName">Customer full name</label>
+          <input id="customerName" type="text" placeholder="Optional for screening" />
+        </div>
+        <div class="field">
+          <label for="phone">Phone number</label>
+          <input id="phone" type="tel" placeholder="Optional for screening" />
+        </div>
+        <div class="field">
+          <label for="email">Email address</label>
+          <input id="email" type="email" placeholder="Optional for screening" />
+        </div>
+        <div class="field">
+          <label for="address">Job address</label>
+          <input id="address" type="text" placeholder="Optional for screening" />
+        </div>
+        <div class="field">
+          <label for="gpsPin">GPS coordinates or map pin</label>
+          <input id="gpsPin" type="text" placeholder="Optional — paste coordinates or what3words" />
+        </div>
+        <div class="field">
+          <label for="preferredContact">Preferred contact method</label>
+          <select id="preferredContact">
+            <option value="">Not specified</option>
+            <option>Phone call</option>
+            <option>Text message</option>
+            <option>Email</option>
+          </select>
+        </div>
+      </div>
+    </div>
+
+    <!-- SUBMIT -->
+    <div class="form-footer">
+      <button type="submit" class="primary">Generate Full Assessment &amp; Crew Package</button>
+      <button type="button" id="resetButton" class="secondary">Reset Form</button>
+    </div>
+  </form>
+
+  <!-- RESULTS -->
+  <section id="results" class="results" hidden>
+    <div class="results-header-bar">
+      <div>
+        <p class="eyebrow">TreeVision AI Preliminary Assessment</p>
+        <h2 id="resultsTitle">Assessment Ready</h2>
+      </div>
+      <div class="results-actions">
+        <button type="button" id="printCrew" class="secondary small-btn">Print Crew Package</button>
+      </div>
+    </div>
+
+    <nav class="tab-nav" role="tablist">
+      <button class="tab-btn active" data-tab="customer" role="tab">Customer View</button>
+      <button class="tab-btn" data-tab="assessment" role="tab">Full Assessment</button>
+      <button class="tab-btn" data-tab="crew" role="tab">Crew Package</button>
+      <button class="tab-btn" data-tab="science" role="tab">Arborist Science</button>
+    </nav>
+
+    <div id="tab-customer" class="tab-panel"></div>
+    <div id="tab-assessment" class="tab-panel" hidden></div>
+    <div id="tab-crew" class="tab-panel" hidden></div>
+    <div id="tab-science" class="tab-panel" hidden></div>
+  </section>
+
+  <!-- ARBORIST REFERENCE (always visible) -->
+  <section class="arborist-ref">
+    <div class="ref-header">
+      <h2>Arborist Science Reference</h2>
+      <p>ISA Best Management Practices · ANSI A300 Standards · Species Protocols · Cut Techniques</p>
+    </div>
+
+    <div class="accordion">
+
+      <div class="accordion-item">
+        <button class="accordion-btn" data-target="acc-ansi"><span>ANSI A300 Pruning Standards (Part 1)</span><span class="acc-arrow">▼</span></button>
+        <div class="accordion-body" id="acc-ansi" hidden>
+          <div class="ref-grid">
+            <div class="ref-card"><h4>Crown Cleaning</h4><p>Removal of dead, dying, diseased, crowded, weakly attached, and low-vigor branches from the crown. Preferred service for general health maintenance with minimal tree stress.</p></div>
+            <div class="ref-card"><h4>Crown Raising</h4><p>Removal of lower branches to provide clearance for buildings, vehicles, pedestrians, and sight lines. Maintain live crown ratio ≥60% for most species after work.</p></div>
+            <div class="ref-card"><h4>Crown Reduction</h4><p>Reduces overall size using natural reduction cuts (back to laterals ≥⅓ diameter of removed limb). Never a flat topping cut. ANSI-approved language: "selective reduction" or "end-weight reduction."</p></div>
+            <div class="ref-card"><h4>Crown Restoration</h4><p>Improves structure, form, and appearance of trees with prior improper pruning. Multi-year program typically required. Refer to ISA-certified arborist.</p></div>
+            <div class="ref-card"><h4>Structural Pruning</h4><p>Directed at young and maturing trees to reduce co-dominant stems, included bark, and poor branch architecture. High long-term ROI — prevents future hazard removals.</p></div>
+            <div class="ref-card"><h4>Clearance Pruning</h4><p>Specific clearance from structures, utilities, or right-of-way. Utility work within 10 ft of energized lines requires OSHA-qualified line-clearance arborists only.</p></div>
+          </div>
+        </div>
+      </div>
+
+      <div class="accordion-item">
+        <button class="accordion-btn" data-target="acc-bmp"><span>ISA Best Management Practices — Core Rules</span><span class="acc-arrow">▼</span></button>
+        <div class="accordion-body" id="acc-bmp" hidden>
+          <ul class="ref-list">
+            <li><strong>25% Live Crown Rule:</strong> Never remove more than 25–30% of live crown in a single growing season for mature trees.</li>
+            <li><strong>Branch Collar Cuts:</strong> Always cut just outside the branch collar — never flush, never into it. Contains protective chemical boundary tissue critical for CODIT response.</li>
+            <li><strong>3-Cut Method:</strong> Required for limbs &gt;2 inches. (1) Undercut 12–18 in. from trunk; (2) Top cut outside undercut removes weight; (3) Final collar cut. Prevents bark stripping.</li>
+            <li><strong>No Topping:</strong> Condemned by ISA, ANSI, and the National Arborist Association. Opens massive decay pathways, produces weak epicormic sprouts. Never use topping language in customer materials.</li>
+            <li><strong>No Lion's Tailing:</strong> Stripping inner branches creates end-heavy, wind-failure-prone limbs. Always preserve inner foliage for structural load distribution.</li>
+            <li><strong>No Wound Dressings:</strong> ISA research shows sealants impede natural compartmentalization. Exception: oak or elm cuts during beetle season.</li>
+            <li><strong>CODIT Theory (Shigo 1977):</strong> Trees compartmentalize wounds — they do not heal. Four walling zones limit decay spread. Good collar cuts maximize CODIT response.</li>
+            <li><strong>Root Zone Protection:</strong> Critical Root Zone (CRZ) = 1 ft radius per inch DBH minimum. Avoid compaction, grade changes, or excavation within CRZ.</li>
+            <li><strong>Utility Clearance:</strong> Work within 10 ft of energized lines requires OSHA-qualified line-clearance arborists. Standard crews must not enter this zone.</li>
+          </ul>
+        </div>
+      </div>
+
+      <div class="accordion-item">
+        <button class="accordion-btn" data-target="acc-species"><span>Species-Specific Pruning Protocols</span><span class="acc-arrow">▼</span></button>
+        <div class="accordion-body" id="acc-species" hidden>
+          <div class="species-table-wrap">
+            <table class="species-table">
+              <thead><tr><th>Species</th><th>Best Pruning Window</th><th>Primary Risk</th><th>Key Notes</th></tr></thead>
+              <tbody>
+                <tr><td><strong>Oak</strong> (Quercus)</td><td>Late winter / dormant</td><td>Oak wilt (Apr–Jun)</td><td>AVOID April–June in red/black oak group. Seal wounds immediately if spring cut required. Never leave cut branches onsite as beetle habitat.</td></tr>
+                <tr><td><strong>Elm</strong> (Ulmus)</td><td>Late fall or winter</td><td>Dutch elm disease</td><td>Avoid spring/early summer (bark beetle flight). Sterilize tools between trees. DED spreads via root grafts.</td></tr>
+                <tr><td><strong>Maple</strong> (Acer)</td><td>Late winter or midsummer</td><td>Sap bleed / decay entry</td><td>Avoid early spring (heavy bleed) and fall (poor wound closure). Watch co-dominant stems in silver maple.</td></tr>
+                <tr><td><strong>Ash</strong> (Fraxinus)</td><td>Any, ideally winter</td><td>Emerald Ash Borer (EAB)</td><td>Dead ash = extremely brittle — elevated removal caution. D-shaped exit holes = EAB. Do not transport from quarantine zones.</td></tr>
+                <tr><td><strong>Pine</strong> (Pinus)</td><td>Early summer (candle stage)</td><td>Bark beetles / pine wilt</td><td>Remove no more than ⅓ annual growth. Never cut into bare old wood — no latent buds. Dead pine = beetle habitat.</td></tr>
+                <tr><td><strong>Birch</strong> (Betula)</td><td>Late summer or winter</td><td>Bronze birch borer</td><td>Stressed birch = high borer risk. Avoid spring (heavy bleed). River birch significantly more resistant than white birch.</td></tr>
+                <tr><td><strong>Apple / Crabapple</strong></td><td>Late winter (dormant)</td><td>Fire blight</td><td>Sterilize tools between every cut. Cut 8–12 in. below visible infection. Avoid wet weather pruning.</td></tr>
+                <tr><td><strong>Cherry / Plum</strong></td><td>Late summer after fruiting</td><td>Cytospora canker</td><td>Avoid winter and spring. Sterilize tools. Prune only in dry weather conditions.</td></tr>
+                <tr><td><strong>Cottonwood / Poplar</strong></td><td>Dormant winter</td><td>Rapid decay, brittle wood</td><td>Very brittle species. High hazard potential. Prioritize risk screening. Large limb failures common with minimal warning.</td></tr>
+                <tr><td><strong>Cedar / Juniper</strong></td><td>Late winter or early spring</td><td>Brown zone won't regrow</td><td>Never cut into dead wood zone — no dormant buds. Shape live foliage only. Over-pruning kills the plant permanently.</td></tr>
+                <tr><td><strong>Bradford Pear</strong></td><td>Dormant winter</td><td>Structural failure / fire blight</td><td>Inherently weak V-angle co-dominant stems. Structural pruning critical at young age. Full removal often recommended at maturity.</td></tr>
+                <tr><td><strong>Magnolia</strong></td><td>Right after bloom / summer</td><td>Slow wound closure</td><td>Minimize cuts — magnolias compartmentalize poorly. Remove dead branches as needed. Avoid large-wound cuts.</td></tr>
+              </tbody>
+            </table>
+          </div>
+        </div>
+      </div>
+
+      <div class="accordion-item">
+        <button class="accordion-btn" data-target="acc-cuts"><span>Pruning Cut Types &amp; Technique Standards</span><span class="acc-arrow">▼</span></button>
+        <div class="accordion-body" id="acc-cuts" hidden>
+          <div class="ref-grid">
+            <div class="ref-card approved"><h4>✓ Natural Target Cut</h4><p>Cut just outside the branch collar at the natural union angle. Gold standard for all branches. Maximizes CODIT response and wound closure rate.</p></div>
+            <div class="ref-card approved"><h4>✓ Reduction Cut (Lateral)</h4><p>Cut back to a lateral branch at least ⅓ the diameter of the removed limb. Used for crown reduction. Maintains natural tree form. ANSI A300 Part 1 compliant.</p></div>
+            <div class="ref-card approved"><h4>✓ Three-Cut Method</h4><p>For limbs &gt;2 in.: (1) Undercut 12–18 in. from trunk; (2) Top cut outside undercut removes weight; (3) Final collar cut. Prevents bark stripping and tearing.</p></div>
+            <div class="ref-card forbidden"><h4>✗ Stub Cut (FORBIDDEN)</h4><p>Leaving a stub outside the branch collar. Stubs die back and create major decay entry points. Always complete the cut at the collar on every branch removed.</p></div>
+            <div class="ref-card forbidden"><h4>✗ Flush Cut (FORBIDDEN)</h4><p>Cutting into or through the branch collar. Destroys the protective chemical boundary. Results in severe decay column. Never flush-cut a living branch.</p></div>
+            <div class="ref-card forbidden"><h4>✗ Topping / Heading (FORBIDDEN)</h4><p>Cutting back to an internodal stub. ISA-condemned. Creates epicormic sprout regrowth, massive decay, and structurally weak canopy architecture.</p></div>
+          </div>
+        </div>
+      </div>
+
+      <div class="accordion-item">
+        <button class="accordion-btn" data-target="acc-hazard"><span>Hazard &amp; Risk Assessment Framework (ISA TRAQ)</span><span class="acc-arrow">▼</span></button>
+        <div class="accordion-body" id="acc-hazard" hidden>
+          <div class="ref-grid">
+            <div class="ref-card"><h4>Failure Potential Indicators</h4><ul><li>Included bark at branch unions</li><li>Co-dominant stems with tight V-angles</li><li>Cracks, splits, or open wounds</li><li>Cavity or hollow sections</li><li>Fungal conks or mushroom growth at base</li><li>Severe lean — especially recent change</li><li>Root zone disturbance or soil heaving</li><li>Crown dieback or sudden epicormic sprouting</li></ul></div>
+            <div class="ref-card"><h4>Target Assessment</h4><ul><li>House, roof, foundation, garage</li><li>Power lines &amp; service drops</li><li>Gas, water, fiber, irrigation underground</li><li>Driveway, road, public sidewalk</li><li>Pool, hot tub, shed, outbuildings</li><li>Neighbor property or fencing</li><li>Public right-of-way exposure</li><li>Parked vehicles or equipment</li></ul></div>
+            <div class="ref-card"><h4>ISA Risk Rating Levels</h4><p><strong>Low:</strong> No visible defects, good structure, low-value targets, open access.</p><p><strong>Medium:</strong> Minor defects, moderate targets, some access constraints.</p><p><strong>High:</strong> Significant defects, high-value targets, limited access, climbing or rigging likely.</p><p><strong>Extreme / SVR:</strong> Utilities, storm damage, dead wood, large removals — site visit always required.</p></div>
+            <div class="ref-card"><h4>TRAQ Formal Assessment</h4><p>ISA Tree Risk Assessment Qualification (TRAQ) is the industry standard for formal written risk assessments. Only TRAQ-qualified arborists may provide formal assessments. This tool performs preliminary screening only.</p></div>
+          </div>
+        </div>
+      </div>
+
+      <div class="accordion-item">
+        <button class="accordion-btn" data-target="acc-equipment"><span>Equipment Guide by Tree Size &amp; Complexity</span><span class="acc-arrow">▼</span></button>
+        <div class="accordion-body" id="acc-equipment" hidden>
+          <div class="ref-grid">
+            <div class="ref-card"><h4>Small Tree / Shrub</h4><p>Under ~20 ft</p><ul><li>Hand pruners, loppers, hand saw</li><li>Pole pruner (telescoping)</li><li>Small chainsaw</li><li>Chip truck or debris trailer</li><li>Typical crew: 2–3 people, 1.5–3 hrs</li></ul></div>
+            <div class="ref-card"><h4>Medium Tree</h4><p>20–45 ft</p><ul><li>Gas chainsaw (16–20 in. bar)</li><li>Pole saw</li><li>Aerial lift (if access available)</li><li>Climbing equipment</li><li>Chipper truck</li><li>Typical crew: 3–4 people, 3–5 hrs</li></ul></div>
+            <div class="ref-card"><h4>Large Tree</h4><p>45–70 ft</p><ul><li>Gas chainsaw (20+ in. bar)</li><li>Aerial lift or climbing required</li><li>Rigging blocks, lowering lines</li><li>Large chipper truck</li><li>Log truck possible</li><li>Typical crew: 4–5 people, 5–8 hrs</li></ul></div>
+            <div class="ref-card"><h4>Very Large / Hazard</h4><p>70+ ft or high complexity</p><ul><li>Large chainsaw, full climbing gear</li><li>Crane possible for section removal</li><li>Rigging systems, pulleys, blocks</li><li>Large chipper + log truck</li><li>Traffic control if near road</li><li>Typical crew: 5–6+ people, full day+</li></ul></div>
+          </div>
+        </div>
+      </div>
+
+    </div>
+  </section>
+
+</main>
+<script src="script.js"></script>
 </body>
 </html>
