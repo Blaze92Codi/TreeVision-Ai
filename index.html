@@ -13,25 +13,26 @@
   <!-- HERO -->
   <section class="hero">
     <div>
-      <p class="eyebrow">TreeVision AI · Dynamic Tree</p>
-      <h1>Canopy Trim<br>Pre-Estimator</h1>
+      <p class="eyebrow">TreeVision AI · One Photo Scope Engine</p>
+      <h1>Photo In.<br>Scope Out.</h1>
       <p class="hero-copy">
-        Upload one record photo, answer six questions, and receive a complete
-        arborist-informed preliminary assessment — annotated photo analysis,
-        ISA-standard service classification, risk screening, cost-plus estimate range,
-        crew package, and ready-to-send customer message.
+        Upload one photo of a tree, shrub, bush, hedge, or mixed landscape item and generate
+        an obsessed preliminary work package: annotated scope zones, ANSI/ISA pruning language,
+        site-risk gates, industry cost-plus estimate range, crew profile, exclusions,
+        approval requirements, and a ready-to-send customer message.
         Final quote requires authorized human approval.
       </p>
     </div>
     <div class="status-card">
       <div class="status-top"><span class="status-dot"></span><strong>Arborist-Informed AI</strong></div>
-      <p>Built on ISA Best Management Practices, ANSI A300 pruning standards, CODIT theory, and industry cost-plus estimating protocols.</p>
+      <p>Built on ISA Best Management Practices, ANSI A300 pruning standards, CODIT theory, one-photo readiness scoring, and industry cost-plus estimating protocols.</p>
       <div class="tag-row">
         <span class="tag">ISA BMP</span>
         <span class="tag">ANSI A300</span>
         <span class="tag">CODIT</span>
-        <span class="tag">9 Presets</span>
-        <span class="tag">15-Section Output</span>
+        <span class="tag">One Photo</span>
+        <span class="tag">Precise Scope</span>
+        <span class="tag">Crew Package</span>
       </div>
     </div>
   </section>
@@ -99,6 +100,28 @@
             <option value="Not Quote-Ready">Not Quote-Ready — full tree, base, work area, or hazards not visible</option>
           </select>
         </div>
+
+        <div class="field">
+          <label for="plantType">What is in the photo?</label>
+          <select id="plantType" required>
+            <option value="Tree" selected>Tree</option>
+            <option value="Shrub">Shrub</option>
+            <option value="Bush">Bush / ornamental</option>
+            <option value="Hedge">Hedge row</option>
+            <option value="Mixed">Mixed tree + shrub work</option>
+          </select>
+        </div>
+
+        <div class="field full">
+          <label for="photoChecklist">One-photo precision checklist</label>
+          <div class="check-grid">
+            <label><input type="checkbox" class="photo-check" value="Full crown visible"> Full crown visible</label>
+            <label><input type="checkbox" class="photo-check" value="Trunk or base visible"> Trunk / base visible</label>
+            <label><input type="checkbox" class="photo-check" value="Nearest target visible"> House, fence, wire, road, or target visible</label>
+            <label><input type="checkbox" class="photo-check" value="Crew access visible"> Gate, driveway, slope, or crew access visible</label>
+          </div>
+          <small>The app will grade whether one photo is enough for a responsible preliminary scope. Missing items trigger a tighter range or site visit.</small>
+        </div>
       </div>
     </div>
 
@@ -140,6 +163,19 @@
         </div>
 
         <div class="field">
+          <label for="workSide">Main work zone in the photo</label>
+          <select id="workSide" required>
+            <option value="House / roof side">House / roof side</option>
+            <option value="Driveway / sidewalk side">Driveway / sidewalk side</option>
+            <option value="Fence / neighbor side">Fence / neighbor side</option>
+            <option value="Road / right-of-way side">Road / right-of-way side</option>
+            <option value="Open yard side" selected>Open yard side</option>
+            <option value="Multiple sides">Multiple sides</option>
+            <option value="Utility side">Utility side / wires nearby</option>
+          </select>
+        </div>
+
+        <div class="field">
           <label for="cleanupPreference">What cleanup do you want?</label>
           <select id="cleanupPreference" required>
             <option value="">Choose one</option>
@@ -149,6 +185,18 @@
             <option>Leave debris onsite</option>
             <option>Customer handles cleanup</option>
             <option>Not sure</option>
+          </select>
+        </div>
+
+        <div class="field">
+          <label for="clearanceGoal">Target clearance / finish standard</label>
+          <select id="clearanceGoal" required>
+            <option value="Standard clearance, maintain natural form" selected>Standard clearance, maintain natural form</option>
+            <option value="2-4 ft structure clearance">2–4 ft structure clearance</option>
+            <option value="6-8 ft driveway or sidewalk clearance">6–8 ft driveway / sidewalk clearance</option>
+            <option value="Lift low limbs for mowing and walking">Lift low limbs for mowing / walking</option>
+            <option value="Shape evenly without hard cutting">Shape evenly without hard cutting</option>
+            <option value="Remove to ground level">Remove to ground level</option>
           </select>
         </div>
 

@@ -731,14 +731,18 @@ function determineRiskLevel(input, servicePreset) {
   const access = input.estimateAnswers.accessClass;
   const dist = Number(input.estimateAnswers.nearestTargetDistanceFeet);
   const photo = input.photo;
+  const readiness = onePhotoReadiness(input);
 
   if (!photo.uploaded||photo.score==="Not Quote-Ready") return "Site Visit Required";
   if (servicePreset==="Site Visit Required"||servicePreset==="Hazard / Storm Damage Review") return "Site Visit Required";
   if (includesAny(concerns,SITE_VISIT_KEYWORDS)) return "Site Visit Required";
+  if (readiness.missing.length >= 3) return "Site Visit Required";
   if (size==="Very Large"||access==="Tight") return "High";
   if (!isNaN(dist)&&dist<=10) return "High";
+  if (readiness.missing.length >= 2) return "High";
   if (!isNaN(dist)&&dist<=25) return "Medium";
   if (size==="Large"||access==="Moderate") return "Medium";
+  if (readiness.missing.length === 1) return "Medium";
   if (photo.score==="Limited") return "Medium";
   return "Low";
 }
@@ -759,6 +763,81 @@ function pricingConfidence(photoScore, rl) {
   if (rl==="Site Visit Required"||photoScore==="Limited"||photoScore==="Not Quote-Ready") return "Low";
   if (rl==="High"||photoScore==="Usable") return "Medium";
   return "High";
+}
+
+function checkedPhotoItems() {
+  return Array.from(document.querySelectorAll(".photo-check:checked")).map(el => el.value);
+}
+
+function onePhotoReadiness(input) {
+  const required = ["Full crown visible", "Trunk or base visible", "Nearest target visible", "Crew access visible"];
+  const checked = input.photo.checklist || [];
+  const missing = required.filter(item => !checked.includes(item));
+  const score = Math.round((checked.length / required.length) * 100);
+  let status = "Quote-ready for preliminary scope";
+  if (missing.length >= 2 || input.photo.score==="Limited") status = "Limited one-photo confidence";
+  if (input.photo.score==="Not Quote-Ready" || missing.length >= 3) status = "Needs more photos or site visit";
+  return { score, status, checked, missing };
+}
+
+function recommendedCrewProfile(size, servicePreset, access) {
+  if (servicePreset==="Stump Grinding") return "1-2 person stump crew with grinder";
+  if (servicePreset==="Shrub Trim / Shrub Removal") return "2 person detail crew with hedge tools, saws, and debris trailer";
+  if (size==="Very Large" || servicePreset==="Medium / Large Tree Removal") return "4-5 person arborist crew; climbing, rigging, lift, or crane review possible";
+  if (size==="Large" || access==="Tight") return "3-4 person arborist crew with rigging and controlled lowering plan";
+  if (size==="Small") return "2-3 person pruning crew with pole saw, hand tools, chipper or trailer";
+  return "3 person standard pruning crew with chipper/trailer support";
+}
+
+function buildObsessedScope(input, servicePreset, riskLevel, species) {
+  const plant = input.photo.plantType || "Tree";
+  const workSide = input.customerAnswers.workSide || "Open yard side";
+  const clearance = input.customerAnswers.clearanceGoal || "Standard clearance, maintain natural form";
+  const isRemoval = /removal|stump/i.test(servicePreset) || /Remove to ground/i.test(clearance);
+  const isShrub = /Shrub|Bush|Hedge/i.test(plant) || servicePreset==="Shrub Trim / Shrub Removal";
+  const method = isRemoval
+    ? "Sectional removal or ground-level removal as site conditions allow"
+    : isShrub
+      ? "Selective hand pruning, face reduction, deadwood cleanup, and natural shaping"
+      : "ANSI A300 natural target pruning: crown cleaning, clearance pruning, crown raising, and selective reduction only";
+  const finishStandard = isRemoval
+    ? "Remove selected material to near grade unless stump grinding is separately approved."
+    : isShrub
+      ? "Even natural profile with no bald cuts into dead interior wood and no hard shearing unless approved."
+      : "Maintain natural canopy architecture; no topping, flush cuts, stub cuts, lion's tailing, or removal over 25-30% live crown.";
+  const included = [
+    `Work item: ${plant} shown in the uploaded one-photo record.`,
+    `Primary work zone: ${workSide}.`,
+    `Customer finish target: ${clearance}.`,
+    `Method standard: ${method}.`,
+    `Cleanup standard: ${input.customerAnswers.cleanupPreference}.`,
+  ];
+  if (species) included.push(`Species note: follow ${species.name} timing and wound-response protocol when scheduling.`);
+  if (riskLevel==="Site Visit Required") included.push("Do not issue final price from photo alone; schedule estimator or qualified arborist review.");
+  const excluded = [
+    "No formal ISA TRAQ risk assessment from photo alone.",
+    "No guarantee of tree health, structural safety, disease status, or future failure prevention.",
+    "No energized utility-line work unless handled by qualified line-clearance arborists.",
+    "No extra trees, shrubs, stump work, hauling change, or neighbor-side work unless added to approved scope.",
+  ];
+  const measurementAssumptions = [
+    `${input.estimateAnswers.treeSizeClass || "Unknown"} size class selected from intake.`,
+    `${input.estimateAnswers.nearestTargetDistanceFeet || "Unknown"} ft nearest target distance used for risk and pricing.`,
+    `${input.estimateAnswers.accessClass || "Unknown"} access class used for crew-hour multiplier.`,
+    "One-photo pricing assumes visible canopy density and debris volume match field conditions.",
+  ];
+  return {
+    headline: `${servicePreset} for ${plant}`,
+    workZone: workSide,
+    finishStandard,
+    included,
+    excluded,
+    measurementAssumptions,
+    crewProfile: recommendedCrewProfile(input.estimateAnswers.treeSizeClass, servicePreset, input.estimateAnswers.accessClass),
+    approvalGate: riskLevel==="Site Visit Required"
+      ? "Estimator approval required before customer price is released."
+      : "Manager approval required before this becomes a final quote.",
+  };
 }
 
 // ============================================================
@@ -795,6 +874,8 @@ function buildEstimate(input, rates=DEFAULT_RATES) {
   const high = money(expected*(1+band));
 
   const species = guessSpecies(input.estimateAnswers.treeSpeciesGuess);
+  const onePhoto = onePhotoReadiness(input);
+  const obsessedScope = buildObsessedScope(input, servicePreset, riskLevel, species);
 
   return {
     servicePreset,
@@ -811,6 +892,9 @@ function buildEstimate(input, rates=DEFAULT_RATES) {
       preferredContact: input.jobInfo.preferredContact||"Not specified",
       requestedWork: input.customerAnswers.requestedWork,
       cleanupPreference: input.customerAnswers.cleanupPreference,
+      plantType: input.photo.plantType,
+      workSide: input.customerAnswers.workSide,
+      clearanceGoal: input.customerAnswers.clearanceGoal,
       urgency: input.estimateAnswers.urgencyLevel,
       completionWindow: input.estimateAnswers.completionWindow||"Not specified",
       recordPhotoReceived: input.photo.uploaded?"Yes":"No",
@@ -819,9 +903,11 @@ function buildEstimate(input, rates=DEFAULT_RATES) {
     },
     intakeCompleteness: isIntakeComplete(input)?"Complete for preliminary screening":"Incomplete — missing required fields",
     missingItems: getMissingItems(input),
+    onePhotoReadiness: onePhoto,
+    obsessedScope,
     photoPacketScore: {
       singlePhotoScore: input.photo.score,
-      fullPacketStatus: "Incomplete — one record photo only (standard quote-ready packet requires 12 photos)",
+      fullPacketStatus: onePhoto.status,
       reason: photoScoreReason(input.photo.score),
     },
     visibleTreeReview: {
@@ -864,6 +950,8 @@ function buildEstimate(input, rates=DEFAULT_RATES) {
     meta: {
       estimatedCrewHours: +hours.toFixed(1),
       debrisCubicYards: +debrisYards.toFixed(1),
+      pricingMethod: "Industry cost-plus: crew hours + travel + fuel + equipment + disposal + overhead + risk buffer + profit margin",
+      crewProfile: obsessedScope.crewProfile,
       riskLevel, siteVisitRequired, humanReviewRequired: true,
     },
   };
@@ -872,7 +960,10 @@ function buildEstimate(input, rates=DEFAULT_RATES) {
 function isIntakeComplete(input) {
   return Boolean(
     input.photo.uploaded &&
+    input.photo.plantType &&
     input.customerAnswers.requestedWork &&
+    input.customerAnswers.workSide &&
+    input.customerAnswers.clearanceGoal &&
     input.customerAnswers.cleanupPreference &&
     input.customerAnswers.accessUtilitySafetyConcerns &&
     input.estimateAnswers.treeSizeClass &&
@@ -887,7 +978,7 @@ function getMissingItems(input) {
   if (!input.jobInfo.phone) m.push("Phone number");
   if (!input.jobInfo.email) m.push("Email address");
   if (!input.jobInfo.address) m.push("Job address / GPS");
-  m.push("Full 12-photo packet required for final quote readiness");
+  if (input.photo.checklist && input.photo.checklist.length < 4) m.push("More photo context: " + onePhotoReadiness(input).missing.join(", "));
   m.push("Manager or estimator approval before final price delivery");
   return m;
 }
@@ -930,12 +1021,17 @@ function buildPriceChangeFactors(input, servicePreset, riskLevel) {
 function buildCustomerMessage(input, servicePreset, riskLevel, low, expected, high) {
   const name = input.jobInfo.customerName||"there";
   const urgency = input.estimateAnswers.urgencyLevel;
-  return `Hi ${name}, thanks for sending the tree photo and answers.\n\nBased on the information provided, the likely service is: ${servicePreset}.\n\nYour preliminary 80% confidence estimate range is:\n  Low: ${fmt(low)}\n  Expected: ${fmt(expected)}\n  High: ${fmt(high)}\n\nRisk level: ${riskLevel}\nUrgency: ${urgency}\n${input.estimateAnswers.completionWindow?"Preferred completion: "+input.estimateAnswers.completionWindow+"\n":""}\nThis is a photo-based preliminary review, not a final inspection or final quote. Final pricing may change after human review due to access conditions, utility conflicts, limb weight, hidden decay, cleanup volume, traffic or sidewalk exposure, or field conditions that differ from the photo.\n\nRecommended next step: ${riskLevel==="Site Visit Required"?"Schedule a site visit before any pricing is confirmed.":"Manager review of this assessment before a final quote is delivered to you."}\n\nFinal scope and price require authorized company approval.`;
+  const scope = buildObsessedScope(input, servicePreset, riskLevel, guessSpecies(input.estimateAnswers.treeSpeciesGuess));
+  return `Hi ${name}, thanks for sending the tree photo and answers.\n\nBased on the information provided, the likely service is: ${servicePreset}.\n\nPreliminary scope:\n  ${scope.included.join("\n  ")}\n\nYour preliminary 80% confidence estimate range is:\n  Low: ${fmt(low)}\n  Expected: ${fmt(expected)}\n  High: ${fmt(high)}\n\nRisk level: ${riskLevel}\nUrgency: ${urgency}\n${input.estimateAnswers.completionWindow?"Preferred completion: "+input.estimateAnswers.completionWindow+"\n":""}\nThis is a photo-based preliminary review, not a final inspection or final quote. Final pricing may change after human review due to access conditions, utility conflicts, limb weight, hidden decay, cleanup volume, traffic or sidewalk exposure, or field conditions that differ from the photo.\n\nRecommended next step: ${riskLevel==="Site Visit Required"?"Schedule a site visit before any pricing is confirmed.":"Manager review of this assessment before a final quote is delivered to you."}\n\nFinal scope and price require authorized company approval.`;
 }
 
 function buildCrewNotes(input, servicePreset, riskLevel, hours, debrisYards) {
   const lines = [
     `Work tree: Use uploaded record photo as reference.`,
+    `Obsessed scope headline: ${buildObsessedScope(input, servicePreset, riskLevel, guessSpecies(input.estimateAnswers.treeSpeciesGuess)).headline}`,
+    `Plant type: ${input.photo.plantType}`,
+    `Work zone: ${input.customerAnswers.workSide}`,
+    `Finish standard: ${input.customerAnswers.clearanceGoal}`,
     `Requested work: ${input.customerAnswers.requestedWork}`,
     `Service preset: ${servicePreset}`,
     `Photo score: ${input.photo.score}`,
@@ -982,9 +1078,13 @@ function getFormInput() {
     photo: {
       uploaded: document.getElementById("photoUpload").files.length>0,
       score: document.getElementById("photoScore").value,
+      plantType: document.getElementById("plantType").value,
+      checklist: checkedPhotoItems(),
     },
     customerAnswers: {
       requestedWork: document.getElementById("requestedWork").value,
+      workSide: document.getElementById("workSide").value,
+      clearanceGoal: document.getElementById("clearanceGoal").value,
       cleanupPreference: document.getElementById("cleanupPreference").value,
       accessUtilitySafetyConcerns: document.getElementById("concerns").value,
     },
@@ -1033,6 +1133,18 @@ function renderCustomerTab(e, dangerClass) {
       </div>
       <span class="badge ${dangerClass}">${esc(e.riskLevel)}</span>
     </div>
+    <div class="scope-hero">
+      <div>
+        <span>Obsessed One-Photo Scope</span>
+        <strong>${esc(e.obsessedScope.headline)}</strong>
+        <p>${esc(e.obsessedScope.finishStandard)}</p>
+      </div>
+      <div>
+        <span>Readiness</span>
+        <strong>${esc(e.onePhotoReadiness.status)}</strong>
+        <p>${e.onePhotoReadiness.score}% one-photo context captured</p>
+      </div>
+    </div>
     <div class="price-range">
       <div class="price-card"><span>Low (80% range)</span><strong>${fmt(e.preliminaryEstimateRange.low)}</strong></div>
       <div class="price-card expected"><span>Expected</span><strong>${fmt(e.preliminaryEstimateRange.expected)}</strong></div>
@@ -1051,6 +1163,11 @@ function renderCustomerTab(e, dangerClass) {
         <h3>Site Visit Decision</h3>
         <p><strong>${esc(e.siteVisitDecision.decision)}</strong></p>
         <p>${esc(e.siteVisitDecision.reason)}</p>
+      </div>
+      <div class="result-section full">
+        <h3>Precise Scope of Work</h3>
+        <ul>${e.obsessedScope.included.map(i=>`<li>${esc(i)}</li>`).join("")}</ul>
+        <p style="margin-top:10px"><strong>Approval gate:</strong> ${esc(e.obsessedScope.approvalGate)}</p>
       </div>
       <div class="result-section full">
         <h3>Customer Message Draft</h3>
@@ -1088,6 +1205,8 @@ function renderAssessmentTab(e, dangerClass) {
           <li><strong>Single-photo score:</strong> ${esc(e.photoPacketScore.singlePhotoScore)}</li>
           <li><strong>Full packet status:</strong> ${esc(e.photoPacketScore.fullPacketStatus)}</li>
           <li><strong>Reason:</strong> ${esc(e.photoPacketScore.reason)}</li>
+          <li><strong>Checklist score:</strong> ${e.onePhotoReadiness.score}%</li>
+          <li><strong>Missing:</strong> ${e.onePhotoReadiness.missing.length ? esc(e.onePhotoReadiness.missing.join(", ")) : "None"}</li>
         </ul>
       </div>
       <div class="result-section">
@@ -1142,19 +1261,36 @@ function renderAssessmentTab(e, dangerClass) {
         <p>${esc(e.siteVisitDecision.reason)}</p>
       </div>
       <div class="result-section full">
-        <h3>12. What Could Change Final Price</h3>
+        <h3>12. Obsessed Scope Details</h3>
+        <div class="scope-columns">
+          <div>
+            <h4>Included</h4>
+            <ul>${e.obsessedScope.included.map(i=>`<li>${esc(i)}</li>`).join("")}</ul>
+          </div>
+          <div>
+            <h4>Excluded / Requires Approval</h4>
+            <ul>${e.obsessedScope.excluded.map(i=>`<li>${esc(i)}</li>`).join("")}</ul>
+          </div>
+          <div>
+            <h4>Pricing Assumptions</h4>
+            <ul>${e.obsessedScope.measurementAssumptions.map(i=>`<li>${esc(i)}</li>`).join("")}</ul>
+          </div>
+        </div>
+      </div>
+      <div class="result-section full">
+        <h3>13. What Could Change Final Price</h3>
         <ul>${e.priceChangeFactor.map(f=>`<li>${esc(f)}</li>`).join("")}</ul>
       </div>
       <div class="result-section full">
-        <h3>13. Customer Message Draft</h3>
+        <h3>14. Customer Message Draft</h3>
         <pre>${esc(e.customerMessage)}</pre>
       </div>
       <div class="result-section full">
-        <h3>14. Visual Preview Instructions</h3>
+        <h3>15. Visual Preview Instructions</h3>
         <pre>${esc(e.visualPreviewPrompt)}</pre>
       </div>
       <div class="result-section full">
-        <h3>15. Human Approval Requirement</h3>
+        <h3>16. Human Approval Requirement</h3>
         <p>${esc(e.humanApprovalRequirement)}</p>
       </div>
     </div>`;
@@ -1190,6 +1326,9 @@ function renderCrewTab(e, dangerClass) {
       <div class="crew-block">
         <h4>Scope &amp; Classification</h4>
         <div class="crew-field"><strong>Service preset:</strong><span>${esc(e.servicePreset)}</span></div>
+        <div class="crew-field"><strong>Obsessed scope:</strong><span>${esc(e.obsessedScope.headline)}</span></div>
+        <div class="crew-field"><strong>Work zone:</strong><span>${esc(e.obsessedScope.workZone)}</span></div>
+        <div class="crew-field"><strong>Finish:</strong><span>${esc(e.jobSnapshot.clearanceGoal)}</span></div>
         <div class="crew-field"><strong>Requested work:</strong><span>${esc(j.requestedWork)}</span></div>
         <div class="crew-field"><strong>Cleanup:</strong><span>${esc(j.cleanupPreference)}</span></div>
         <div class="crew-field"><strong>Risk level:</strong><span><span class="badge ${dangerClass}" style="font-size:0.78rem">${esc(e.riskLevel)}</span></span></div>
@@ -1201,6 +1340,7 @@ function renderCrewTab(e, dangerClass) {
       <div class="crew-block">
         <h4>Estimate &amp; Resources</h4>
         <div class="crew-field"><strong>Est. crew hours:</strong><span>${e.meta.estimatedCrewHours}</span></div>
+        <div class="crew-field"><strong>Crew profile:</strong><span>${esc(e.meta.crewProfile)}</span></div>
         <div class="crew-field"><strong>Est. debris:</strong><span>${e.meta.debrisCubicYards} cu yd</span></div>
         <div class="crew-field"><strong>Price low:</strong><span>${fmt(e.preliminaryEstimateRange.low)}</span></div>
         <div class="crew-field"><strong>Price expected:</strong><span>${fmt(e.preliminaryEstimateRange.expected)}</span></div>
@@ -1357,8 +1497,20 @@ document.getElementById("photoUpload").addEventListener("change", evt => {
 });
 
 // Redraw annotation when key form fields change
-["requestedWork","photoScore","accessClass","treeSizeClass","concerns","nearestTargetDistanceFeet"].forEach(id => {
+["requestedWork","photoScore","plantType","workSide","clearanceGoal","accessClass","treeSizeClass","concerns","nearestTargetDistanceFeet"].forEach(id => {
   document.getElementById(id).addEventListener("change", () => {
+    const preview = document.getElementById("photoPreview");
+    const canvas = document.getElementById("annotationCanvas");
+    if (!preview.src || preview.hidden) return;
+    const input = getFormInput();
+    const sp = classifyService(input.customerAnswers.requestedWork, input.customerAnswers.accessUtilitySafetyConcerns);
+    const rl = determineRiskLevel(input, sp);
+    drawAnnotations(canvas, preview, input, sp, rl);
+  });
+});
+
+document.querySelectorAll(".photo-check").forEach(box => {
+  box.addEventListener("change", () => {
     const preview = document.getElementById("photoPreview");
     const canvas = document.getElementById("annotationCanvas");
     if (!preview.src || preview.hidden) return;

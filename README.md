@@ -4,7 +4,9 @@ A static, GitHub-ready browser app for starting preliminary tree canopy trimming
 
 ## What it does
 
-- Uses one full-framed record photo to start the intake.
+- Uses one full-framed record photo to start the intake for a tree, shrub, bush, hedge, or mixed landscape item.
+- Scores whether the one photo is strong enough for responsible preliminary scoping.
+- Produces an "Obsessed One-Photo Scope" with included work, exclusions, finish standard, assumptions, and approval gate.
 - Asks three simple customer questions:
   1. What do you want done?
   2. What cleanup do you want?
@@ -16,7 +18,8 @@ A static, GitHub-ready browser app for starting preliminary tree canopy trimming
 - Classifies likely service preset.
 - Flags safety/site-visit triggers.
 - Builds a cost-plus preliminary estimate range.
-- Generates customer message and internal crew notes.
+- Generates annotated photo zones, customer message, and internal crew notes.
+- Builds a crew package with crew profile, stop-work triggers, approved/forbidden pruning language, and price assumptions.
 - Requires human approval before final quote.
 
 ## Files
@@ -25,12 +28,24 @@ A static, GitHub-ready browser app for starting preliminary tree canopy trimming
 index.html
 styles.css
 script.js
+portal.html
+portal.css
+portal.js
 README.md
 ```
 
 ## How to run locally
 
 Open `index.html` in your browser.
+
+Open `portal.html` for the company client portal demo. It includes:
+
+- company-specific portal navigation
+- new photo scan intake
+- client approval queue
+- usage metering
+- CSV usage export
+- account limits and approval settings
 
 ## How to upload to GitHub
 
