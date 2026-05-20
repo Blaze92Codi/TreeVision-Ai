@@ -14,17 +14,23 @@
   --success: #e2f5e8;
   --shadow: 0 18px 55px rgba(28,43,34,0.12);
   --shadow-sm: 0 4px 16px rgba(28,43,34,0.08);
-  --radius: 22px;
-  --radius-sm: 14px;
+  --accent: #b65f24;
+  --accent-soft: #fff0e5;
+  --radius: 8px;
+  --radius-sm: 8px;
 }
 
 body {
   margin: 0;
   font-family: Arial, Helvetica, sans-serif;
   color: var(--ink);
-  background:
-    radial-gradient(circle at top left, rgba(47,111,62,0.16), transparent 32rem),
-    var(--bg);
+  background: var(--bg);
+  overflow-x: hidden;
+}
+
+html,
+body {
+  max-width: 100%;
 }
 
 .app-shell {
@@ -36,10 +42,20 @@ body {
 /* ── HERO ── */
 .hero {
   display: grid;
-  grid-template-columns: 1fr 340px;
-  gap: 24px;
+  grid-template-columns: minmax(0, 1fr) 360px;
+  gap: 28px;
   align-items: stretch;
   margin-bottom: 22px;
+  background: linear-gradient(135deg, rgba(255,255,255,0.94), rgba(228,239,229,0.94));
+  border: 1px solid var(--line);
+  border-radius: var(--radius);
+  padding: 28px;
+  box-shadow: var(--shadow-sm);
+}
+
+.hero > *,
+.sales-panel > * {
+  min-width: 0;
 }
 
 .eyebrow {
@@ -49,13 +65,16 @@ body {
   letter-spacing: 0.08em;
   text-transform: uppercase;
   font-size: 0.78rem;
+  line-height: 1.35;
+  overflow-wrap: anywhere;
 }
 
 h1 {
   margin: 0 0 16px;
-  font-size: clamp(2.2rem, 6vw, 4.6rem);
-  line-height: 0.93;
-  letter-spacing: -0.06em;
+  font-size: clamp(2.1rem, 5vw, 4.35rem);
+  line-height: 0.98;
+  letter-spacing: 0;
+  overflow-wrap: break-word;
 }
 
 h2 {
@@ -70,12 +89,53 @@ h2 {
   font-size: 1.05rem;
   line-height: 1.6;
   margin: 0;
+  overflow-wrap: anywhere;
+}
+
+.hero-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 10px;
+  margin-top: 22px;
+}
+
+.button-link {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-height: 46px;
+  border-radius: 999px;
+  padding: 12px 20px;
+  font-weight: 800;
+  text-decoration: none;
+}
+
+.button-link.primary { color: #fff; background: var(--brand); }
+.button-link.primary:hover { background: var(--brand-dark); }
+.button-link.secondary { color: var(--brand-dark); background: #fff; border: 1px solid var(--line); }
+.button-link.secondary:hover { background: var(--soft); }
+
+.hero-proof {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  margin-top: 16px;
+}
+
+.hero-proof span {
+  border: 1px solid var(--line);
+  background: #fff;
+  border-radius: 999px;
+  color: var(--brand-dark);
+  font-size: 0.82rem;
+  font-weight: 800;
+  padding: 7px 11px;
 }
 
 .status-card {
   border: 1px solid var(--line);
-  background: rgba(255,255,255,0.88);
-  box-shadow: var(--shadow);
+  background: #fff;
+  box-shadow: var(--shadow-sm);
   border-radius: var(--radius);
   padding: 24px;
 }
@@ -107,6 +167,116 @@ h2 {
   line-height: 1.5;
   font-size: 0.92rem;
   box-shadow: var(--shadow-sm);
+}
+
+.conversion-strip {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 14px;
+  margin-bottom: 22px;
+}
+
+.conversion-strip > div,
+.sales-grid > div,
+.process-grid > div {
+  border: 1px solid var(--line);
+  background: #fff;
+  border-radius: var(--radius);
+  padding: 18px;
+  box-shadow: var(--shadow-sm);
+}
+
+.metric {
+  display: block;
+  color: var(--accent);
+  font-size: 2rem;
+  line-height: 1;
+  font-weight: 900;
+  margin-bottom: 10px;
+}
+
+.conversion-strip strong,
+.sales-grid strong {
+  display: block;
+  color: var(--brand-dark);
+  margin-bottom: 6px;
+}
+
+.conversion-strip p,
+.sales-panel p,
+.sales-grid span {
+  color: var(--muted);
+  line-height: 1.5;
+  margin: 0;
+  font-size: 0.92rem;
+}
+
+.sales-panel {
+  display: grid;
+  grid-template-columns: 0.75fr 1.25fr;
+  gap: 20px;
+  align-items: start;
+  border: 1px solid var(--line);
+  background: rgba(255,255,255,0.9);
+  border-radius: var(--radius);
+  padding: 24px;
+  margin-bottom: 22px;
+  box-shadow: var(--shadow-sm);
+}
+
+.sales-panel h2 {
+  font-size: 1.65rem;
+  line-height: 1.12;
+  margin-bottom: 10px;
+}
+
+.sales-grid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 12px;
+}
+
+.sales-grid span { display: block; }
+
+.process-panel {
+  border: 1px solid var(--line);
+  background: rgba(255,255,255,0.9);
+  border-radius: var(--radius);
+  padding: 22px;
+  margin-bottom: 22px;
+  box-shadow: var(--shadow-sm);
+}
+
+.process-grid {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 12px;
+}
+
+.process-grid span {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 32px;
+  height: 32px;
+  border-radius: 999px;
+  background: var(--brand);
+  color: #fff;
+  font-weight: 900;
+  margin-bottom: 10px;
+}
+
+.process-grid strong {
+  display: block;
+  color: var(--brand-dark);
+  margin-bottom: 6px;
+}
+
+.process-grid p {
+  margin: 0;
+  color: var(--muted);
+  font-size: 0.9rem;
+  line-height: 1.45;
 }
 
 /* ── FORM CARD ── */
@@ -155,6 +325,22 @@ h2 {
 
 label { font-weight: 700; font-size: 0.93rem; }
 small { color: var(--muted); font-size: 0.82rem; line-height: 1.4; }
+
+.subsection-divider {
+  border-top: 1px solid var(--line);
+  padding-top: 16px;
+  margin-top: 4px;
+}
+
+.subsection-divider strong {
+  color: var(--brand-dark);
+}
+
+.subsection-divider span {
+  color: var(--muted);
+  font-size: 0.86rem;
+  line-height: 1.45;
+}
 
 input, select, textarea {
   width: 100%;
@@ -216,6 +402,48 @@ button {
 .secondary { color: var(--brand-dark); background: var(--soft); border: 1px solid var(--line); }
 .secondary:hover { background: #d8ead9; }
 .small-btn { padding: 8px 16px; font-size: 0.85rem; }
+
+.approval-panel {
+  border: 1px solid #efc49f;
+  background: var(--accent-soft);
+  border-radius: var(--radius);
+  padding: 18px;
+  margin: 18px 0;
+}
+
+.approval-panel h3 {
+  margin: 0 0 8px;
+  color: #7a3f16;
+  font-size: 1rem;
+}
+
+.approval-steps {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 10px;
+  margin-top: 12px;
+}
+
+.approval-steps div {
+  background: #fff;
+  border: 1px solid #f2d4ba;
+  border-radius: var(--radius);
+  padding: 12px;
+}
+
+.approval-steps strong {
+  display: block;
+  color: #7a3f16;
+  font-size: 0.86rem;
+  margin-bottom: 4px;
+}
+
+.approval-steps span {
+  display: block;
+  color: var(--muted);
+  font-size: 0.82rem;
+  line-height: 1.4;
+}
 
 /* ── PHOTO COMPARE ── */
 .photo-compare {
@@ -536,6 +764,29 @@ pre {
   margin-top: 32px;
 }
 
+.final-cta {
+  margin-top: 30px;
+  border: 1px solid var(--line);
+  background: var(--brand-dark);
+  color: #fff;
+  border-radius: var(--radius);
+  padding: 28px;
+  text-align: center;
+}
+
+.final-cta .eyebrow { color: rgba(255,255,255,0.78); }
+.final-cta h2 {
+  color: #fff;
+  font-size: 1.7rem;
+  margin: 0 auto 18px;
+  max-width: 720px;
+}
+
+.final-cta .button-link.primary {
+  background: #fff;
+  color: var(--brand-dark);
+}
+
 .ref-header {
   margin-bottom: 16px;
 }
@@ -613,9 +864,25 @@ pre {
 @media (max-width: 860px) {
   .hero, .form-grid, .section-grid, .price-range,
   .photo-compare, .crew-grid, .science-grid,
-  .check-grid, .scope-hero, .scope-columns { grid-template-columns: 1fr; }
+  .check-grid, .scope-hero, .scope-columns,
+  .conversion-strip, .sales-panel, .sales-grid,
+  .process-grid, .approval-steps { grid-template-columns: 1fr; }
   .result-header-row { flex-direction: column; }
-  .app-shell { width: min(100% - 20px, 1160px); padding-top: 22px; }
+  .app-shell {
+    width: calc(100vw - 20px);
+    max-width: calc(100vw - 20px);
+    padding-top: 22px;
+    overflow: hidden;
+  }
+  .hero, .notice, .sales-panel, .process-panel, .card, .results, .arborist-ref, .final-cta {
+    max-width: 100%;
+    overflow: hidden;
+  }
+  .hero, .sales-panel {
+    display: block;
+  }
+  .hero, .sales-panel, .process-panel { padding: 20px 18px; }
+  .status-card, .sales-grid { margin-top: 18px; }
   .form-section { padding: 20px 18px; }
   .tab-panel { padding: 20px 18px 26px; }
   .form-footer { padding: 18px; }
@@ -623,5 +890,7 @@ pre {
   .tab-nav { padding: 12px 18px 0; }
   .accordion-btn { padding: 14px 16px; }
   .accordion-body { padding: 0 16px 18px; }
-  h1 { font-size: 2.4rem; }
+  h1 { font-size: 2.1rem; }
+  .eyebrow { font-size: 0.72rem; }
+  .hero-actions .button-link { width: 100%; }
 }

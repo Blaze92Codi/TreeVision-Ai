@@ -1150,6 +1150,15 @@ function renderCustomerTab(e, dangerClass) {
       <div class="price-card expected"><span>Expected</span><strong>${fmt(e.preliminaryEstimateRange.expected)}</strong></div>
       <div class="price-card"><span>High (80% range)</span><strong>${fmt(e.preliminaryEstimateRange.high)}</strong></div>
     </div>
+    <div class="approval-panel">
+      <h3>Recommended Approval Path</h3>
+      <p>This packet is designed to help the customer approve the work faster while keeping final pricing under company control.</p>
+      <div class="approval-steps">
+        <div><strong>1. Confirm scope</strong><span>Customer reviews the annotated photo, cleanup choice, and included work.</span></div>
+        <div><strong>2. Manager approval</strong><span>Company reviews risk, access, utility concerns, and price range before final quote.</span></div>
+        <div><strong>3. Schedule once</strong><span>Crew arrives with a documented plan after the customer accepts the approved quote.</span></div>
+      </div>
+    </div>
     <div class="section-grid">
       <div class="result-section">
         <h3>Confidence Level</h3>

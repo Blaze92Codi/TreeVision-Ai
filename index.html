@@ -13,19 +13,27 @@
   <!-- HERO -->
   <section class="hero">
     <div>
-      <p class="eyebrow">TreeVision AI · One Photo Scope Engine</p>
-      <h1>Photo In.<br>Scope Out.</h1>
+      <p class="eyebrow">TreeVision AI · Faster Tree Quotes From One Photo</p>
+      <h1>Know the scope before the crew rolls.</h1>
       <p class="hero-copy">
-        Upload one photo of a tree, shrub, bush, hedge, or mixed landscape item and generate
-        an obsessed preliminary work package: annotated scope zones, ANSI/ISA pruning language,
-        site-risk gates, industry cost-plus estimate range, crew profile, exclusions,
-        approval requirements, and a ready-to-send customer message.
-        Final quote requires authorized human approval.
+        Upload one clear property photo and get a professional preliminary tree-service review:
+        annotated work zones, an estimate range, risk flags, cleanup options, and a ready-to-approve
+        next step. The goal is simple: help customers say yes faster while the company protects the
+        crew, the property, and the final quote process.
       </p>
+      <div class="hero-actions">
+        <a class="button-link primary" href="#estimateForm">Start Photo Estimate</a>
+        <a class="button-link secondary" href="#purchase-confidence">Why Customers Trust It</a>
+      </div>
+      <div class="hero-proof">
+        <span>One-photo intake</span>
+        <span>Human approval gate</span>
+        <span>Fewer wasted site visits</span>
+      </div>
     </div>
     <div class="status-card">
       <div class="status-top"><span class="status-dot"></span><strong>Arborist-Informed AI</strong></div>
-      <p>Built on ISA Best Management Practices, ANSI A300 pruning standards, CODIT theory, one-photo readiness scoring, and industry cost-plus estimating protocols.</p>
+      <p>Designed to turn uncertain photo leads into organized quote packets with scope, safety, pricing logic, and customer-ready language.</p>
       <div class="tag-row">
         <span class="tag">ISA BMP</span>
         <span class="tag">ANSI A300</span>
@@ -43,6 +51,47 @@
     approval, insurance determination, or final quote. Hidden decay, root issues, utility conflicts, access limitations,
     and field conditions require on-site human review. Photo annotations are illustrative and algorithmically positioned
     from form inputs — not computer vision. They do not replace a qualified arborist inspection.
+  </section>
+
+  <section id="purchase-confidence" class="conversion-strip">
+    <div>
+      <span class="metric">25%+</span>
+      <strong>Premium-ready lead positioning</strong>
+      <p>Use clearer scope, visuals, and approval language to justify higher-value work instead of competing only on lowest price.</p>
+    </div>
+    <div>
+      <span class="metric">1 visit</span>
+      <strong>Target workflow</strong>
+      <p>Pre-screen photos, quote responsibly, and send crews once the customer understands the work and approves the plan.</p>
+    </div>
+    <div>
+      <span class="metric">4 outputs</span>
+      <strong>Built for buyer confidence</strong>
+      <p>Customer view, full assessment, crew package, and arborist science notes all support the same buying decision.</p>
+    </div>
+  </section>
+
+  <section class="sales-panel">
+    <div>
+      <p class="eyebrow">For Homeowners</p>
+      <h2>See what you are buying before you approve it.</h2>
+      <p>Tree work is hard to judge from a quick phone call. This estimator shows the likely service, cleanup expectation, hazard flags, and price range before anyone commits to the job.</p>
+    </div>
+    <div class="sales-grid">
+      <div><strong>Clear visual scope</strong><span>Annotated photo zones show what will be trimmed, protected, cleared, or removed.</span></div>
+      <div><strong>Professional standard</strong><span>Uses ANSI/ISA language so the recommendation sounds credible, not improvised.</span></div>
+      <div><strong>No surprise quote logic</strong><span>Price range explains access, size, risk, urgency, and cleanup factors.</span></div>
+      <div><strong>Human final review</strong><span>Customers get speed without pretending a photo replaces field judgment.</span></div>
+    </div>
+  </section>
+
+  <section class="process-panel">
+    <p class="eyebrow">Three-Step Quote Flow</p>
+    <div class="process-grid">
+      <div><span>1</span><strong>Upload the photo</strong><p>Show the full tree, trunk/base, access path, and nearby targets.</p></div>
+      <div><span>2</span><strong>Answer job details</strong><p>Tell us the work requested, cleanup choice, access, size, and safety concerns.</p></div>
+      <div><span>3</span><strong>Review and approve</strong><p>Get the estimate range, annotated scope, risk flags, and next step for scheduling.</p></div>
+    </div>
   </section>
 
   <!-- FORM -->
@@ -125,13 +174,13 @@
       </div>
     </div>
 
-    <!-- STEP 2: CUSTOMER QUESTIONS -->
+    <!-- STEP 2: JOB DETAILS -->
     <div class="form-section">
       <div class="section-label">
         <span class="step-num">2</span>
         <div>
-          <h2>Three Customer Questions</h2>
-          <p class="section-desc">Classify the job type and flag safety concerns before any scope or pricing work begins.</p>
+          <h2>Job Details</h2>
+          <p class="section-desc">Answer the work, cleanup, access, size, and safety questions needed for a responsible preliminary estimate.</p>
         </div>
       </div>
       <div class="form-grid">
@@ -204,19 +253,12 @@
           <label for="concerns">Any access, utility, or safety concerns?</label>
           <textarea id="concerns" rows="4" placeholder="Power lines or service drop · branches touching roof · fence or gate access · tight backyard · pool, shed, car, driveway, sidewalk, or road nearby · neighbor property · storm damage · hanging limbs · underground utilities, irrigation, septic, gas, fiber, or invisible fence · no known concerns" required></textarea>
         </div>
-      </div>
-    </div>
 
-    <!-- STEP 3: ESTIMATING QUESTIONS -->
-    <div class="form-section">
-      <div class="section-label">
-        <span class="step-num">3</span>
-        <div>
-          <h2>Three Estimating Questions</h2>
-          <p class="section-desc">Used for risk matrix, service classification, and the preliminary cost-plus estimate range calculation.</p>
+        <div class="field full subsection-divider">
+          <strong>Estimate details</strong>
+          <span>These fields narrow the price range and identify jobs that need manager review before a final quote.</span>
         </div>
-      </div>
-      <div class="form-grid">
+
         <div class="field">
           <label for="treeSizeClass">Tree or shrub size class</label>
           <select id="treeSizeClass" required>
@@ -267,13 +309,13 @@
       </div>
     </div>
 
-    <!-- STEP 4: CONTACT INFO -->
+    <!-- STEP 3: CONTACT INFO -->
     <div class="form-section">
       <div class="section-label">
-        <span class="step-num">4</span>
+        <span class="step-num">3</span>
         <div>
-          <h2>Customer Contact Information</h2>
-          <p class="section-desc">Required before final quote or scheduling. Optional for preliminary screening only.</p>
+          <h2>Review &amp; Contact</h2>
+          <p class="section-desc">Add contact details so an approved quote can be confirmed and scheduled after review.</p>
         </div>
       </div>
       <div class="form-grid">
@@ -311,7 +353,7 @@
 
     <!-- SUBMIT -->
     <div class="form-footer">
-      <button type="submit" class="primary">Generate Full Assessment &amp; Crew Package</button>
+      <button type="submit" class="primary">Get My Preliminary Estimate</button>
       <button type="button" id="resetButton" class="secondary">Reset Form</button>
     </div>
   </form>
@@ -445,6 +487,12 @@
       </div>
 
     </div>
+  </section>
+
+  <section class="final-cta">
+    <p class="eyebrow">Ready When The Photo Is</p>
+    <h2>Turn the next tree lead into an approval-ready quote packet.</h2>
+    <a class="button-link primary" href="#estimateForm">Start Another Estimate</a>
   </section>
 
 </main>
