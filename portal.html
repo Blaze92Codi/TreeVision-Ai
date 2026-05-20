@@ -1,0 +1,281 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>TreeVision AI Client Portal</title>
+  <meta name="description" content="Company portal for TreeVision AI photo estimates, customer approvals, usage metering, and account management." />
+  <link rel="stylesheet" href="portal.css" />
+</head>
+<body>
+  <main class="portal-shell">
+    <aside class="sidebar" aria-label="TreeVision portal navigation">
+      <div class="brand-lockup">
+        <div class="brand-mark">TV</div>
+        <div>
+          <strong>TreeVision AI</strong>
+          <span>Company Portal</span>
+        </div>
+      </div>
+
+      <nav class="nav-list" aria-label="Primary">
+        <button class="nav-item active" type="button" data-view="dashboard">Dashboard</button>
+        <button class="nav-item" type="button" data-view="newJob">New Photo Scan</button>
+        <button class="nav-item" type="button" data-view="approvals">Client Approvals</button>
+        <button class="nav-item" type="button" data-view="metering">Usage Meter</button>
+        <button class="nav-item" type="button" data-view="account">Account</button>
+      </nav>
+
+      <div class="account-card">
+        <span class="account-label">Demo Company</span>
+        <strong id="companyNameSide">Dynamic Tree Services</strong>
+        <div class="mini-meter" aria-label="Monthly scan usage">
+          <span id="miniMeterFill"></span>
+        </div>
+        <small><span id="usedCountSide">38</span>/<span id="limitCountSide">100</span> scans used this month</small>
+      </div>
+    </aside>
+
+    <section class="workspace">
+      <header class="topbar">
+        <div>
+          <p class="eyebrow">White-label client portal</p>
+          <h1 id="viewTitle">Dashboard</h1>
+        </div>
+        <div class="top-actions">
+          <a class="ghost-link" href="index.html">Estimator</a>
+          <button class="primary-btn" type="button" data-view-link="newJob">New Scan</button>
+        </div>
+      </header>
+
+      <section class="view active" id="dashboard" aria-labelledby="dashboardTitle">
+        <div class="metric-grid">
+          <article class="metric-card">
+            <span>Monthly scans</span>
+            <strong id="metricScans">38</strong>
+            <small>62 remaining on current plan</small>
+          </article>
+          <article class="metric-card">
+            <span>Pending approvals</span>
+            <strong id="metricPending">6</strong>
+            <small>Human approval required before sending</small>
+          </article>
+          <article class="metric-card">
+            <span>Estimated revenue</span>
+            <strong>$18.4k</strong>
+            <small>Open preliminary quote value</small>
+          </article>
+          <article class="metric-card">
+            <span>Avg turnaround</span>
+            <strong>9 min</strong>
+            <small>Upload to client-ready preview</small>
+          </article>
+        </div>
+
+        <div class="dashboard-grid">
+          <article class="panel work-panel">
+            <div class="panel-head">
+              <div>
+                <h2>Recent Jobs</h2>
+                <p>Photo scans waiting for review, quote, or customer approval.</p>
+              </div>
+              <button class="secondary-btn" type="button" id="seedJob">Add Demo Job</button>
+            </div>
+            <div class="job-list" id="jobList"></div>
+          </article>
+
+          <article class="panel preview-panel">
+            <div class="panel-head">
+              <div>
+                <h2>Client Preview Package</h2>
+                <p>What the tree company sees before sending to its customer.</p>
+              </div>
+            </div>
+            <div class="photo-stage">
+              <div class="tree-visual" aria-label="Annotated tree work preview">
+                <span class="zone canopy">Canopy trim zone</span>
+                <span class="zone clearance">Roof clearance target</span>
+                <span class="zone access">Crew access</span>
+                <span class="tree-trunk"></span>
+              </div>
+            </div>
+            <ul class="package-list">
+              <li>Annotated before/after work preview</li>
+              <li>Preliminary estimate range and scope notes</li>
+              <li>ISA/ANSI disclaimer and human approval gate</li>
+              <li>Customer message draft ready to send</li>
+            </ul>
+          </article>
+        </div>
+      </section>
+
+      <section class="view" id="newJob" aria-labelledby="newJobTitle">
+        <form class="panel intake-form" id="scanForm">
+          <div class="panel-head">
+            <div>
+              <h2>New Photo Scan</h2>
+              <p>Create a metered job from one uploaded customer photo.</p>
+            </div>
+            <span class="status-pill">1 scan credit</span>
+          </div>
+
+          <div class="intake-grid">
+            <label>
+              Customer name
+              <input id="clientName" type="text" placeholder="e.g. Sarah Johnson" required />
+            </label>
+            <label>
+              Job address
+              <input id="jobAddress" type="text" placeholder="Street, city, state" required />
+            </label>
+            <label>
+              Requested work
+              <select id="workType" required>
+                <option>Trim away from house</option>
+                <option>Raise canopy</option>
+                <option>Remove dead limbs</option>
+                <option>Full tree removal</option>
+                <option>Shrub trim or removal</option>
+              </select>
+            </label>
+            <label>
+              Priority
+              <select id="priority">
+                <option>Routine</option>
+                <option>Priority</option>
+                <option>Emergency</option>
+              </select>
+            </label>
+            <label class="wide">
+              Upload photo
+              <input id="scanPhoto" type="file" accept="image/*" />
+            </label>
+            <label class="wide">
+              Notes / hazards
+              <textarea id="scanNotes" rows="4" placeholder="Power lines, roof, fence, tight access, storm damage, cleanup preference..."></textarea>
+            </label>
+          </div>
+
+          <div class="upload-preview" id="uploadPreview" hidden>
+            <img id="uploadedPhotoPreview" alt="Uploaded customer job photo" />
+            <div>
+              <strong>Photo attached</strong>
+              <span>This demo stores the preview in the browser only.</span>
+            </div>
+          </div>
+
+          <div class="form-actions">
+            <button class="primary-btn" type="submit">Create Scan</button>
+            <button class="secondary-btn" type="reset">Clear</button>
+          </div>
+        </form>
+      </section>
+
+      <section class="view" id="approvals" aria-labelledby="approvalsTitle">
+        <article class="panel">
+          <div class="panel-head">
+            <div>
+              <h2>Client Approvals</h2>
+              <p>Nothing leaves the portal until the company approves the AI package.</p>
+            </div>
+          </div>
+          <div class="approval-list" id="approvalList"></div>
+        </article>
+      </section>
+
+      <section class="view" id="metering" aria-labelledby="meteringTitle">
+        <div class="meter-grid">
+          <article class="panel">
+            <div class="panel-head">
+              <div>
+                <h2>Usage Meter</h2>
+                <p>Track scans by company, user, month, and overage.</p>
+              </div>
+              <button class="secondary-btn" type="button" id="exportUsage">Export CSV</button>
+            </div>
+            <div class="big-meter" aria-label="Monthly usage">
+              <span id="bigMeterFill"></span>
+            </div>
+            <div class="meter-copy">
+              <strong><span id="usedCount">38</span> scans used</strong>
+              <span><span id="remainingCount">62</span> remaining before overage billing</span>
+            </div>
+            <table class="usage-table">
+              <thead>
+                <tr>
+                  <th>User</th>
+                  <th>Role</th>
+                  <th>Scans</th>
+                  <th>Last active</th>
+                </tr>
+              </thead>
+              <tbody id="usageRows"></tbody>
+            </table>
+          </article>
+
+          <article class="panel plan-panel">
+            <h2>Billing Rules</h2>
+            <div class="price-row">
+              <span>Portal plan</span>
+              <strong>$399/mo</strong>
+            </div>
+            <div class="price-row">
+              <span>Included scans</span>
+              <strong>100</strong>
+            </div>
+            <div class="price-row">
+              <span>Overage</span>
+              <strong>$4/scan</strong>
+            </div>
+            <div class="price-row">
+              <span>Human review add-on</span>
+              <strong>$15/job</strong>
+            </div>
+            <p class="fine-print">Production version should log every scan to a database with company ID, user ID, timestamp, file count, estimate status, and approval status.</p>
+          </article>
+        </div>
+      </section>
+
+      <section class="view" id="account" aria-labelledby="accountTitle">
+        <article class="panel account-settings">
+          <div class="panel-head">
+            <div>
+              <h2>Company Access</h2>
+              <p>Each tree company gets its own login, branding, users, limits, and approval rules.</p>
+            </div>
+          </div>
+          <div class="settings-grid">
+            <label>
+              Company name
+              <input id="companyName" type="text" value="Dynamic Tree Services" />
+            </label>
+            <label>
+              Monthly scan limit
+              <input id="scanLimit" type="number" min="10" step="10" value="100" />
+            </label>
+            <label>
+              Approval rule
+              <select>
+                <option>Owner must approve every customer send</option>
+                <option>Managers can approve standard jobs</option>
+                <option>Auto-send low-risk jobs only</option>
+              </select>
+            </label>
+            <label>
+              Portal URL
+              <input type="text" value="treevision.ai/company/dynamic-tree" readonly />
+            </label>
+          </div>
+          <div class="team-list">
+            <div><strong>Owner</strong><span>owner@dynamictree.example</span></div>
+            <div><strong>Estimator</strong><span>crewlead@dynamictree.example</span></div>
+            <div><strong>Office</strong><span>office@dynamictree.example</span></div>
+          </div>
+        </article>
+      </section>
+    </section>
+  </main>
+
+  <script src="portal.js"></script>
+</body>
+</html>
