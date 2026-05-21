@@ -7,19 +7,28 @@ A static, GitHub-ready browser app for starting preliminary tree canopy trimming
 - Uses one full-framed record photo to start the intake for a tree, shrub, bush, hedge, or mixed landscape item.
 - Scores whether the one photo is strong enough for responsible preliminary scoping.
 - Produces an "Obsessed One-Photo Scope" with included work, exclusions, finish standard, assumptions, and approval gate.
+- Adds a bid-ready scope annotation block for each tree: tree ID, DBH, height, condition, risk target, equipment/access plan, utility/811 check, cleanup, priority, required photos, and "done means" acceptance language.
 - Asks three simple customer questions:
   1. What do you want done?
   2. What cleanup do you want?
   3. Any access, utility, or safety concerns?
-- Asks three simple estimating questions:
+- Asks estimating and annotation questions:
   1. Tree size class
   2. Crew access
   3. Nearest target distance
+  4. Tree ID / scope tag
+  5. DBH and estimated height
+  6. Observed condition and primary risk target
+  7. Equipment/access method
+  8. Utility or underground check
+  9. Final "done means" completion standard
 - Classifies likely service preset.
 - Flags safety/site-visit triggers.
 - Builds a cost-plus preliminary estimate range.
 - Generates annotated photo zones, customer message, and internal crew notes.
 - Builds a crew package with crew profile, stop-work triggers, approved/forbidden pruning language, and price assumptions.
+- Adds a field app workspace for crew and owner modes, local saved job queue, GPS capture, share summary, JSON export, print packet, and completion checklist.
+- Installs as a standalone browser app through the web manifest and caches the app shell for field use with poor signal.
 - Requires human approval before final quote.
 
 ## Files
@@ -29,14 +38,24 @@ index.html
 styles.css
 script.js
 portal.html
-portal.css
 portal.js
+manifest.json
+service-worker.js
+treevision-icon.svg
 README.md
 ```
 
 ## How to run locally
 
 Open `index.html` in your browser.
+
+For install/offline testing, serve the folder from a local web server:
+
+```sh
+python3 -m http.server 8097
+```
+
+Then open `http://127.0.0.1:8097`.
 
 Open `portal.html` for the company client portal demo. It includes:
 

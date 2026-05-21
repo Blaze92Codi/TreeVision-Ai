@@ -21,6 +21,9 @@ const DEFAULT_RATES = {
   minimumJobCharge: 350,
 };
 
+const FIELD_JOB_STORE_KEY = "treevision.fieldJobs.v1";
+let currentEstimate = null;
+
 // ============================================================
 // SITE VISIT KEYWORDS
 // ============================================================
@@ -201,14 +204,15 @@ function drawAnnotations(canvas, imgEl, input, servicePreset, riskLevel) {
   const ctx = canvas.getContext("2d");
   const maxW = canvas.parentElement.clientWidth || 560;
   const ratio = imgEl.naturalHeight / imgEl.naturalWidth;
-  canvas.width = Math.min(maxW, 700);
+  canvas.width = Math.min(maxW, 900);
   canvas.height = Math.round(canvas.width * ratio);
   const W = canvas.width, H = canvas.height;
 
   // Draw photo
   ctx.drawImage(imgEl, 0, 0, W, H);
-  // Subtle dark vignette so labels pop
-  ctx.fillStyle = "rgba(0,0,0,0.06)";
+  // Work-zone preview style: keep the source photo readable while making
+  // annotation bands legible in bright field photos.
+  ctx.fillStyle = "rgba(7,24,18,0.38)";
   ctx.fillRect(0, 0, W, H);
 
   // Build and draw all zones
@@ -219,20 +223,285 @@ function drawAnnotations(canvas, imgEl, input, servicePreset, riskLevel) {
   const cuts = buildCutPoints(servicePreset, W, H);
   if (cuts.length) drawCutPoints(ctx, cuts);
 
-  // ISA method banner — top-right corner chip
+  // Work-zone title and ISA method banner
   const isaMethod = ISA_METHOD_LABEL[servicePreset] || "Canopy Review";
+  ctx.save();
+  ctx.font = "bold 12px Arial";
+  ctx.fillStyle = "rgba(255,255,255,0.96)";
+  ctx.textAlign = "center";
+  ctx.fillText(`${servicePreset.toUpperCase()} ZONE`, W / 2, 24);
+  ctx.restore();
   drawChip(ctx, `ISA: ${isaMethod}`, W - 8, 8, "right",
     "rgba(34,84,49,0.90)", "#fff");
 
   // Bottom disclaimer bar — Knowledge Base Visual Preview Policy
-  ctx.fillStyle = "rgba(0,0,0,0.54)";
-  ctx.fillRect(0, H - 36, W, 36);
-  ctx.font = "bold 10.5px Arial";
+  ctx.fillStyle = "rgba(18,37,27,0.72)";
+  ctx.fillRect(0, H - 32, W, 32);
+  ctx.font = "bold 11px Arial";
   ctx.fillStyle = "rgba(255,255,255,0.95)";
-  ctx.fillText("🌳 TreeVision AI · Dynamic Tree Services", 10, H - 21);
-  ctx.font = "9px Arial";
-  ctx.fillStyle = "rgba(255,255,255,0.75)";
-  ctx.fillText("Illustrative Preview — Final result may vary. Not a final arborist inspection, utility clearance, or guaranteed outcome.", 10, H - 7);
+  ctx.fillText("TreeVision AI · Dynamic Tree Services", 10, H - 18);
+  ctx.font = "9.5px Arial";
+  ctx.fillStyle = "rgba(255,255,255,0.82)";
+  ctx.fillText("Illustrative preview. Final scope may vary after field inspection.", 10, H - 6);
+}
+
+function drawClientBeforeAfter(beforeCanvas, afterCanvas, imgEl, input, servicePreset, riskLevel) {
+  if (!beforeCanvas || !afterCanvas || !imgEl || !imgEl.naturalWidth) return;
+  const maxW = beforeCanvas.parentElement.clientWidth || 560;
+  const ratio = imgEl.naturalHeight / imgEl.naturalWidth;
+  const W = Math.min(maxW, 900);
+  const H = Math.round(W * ratio);
+
+  [beforeCanvas, afterCanvas].forEach(canvas => {
+    canvas.width = W;
+    canvas.height = H;
+  });
+
+  const beforeCtx = beforeCanvas.getContext("2d");
+  const afterCtx = afterCanvas.getContext("2d");
+  drawEstimateRecordPanel(beforeCtx, imgEl, input, servicePreset, riskLevel, W, H);
+  drawProposedAfterPanel(afterCtx, imgEl, input, servicePreset, riskLevel, W, H);
+}
+
+function drawEstimateRecordPanel(ctx, imgEl, input, servicePreset, riskLevel, W, H) {
+  ctx.drawImage(imgEl, 0, 0, W, H);
+  drawPhotoVignette(ctx, W, H);
+  drawPanelStamp(ctx, "BEFORE PHOTO", "Estimate-time record image", W, H, "#143b28");
+
+  const treeId = input.scopeAnnotation.treeId || "Tree / shrub in uploaded photo";
+  const target = input.scopeAnnotation.primaryRiskTarget || input.estimateAnswers.workSide || "Primary target";
+  drawCallout(ctx, {
+    x: W * 0.50, y: H * 0.24, tx: W * 0.08, ty: H * 0.11,
+    title: "Existing canopy",
+    body: servicePreset,
+    color: "rgba(255,255,255,0.94)",
+    accent: "rgba(34,84,49,0.95)",
+  });
+  drawCallout(ctx, {
+    x: W * 0.50, y: H * 0.70, tx: W * 0.08, ty: H * 0.79,
+    title: treeId,
+    body: "Photo locked to estimate scope",
+    color: "rgba(255,255,255,0.94)",
+    accent: "rgba(120,75,35,0.95)",
+  });
+  drawCallout(ctx, {
+    x: W * 0.76, y: H * 0.42, tx: W * 0.56, ty: H * 0.11,
+    title: "Protect",
+    body: target,
+    color: "rgba(255,255,255,0.94)",
+    accent: "rgba(30,90,180,0.95)",
+  });
+}
+
+function drawProposedAfterPanel(ctx, imgEl, input, servicePreset, riskLevel, W, H) {
+  ctx.drawImage(imgEl, 0, 0, W, H);
+  const size = input.estimateAnswers.treeSizeClass || "Medium";
+  const canopyH = { Small: 0.45, Medium: 0.55, Large: 0.64, "Very Large": 0.72, Shrub: 0.38 }[size] || 0.55;
+  const canopy = { x: W * 0.08, y: H * 0.04, w: W * 0.84, h: H * canopyH };
+  const isRemoval = /Removal/.test(servicePreset);
+  const isStump = servicePreset === "Stump Grinding";
+  const isShrub = servicePreset === "Shrub Trim / Shrub Removal";
+
+  if (isRemoval) {
+    paintLifelikeCanopyReduction(ctx, W, H, canopy, 0.82);
+    drawMulchPatch(ctx, W * 0.50, H * 0.76, W * 0.18, H * 0.045);
+    drawCallout(ctx, {
+      x: W * 0.50, y: H * 0.28, tx: W * 0.07, ty: H * 0.12,
+      title: "Removed",
+      body: "Tree cleared to approved scope",
+      color: "rgba(255,255,255,0.95)",
+      accent: "rgba(160,30,30,0.95)",
+    });
+  } else if (isStump) {
+    drawMulchPatch(ctx, W * 0.50, H * 0.77, W * 0.24, H * 0.06);
+    drawCallout(ctx, {
+      x: W * 0.50, y: H * 0.77, tx: W * 0.07, ty: H * 0.14,
+      title: "Stump finish",
+      body: "Ground below grade and cleaned",
+      color: "rgba(255,255,255,0.95)",
+      accent: "rgba(170,95,10,0.95)",
+    });
+  } else {
+    const strength = servicePreset === "Light Trim" ? 0.20
+      : servicePreset === "Structural / Clearance Trim" ? 0.34
+      : servicePreset === "Reduction / Cutback" ? 0.46
+      : isShrub ? 0.32
+      : 0.28;
+    paintLifelikeCanopyReduction(ctx, W, H, canopy, strength);
+    drawCanopyFinishLine(ctx, canopy, servicePreset);
+    drawCallout(ctx, {
+      x: W * 0.70, y: H * 0.27, tx: W * 0.08, ty: H * 0.12,
+      title: "Proposed finish",
+      body: scopeFinishLabel(input, servicePreset),
+      color: "rgba(255,255,255,0.95)",
+      accent: "rgba(34,84,49,0.95)",
+    });
+  }
+
+  if (/house|roof|garage|driveway|sidewalk|road|fence|utility|wire/i.test(`${input.scopeAnnotation.primaryRiskTarget} ${input.customerAnswers.accessUtilitySafetyConcerns}`)) {
+    drawCallout(ctx, {
+      x: W * 0.76, y: H * 0.50, tx: W * 0.56, ty: H * 0.12,
+      title: "Clearance target",
+      body: input.customerAnswers.clearanceGoal || "Maintain safe clearance",
+      color: "rgba(255,255,255,0.95)",
+      accent: "rgba(30,90,180,0.95)",
+    });
+  }
+
+  drawPhotoVignette(ctx, W, H);
+  drawPanelStamp(ctx, "PROPOSED AFTER", "Illustrative scope visual", W, H, "#7a3f16");
+  drawScopeFooter(ctx, input, servicePreset, riskLevel, W, H);
+}
+
+function paintLifelikeCanopyReduction(ctx, W, H, canopy, strength) {
+  ctx.save();
+  ctx.globalCompositeOperation = "source-over";
+  for (let i = 0; i < 11; i++) {
+    const fx = canopy.x + canopy.w * (0.08 + i * 0.085);
+    const fy = canopy.y + canopy.h * (0.08 + (i % 4) * 0.11);
+    const rw = canopy.w * (0.18 + (i % 3) * 0.045);
+    const rh = canopy.h * (0.16 + (i % 2) * 0.05);
+    const grad = ctx.createRadialGradient(fx, fy, 4, fx, fy, Math.max(rw, rh));
+    grad.addColorStop(0, `rgba(210,224,213,${0.20 + strength * 0.24})`);
+    grad.addColorStop(0.56, `rgba(155,185,145,${0.10 + strength * 0.12})`);
+    grad.addColorStop(1, "rgba(255,255,255,0)");
+    ctx.fillStyle = grad;
+    ctx.beginPath();
+    ctx.ellipse(fx, fy, rw, rh, (i % 5) * 0.3, 0, Math.PI * 2);
+    ctx.fill();
+  }
+  ctx.globalAlpha = 0.18 + strength * 0.16;
+  ctx.fillStyle = "rgba(238,244,237,0.9)";
+  ctx.beginPath();
+  ctx.ellipse(canopy.x + canopy.w * 0.50, canopy.y + canopy.h * 0.13, canopy.w * 0.42, canopy.h * 0.13, 0, 0, Math.PI * 2);
+  ctx.fill();
+  ctx.restore();
+}
+
+function drawCanopyFinishLine(ctx, canopy, servicePreset) {
+  ctx.save();
+  ctx.setLineDash([8, 5]);
+  ctx.lineWidth = 2;
+  ctx.strokeStyle = servicePreset === "Reduction / Cutback" ? "rgba(180,95,0,0.86)" : "rgba(34,84,49,0.86)";
+  ctx.beginPath();
+  ctx.moveTo(canopy.x + canopy.w * 0.16, canopy.y + canopy.h * 0.22);
+  ctx.bezierCurveTo(
+    canopy.x + canopy.w * 0.32, canopy.y + canopy.h * 0.08,
+    canopy.x + canopy.w * 0.66, canopy.y + canopy.h * 0.08,
+    canopy.x + canopy.w * 0.84, canopy.y + canopy.h * 0.24
+  );
+  ctx.stroke();
+  ctx.restore();
+}
+
+function drawMulchPatch(ctx, cx, cy, rx, ry) {
+  ctx.save();
+  const grad = ctx.createRadialGradient(cx, cy, 2, cx, cy, rx);
+  grad.addColorStop(0, "rgba(130,78,36,0.86)");
+  grad.addColorStop(0.7, "rgba(98,63,34,0.58)");
+  grad.addColorStop(1, "rgba(78,52,30,0)");
+  ctx.fillStyle = grad;
+  ctx.beginPath();
+  ctx.ellipse(cx, cy, rx, ry, 0, 0, Math.PI * 2);
+  ctx.fill();
+  ctx.restore();
+}
+
+function drawCallout(ctx, c) {
+  ctx.save();
+  const boxW = Math.min(210, Math.max(148, ctx.canvas.width * 0.38));
+  const boxH = 52;
+  ctx.strokeStyle = c.accent;
+  ctx.lineWidth = 2;
+  ctx.beginPath();
+  ctx.moveTo(c.x, c.y);
+  ctx.lineTo(c.tx + boxW * 0.08, c.ty + boxH * 0.72);
+  ctx.stroke();
+  ctx.fillStyle = c.accent;
+  ctx.beginPath();
+  ctx.arc(c.x, c.y, 5, 0, Math.PI * 2);
+  ctx.fill();
+  ctx.fillStyle = c.color;
+  if (ctx.roundRect) ctx.roundRect(c.tx, c.ty, boxW, boxH, 7);
+  else ctx.rect(c.tx, c.ty, boxW, boxH);
+  ctx.fill();
+  ctx.strokeStyle = "rgba(18,37,27,0.18)";
+  ctx.stroke();
+  ctx.fillStyle = c.accent;
+  ctx.font = "bold 11px Arial";
+  ctx.fillText(c.title, c.tx + 10, c.ty + 18);
+  ctx.fillStyle = "rgba(28,43,34,0.90)";
+  ctx.font = "10px Arial";
+  wrapCanvasText(ctx, c.body, c.tx + 10, c.ty + 34, boxW - 20, 12, 2);
+  ctx.restore();
+}
+
+function drawPanelStamp(ctx, title, subtitle, W, H, color) {
+  ctx.save();
+  ctx.fillStyle = "rgba(255,255,255,0.94)";
+  if (ctx.roundRect) ctx.roundRect(10, 10, Math.min(250, W - 20), 42, 7);
+  else ctx.rect(10, 10, Math.min(250, W - 20), 42);
+  ctx.fill();
+  ctx.fillStyle = color;
+  ctx.font = "bold 13px Arial";
+  ctx.fillText(title, 22, 28);
+  ctx.fillStyle = "rgba(75,90,80,0.95)";
+  ctx.font = "10px Arial";
+  ctx.fillText(subtitle, 22, 43);
+  ctx.restore();
+}
+
+function drawScopeFooter(ctx, input, servicePreset, riskLevel, W, H) {
+  ctx.save();
+  ctx.fillStyle = "rgba(18,37,27,0.76)";
+  ctx.fillRect(0, H - 42, W, 42);
+  ctx.fillStyle = "#fff";
+  ctx.font = "bold 11px Arial";
+  ctx.fillText(`${servicePreset} · ${riskLevel}`, 10, H - 25);
+  ctx.font = "9.5px Arial";
+  ctx.fillStyle = "rgba(255,255,255,0.82)";
+  const done = input.scopeAnnotation.doneStandard || "Final scope requires estimator approval.";
+  wrapCanvasText(ctx, `Client visual only. ${done}`, 10, H - 10, W - 20, 11, 1);
+  ctx.restore();
+}
+
+function drawPhotoVignette(ctx, W, H) {
+  const grad = ctx.createLinearGradient(0, 0, 0, H);
+  grad.addColorStop(0, "rgba(0,0,0,0.12)");
+  grad.addColorStop(0.35, "rgba(0,0,0,0)");
+  grad.addColorStop(1, "rgba(0,0,0,0.16)");
+  ctx.fillStyle = grad;
+  ctx.fillRect(0, 0, W, H);
+}
+
+function wrapCanvasText(ctx, text, x, y, maxW, lineH, maxLines) {
+  const words = String(text || "").split(/\s+/).filter(Boolean);
+  let line = "";
+  let lines = 0;
+  for (let i = 0; i < words.length; i++) {
+    const test = line ? `${line} ${words[i]}` : words[i];
+    if (ctx.measureText(test).width > maxW && line) {
+      lines++;
+      if (lines >= maxLines) {
+        ctx.fillText(`${line.replace(/[.,;:]$/, "")}...`, x, y);
+        return;
+      }
+      ctx.fillText(line, x, y);
+      y += lineH;
+      line = words[i];
+    } else {
+      line = test;
+    }
+  }
+  if (line && lines < maxLines) ctx.fillText(line, x, y);
+}
+
+function scopeFinishLabel(input, servicePreset) {
+  if (servicePreset === "Structural / Clearance Trim") return input.customerAnswers.clearanceGoal || "Clearance with natural form";
+  if (servicePreset === "Reduction / Cutback") return "Reduced overhang, natural branch form retained";
+  if (servicePreset === "Light Trim") return "Cleaned and balanced canopy";
+  if (servicePreset === "Shrub Trim / Shrub Removal") return "Clean shaped ornamental finish";
+  return input.scopeAnnotation.doneStandard || "Approved scope completed";
 }
 
 // ISA BMP pruning method per service preset (Knowledge Base p.15)
@@ -259,8 +528,8 @@ function buildAnnotationZones(input, servicePreset, riskLevel, W, H) {
 
   // ── Canopy depth by size class (Knowledge Base: size class definitions) ──
   const canopyH = { Small: 0.45, Medium: 0.55, Large: 0.64, "Very Large": 0.72 }[size] || 0.55;
-  const trunkY  = H * (0.58 + (canopyH - 0.55) * 0.2);
-  const trunkH  = H * 0.30;
+  const trunkY  = H * (0.55 + (canopyH - 0.55) * 0.16);
+  const trunkH  = H * 0.25;
 
   // ════════════════════════════════════════════════════════
   // ALWAYS-PRESENT: TRUNK ZONE (Visible Trunk Review — KB p.6)
@@ -269,7 +538,7 @@ function buildAnnotationZones(input, servicePreset, riskLevel, W, H) {
     ? "TRUNK — INSPECT CO-DOMINANT STEMS"
     : /cavity|decay|mushroom/.test(c)
     ? "TRUNK — DECAY INDICATORS NOTED"
-    : "TRUNK ZONE — BRANCH COLLAR CUTS";
+    : "TRUNK ZONE";
   zones.push({ x: W*0.38, y: trunkY, w: W*0.24, h: trunkH,
     fill: "rgba(120,75,35,0.16)", stroke: "rgba(90,55,20,0.65)",
     label: trunkLabel, lpos: "bottom", dash: false });
@@ -280,8 +549,8 @@ function buildAnnotationZones(input, servicePreset, riskLevel, W, H) {
   const rootLabel = /underground|irrigation|septic|gas|fiber|invisible fence/.test(c)
     ? "ROOT ZONE — UNDERGROUND UTILITIES NOTED"
     : "CRITICAL ROOT ZONE — PROTECT FROM COMPACTION";
-  zones.push({ x: W*0.14, y: H*0.87, w: W*0.72, h: H*0.09,
-    fill: "rgba(120,75,35,0.10)", stroke: "rgba(90,55,20,0.40)",
+  zones.push({ x: W*0.14, y: H*0.82, w: W*0.72, h: H*0.08,
+    fill: "rgba(120,75,35,0.20)", stroke: "rgba(90,55,20,0.56)",
     label: rootLabel, lpos: "bottom", dash: true });
 
   // ════════════════════════════════════════════════════════
@@ -293,22 +562,22 @@ function buildAnnotationZones(input, servicePreset, riskLevel, W, H) {
       // Crown cleaning + canopy balancing — outer ring only, max 25% live crown
       zones.push({ x: W*0.06, y: H*0.04, w: W*0.88, h: H*canopyH,
         fill: "rgba(40,160,70,0.09)", stroke: "rgba(30,130,55,0.58)",
-        label: "CROWN CLEANING · OUTER CANOPY ONLY", lpos: "top", dash: true });
+        label: "CROWN CLEANING AREA", lpos: "top", dash: true });
       // Inner "do not enter" zone — protect live crown interior
       zones.push({ x: W*0.20, y: H*0.12, w: W*0.60, h: H*(canopyH*0.55),
         fill: "rgba(40,160,70,0.04)", stroke: "rgba(30,130,55,0.28)",
-        label: "LIVE CROWN INTERIOR — DO NOT REMOVE", lpos: "top", dash: true });
+        label: "PRESERVE LIVE CROWN", lpos: "top", dash: true });
       break;
 
     case "Structural / Clearance Trim":
       // Main clearance pruning zone
       zones.push({ x: W*0.05, y: H*0.03, w: W*0.90, h: H*canopyH,
-        fill: rc.fill, stroke: rc.stroke,
+        fill: "rgba(17,55,40,0.20)", stroke: rc.stroke,
         label: "CLEARANCE PRUNING ZONE", lpos: "top", dash: false });
       // Crown raising sub-zone (lower canopy lifted)
       zones.push({ x: W*0.12, y: H*(canopyH*0.55), w: W*0.76, h: H*0.14,
-        fill: "rgba(30,110,210,0.10)", stroke: "rgba(30,100,200,0.65)",
-        label: "CROWN RAISING — LOWER LIMB REMOVAL", lpos: "bottom", dash: true });
+        fill: "rgba(30,110,210,0.18)", stroke: "rgba(30,100,200,0.76)",
+        label: "CROWN RAISING AREA", lpos: "bottom", dash: true });
       // Roof or house clearance target
       if (/house|roof|garage|trim away/.test(work + " " + c)) {
         zones.push({ x: W*0.64, y: H*0.06, w: W*0.32, h: H*0.50,
@@ -327,7 +596,7 @@ function buildAnnotationZones(input, servicePreset, riskLevel, W, H) {
       // Selective reduction — lateral cuts to live branches only
       zones.push({ x: W*0.03, y: H*0.02, w: W*0.94, h: H*canopyH,
         fill: rc.fill, stroke: rc.stroke,
-        label: "SELECTIVE REDUCTION — LATERAL CUTS TO LIVE BRANCHES", lpos: "top", dash: false });
+        label: "SELECTIVE REDUCTION AREA", lpos: "top", dash: false });
       // End-weight reduction sub-zone — tips/outer canopy
       zones.push({ x: W*0.06, y: H*0.04, w: W*0.88, h: H*(canopyH*0.38),
         fill: "rgba(220,130,0,0.10)", stroke: "rgba(190,105,0,0.60)",
@@ -335,7 +604,7 @@ function buildAnnotationZones(input, servicePreset, riskLevel, W, H) {
       // Preserve: live crown interior
       zones.push({ x: W*0.22, y: H*(canopyH*0.38), w: W*0.56, h: H*(canopyH*0.40),
         fill: "rgba(40,160,70,0.05)", stroke: "rgba(30,130,55,0.30)",
-        label: "LIVE CROWN — PRESERVE LATERAL STRUCTURE", lpos: "bottom", dash: true });
+        label: "PRESERVE LATERAL STRUCTURE", lpos: "bottom", dash: true });
       break;
 
     case "Small Tree Removal":
@@ -364,7 +633,7 @@ function buildAnnotationZones(input, servicePreset, riskLevel, W, H) {
       // Main hazard review zone
       zones.push({ x: W*0.04, y: H*0.02, w: W*0.92, h: H*(canopyH + 0.04),
         fill: "rgba(200,35,35,0.17)", stroke: "rgba(185,0,0,0.84)",
-        label: "HAZARD ASSESSMENT ZONE — HUMAN REVIEW REQUIRED", lpos: "top", dash: true });
+        label: "HAZARD REVIEW AREA", lpos: "top", dash: true });
       // Hanging / dead limb sub-zone
       if (/hanging|dead|broken|deadwood/.test(c)) {
         zones.push({ x: W*0.10, y: H*0.05, w: W*0.55, h: H*(canopyH*0.45),
@@ -411,7 +680,7 @@ function buildAnnotationZones(input, servicePreset, riskLevel, W, H) {
     case "Site Visit Required":
       zones.push({ x: W*0.03, y: H*0.02, w: W*0.94, h: H*(canopyH + 0.06),
         fill: "rgba(190,30,30,0.16)", stroke: "rgba(165,10,10,0.86)",
-        label: "SITE VISIT REQUIRED — PHOTO ESTIMATE NOT SAFE", lpos: "top", dash: true });
+        label: "SITE VISIT REQUIRED", lpos: "top", dash: true });
       break;
 
     default:
@@ -439,9 +708,9 @@ function buildAnnotationZones(input, servicePreset, riskLevel, W, H) {
     : { fill:"rgba(255,200,0,0.10)", stroke:"rgba(190,145,0,0.60)" };
   zones.push({
     x: access === "Tight" ? W*0.38 : W*0.03,
-    y: H*0.74,
+    y: H*0.70,
     w: access === "Tight" ? W*0.24 : W*0.30,
-    h: H*0.22,
+    h: H*0.16,
     fill: accessColor.fill, stroke: accessColor.stroke,
     label: `CREW ACCESS — ${access.toUpperCase()}`,
     lpos: "bottom", dash: access === "Tight",
@@ -453,7 +722,7 @@ function buildAnnotationZones(input, servicePreset, riskLevel, W, H) {
   if (/roof|house|garage/.test(c) || /trim away|clearance|away from house/.test(work)) {
     zones.push({ x: W*0.63, y: H*0.04, w: W*0.33, h: H*0.36,
       fill: "rgba(30,110,210,0.08)", stroke: "rgba(20,90,190,0.65)",
-      label: "PROTECT STRUCTURE", lpos: "top", dash: true });
+      label: "PROTECT STRUCTURE", lpos: "bottom", dash: true });
   }
   if (/pool|car|vehicle/.test(c)) {
     zones.push({ x: W*0.60, y: H*0.55, w: W*0.36, h: H*0.22,
@@ -473,13 +742,13 @@ function buildAnnotationZones(input, servicePreset, riskLevel, W, H) {
   if (includesAnyNotNegated(c, ["power line","service drop","transformer","utility pole","wire"])) {
     zones.push({ x: W*0.04, y: H*0.01, w: W*0.92, h: H*0.12,
       fill: "rgba(190,30,30,0.18)", stroke: "rgba(165,10,10,0.88)",
-      label: "⚡ UTILITY / POWER LINE — HUMAN REVIEW & CLEARANCE REQUIRED", lpos: "top", dash: true });
+      label: "⚡ UTILITY / POWER LINE — HUMAN REVIEW & CLEARANCE REQUIRED", lpos: "bottom", dash: true });
   }
 
   // ════════════════════════════════════════════════════════
   // RISK BADGE (top-left) — Risk Rating Matrix
   // ════════════════════════════════════════════════════════
-  zones.push({ type: "badge", x: W*0.02, y: H*0.02,
+  zones.push({ type: "badge", x: W*0.02, y: H*0.10,
     text: riskLevel === "Site Visit Required" ? "⚠ SITE VISIT REQUIRED"
         : riskLevel === "High"   ? "⚠ HIGH RISK"
         : riskLevel === "Medium" ? "● MEDIUM RISK"
@@ -496,15 +765,15 @@ function _pushDropZone(zones, dist, W, H, servicePreset) {
   const wide   = dist >= 20;
   const dropX  = tight ? W*0.20 : W*0.06;
   const dropW  = tight ? W*0.60 : wide ? W*0.92 : W*0.84;
-  const dropY  = isRemoval ? H*0.55 : H*0.58;
+  const dropY  = isRemoval ? H*0.54 : H*0.56;
   const dropH  = isRemoval ? H*0.16 : H*0.12;
   const lbl    = tight
     ? `TIGHT DROP — TARGET ${dist}ft AWAY`
     : wide
-    ? "OPEN DROP ZONE — CLEAR AREA"
-    : `CONTROLLED DROP ZONE — ${dist}ft TO TARGET`;
-  const dropFill   = tight ? "rgba(210,70,20,0.12)"  : "rgba(190,190,0,0.09)";
-  const dropStroke = tight ? "rgba(185,45,10,0.72)"  : "rgba(160,160,0,0.52)";
+    ? "OPEN DROP ZONE"
+    : `CONTROLLED DROP ZONE`;
+  const dropFill   = tight ? "rgba(210,70,20,0.16)"  : "rgba(88,132,36,0.18)";
+  const dropStroke = tight ? "rgba(185,45,10,0.78)"  : "rgba(168,178,28,0.66)";
   zones.push({ x: dropX, y: dropY, w: dropW, h: dropH,
     fill: dropFill, stroke: dropStroke, label: lbl, lpos: "bottom", dash: true });
 }
@@ -512,12 +781,13 @@ function _pushDropZone(zones, dist, W, H, servicePreset) {
 function drawZone(ctx, z) {
   if (z.type === "badge") {
     ctx.save();
-    ctx.font = "bold 10.5px Arial";
+    ctx.font = "bold 11px Arial";
     const tw = ctx.measureText(z.text).width;
+    const badgeW = z.text.includes("SITE VISIT") ? Math.max(tw + 26, 164) : tw + 18;
     ctx.fillStyle = z.bg;
     ctx.beginPath();
-    if (ctx.roundRect) ctx.roundRect(z.x, z.y, tw + 18, 23, 5);
-    else ctx.rect(z.x, z.y, tw + 18, 23);
+    if (ctx.roundRect) ctx.roundRect(z.x, z.y, badgeW, 23, 5);
+    else ctx.rect(z.x, z.y, badgeW, 23);
     ctx.fill();
     ctx.fillStyle = "#fff";
     ctx.fillText(z.text, z.x + 9, z.y + 16);
@@ -529,7 +799,7 @@ function drawZone(ctx, z) {
   ctx.setLineDash(z.dash ? [7, 4] : []);
   ctx.fillStyle = z.fill;
   ctx.strokeStyle = z.stroke;
-  ctx.lineWidth = z.bold ? 2.5 : 1.8;
+  ctx.lineWidth = z.bold ? 2.5 : 1.6;
 
   ctx.beginPath();
   if (ctx.roundRect) ctx.roundRect(z.x, z.y, z.w, z.h, 8);
@@ -539,19 +809,25 @@ function drawZone(ctx, z) {
 
   if (z.label) {
     ctx.setLineDash([]);
-    ctx.font = "bold 9.5px Arial";
-    const tw = ctx.measureText(z.label).width;
+    const maxTextW = Math.max(70, z.w - 16);
+    ctx.font = "bold 11px Arial";
+    let label = z.label;
+    let tw = ctx.measureText(label).width;
+    while (tw > maxTextW && label.length > 12) {
+      label = `${label.slice(0, -2).trim()}…`;
+      tw = ctx.measureText(label).width;
+    }
     const lx = z.x + z.w / 2 - tw / 2;
-    const ly = z.lpos === "top" ? z.y + 14 : z.y + z.h - 5;
+    const ly = z.lpos === "top" ? z.y + 17 : z.y + z.h - 7;
     // Label pill background
     const pillColor = z.label.startsWith("⚡") || z.label.startsWith("⚠")
-      ? "rgba(160,10,10,0.78)" : "rgba(0,0,0,0.56)";
+      ? "rgba(160,10,10,0.92)" : "rgba(18,37,27,0.84)";
     ctx.fillStyle = pillColor;
-    if (ctx.roundRect) ctx.roundRect(lx - 6, ly - 13, tw + 12, 18, 4);
-    else ctx.rect(lx - 6, ly - 13, tw + 12, 18);
+    if (ctx.roundRect) ctx.roundRect(lx - 7, ly - 15, tw + 14, 21, 5);
+    else ctx.rect(lx - 7, ly - 15, tw + 14, 21);
     ctx.fill();
     ctx.fillStyle = "#fff";
-    ctx.fillText(z.label, lx, ly);
+    ctx.fillText(label, lx, ly);
   }
   ctx.restore();
 }
@@ -651,7 +927,7 @@ function includesAny(text, kws) {
   const t = String(text||"").toLowerCase();
   return kws.some(k => t.includes(k));
 }
-// Negation-aware version: "no power lines", "not near wires" will NOT match
+// Negation-aware version: "no known power lines", "not near wires" will NOT match
 function includesAnyNotNegated(text, kws) {
   const t = String(text||"").toLowerCase();
   return kws.some(k => {
@@ -659,8 +935,8 @@ function includesAnyNotNegated(text, kws) {
     while (pos < t.length) {
       const idx = t.indexOf(k, pos);
       if (idx === -1) return false;
-      const before = t.slice(Math.max(0, idx - 12), idx).trimEnd();
-      if (!/\b(no|not|none|without|zero)\s*$/.test(before)) return true;
+      const before = t.slice(Math.max(0, idx - 28), idx).trimEnd();
+      if (!/\b(no|not|none|without|zero|no known|not near|not by|clear of)\b[\w\s-]*$/.test(before)) return true;
       pos = idx + 1;
     }
     return false;
@@ -793,6 +1069,7 @@ function buildObsessedScope(input, servicePreset, riskLevel, species) {
   const plant = input.photo.plantType || "Tree";
   const workSide = input.customerAnswers.workSide || "Open yard side";
   const clearance = input.customerAnswers.clearanceGoal || "Standard clearance, maintain natural form";
+  const scope = input.scopeAnnotation || {};
   const isRemoval = /removal|stump/i.test(servicePreset) || /Remove to ground/i.test(clearance);
   const isShrub = /Shrub|Bush|Hedge/i.test(plant) || servicePreset==="Shrub Trim / Shrub Removal";
   const method = isRemoval
@@ -806,11 +1083,16 @@ function buildObsessedScope(input, servicePreset, riskLevel, species) {
       ? "Even natural profile with no bald cuts into dead interior wood and no hard shearing unless approved."
       : "Maintain natural canopy architecture; no topping, flush cuts, stub cuts, lion's tailing, or removal over 25-30% live crown.";
   const included = [
-    `Work item: ${plant} shown in the uploaded one-photo record.`,
+    `Work item: ${scope.treeId || "Tree/shrub in uploaded one-photo record"} (${plant}).`,
     `Primary work zone: ${workSide}.`,
     `Customer finish target: ${clearance}.`,
+    `Observed condition: ${scope.treeCondition || "Not specified"}.`,
+    `Primary risk target: ${scope.primaryRiskTarget || "Not specified"}.`,
     `Method standard: ${method}.`,
+    `Likely access/equipment: ${scope.equipmentPlan || "Not specified"}.`,
+    `Utility/811 check: ${scope.utilityPlan || "Not specified"}.`,
     `Cleanup standard: ${input.customerAnswers.cleanupPreference}.`,
+    `Done means: ${scope.doneStandard || "Final completion standard must be confirmed before approval."}`,
   ];
   if (species) included.push(`Species note: follow ${species.name} timing and wound-response protocol when scheduling.`);
   if (riskLevel==="Site Visit Required") included.push("Do not issue final price from photo alone; schedule estimator or qualified arborist review.");
@@ -821,7 +1103,10 @@ function buildObsessedScope(input, servicePreset, riskLevel, species) {
     "No extra trees, shrubs, stump work, hauling change, or neighbor-side work unless added to approved scope.",
   ];
   const measurementAssumptions = [
+    `Tree ID / scope tag: ${scope.treeId || "Not provided"}.`,
     `${input.estimateAnswers.treeSizeClass || "Unknown"} size class selected from intake.`,
+    `${scope.dbhInches || "Unknown"} in DBH / trunk diameter used as field-check item.`,
+    `${scope.estimatedHeightFeet || "Unknown"} ft estimated height used as field-check item.`,
     `${input.estimateAnswers.nearestTargetDistanceFeet || "Unknown"} ft nearest target distance used for risk and pricing.`,
     `${input.estimateAnswers.accessClass || "Unknown"} access class used for crew-hour multiplier.`,
     "One-photo pricing assumes visible canopy density and debris volume match field conditions.",
@@ -837,6 +1122,38 @@ function buildObsessedScope(input, servicePreset, riskLevel, species) {
     approvalGate: riskLevel==="Site Visit Required"
       ? "Estimator approval required before customer price is released."
       : "Manager approval required before this becomes a final quote.",
+  };
+}
+
+function buildAnnotationSpec(input, servicePreset, riskLevel) {
+  const scope = input.scopeAnnotation || {};
+  const treeId = scope.treeId || "T-001";
+  const dbh = scope.dbhInches ? `${scope.dbhInches} in DBH` : "DBH field check required";
+  const height = scope.estimatedHeightFeet ? `${scope.estimatedHeightFeet} ft height est.` : "height field check required";
+  const photoMissing = onePhotoReadiness(input).missing;
+  const photosNeeded = [
+    "Wide record photo showing full tree, trunk/base, work area, and target",
+    "Close-up of defect, deadwood, lean, stump, or requested cut area",
+    "Access path photo showing driveway, gate, slope, mats, or staging area",
+    "Target/risk photo showing house, wire, fence, road, vehicle, or neighbor side",
+  ];
+  return {
+    treeId,
+    title: `${treeId} - ${servicePreset}`,
+    measurements: [dbh, height, `${input.estimateAnswers.nearestTargetDistanceFeet || "Unknown"} ft nearest target`],
+    condition: scope.treeCondition || "Not specified",
+    riskTarget: scope.primaryRiskTarget || "Not specified",
+    action: input.customerAnswers.requestedWork || servicePreset,
+    priority: input.estimateAnswers.urgencyLevel || "Routine",
+    access: `${input.estimateAnswers.accessClass || "Unknown"} access; ${scope.equipmentPlan || "equipment plan not specified"}`,
+    utility: scope.utilityPlan || "Not specified",
+    cleanup: input.customerAnswers.cleanupPreference || "Not specified",
+    doneStandard: scope.doneStandard || "Final done standard must be approved before quote release.",
+    photoRequirements: photosNeeded,
+    missingPhotoContext: photoMissing.length ? photoMissing : ["None from checklist"],
+    quoteReadyGate: riskLevel==="Site Visit Required"
+      ? "Not quote-ready from photo alone; site visit or qualified review required."
+      : "Preliminary quote-ready after manager review and scope approval.",
   };
 }
 
@@ -876,6 +1193,7 @@ function buildEstimate(input, rates=DEFAULT_RATES) {
   const species = guessSpecies(input.estimateAnswers.treeSpeciesGuess);
   const onePhoto = onePhotoReadiness(input);
   const obsessedScope = buildObsessedScope(input, servicePreset, riskLevel, species);
+  const annotationSpec = buildAnnotationSpec(input, servicePreset, riskLevel);
 
   return {
     servicePreset,
@@ -899,12 +1217,21 @@ function buildEstimate(input, rates=DEFAULT_RATES) {
       completionWindow: input.estimateAnswers.completionWindow||"Not specified",
       recordPhotoReceived: input.photo.uploaded?"Yes":"No",
       accessClass: input.estimateAnswers.accessClass||"Not specified",
+      treeId: input.scopeAnnotation.treeId||"Not provided",
+      dbhInches: input.scopeAnnotation.dbhInches||"Not provided",
+      estimatedHeightFeet: input.scopeAnnotation.estimatedHeightFeet||"Not provided",
+      observedCondition: input.scopeAnnotation.treeCondition||"Not specified",
+      primaryRiskTarget: input.scopeAnnotation.primaryRiskTarget||"Not specified",
+      equipmentPlan: input.scopeAnnotation.equipmentPlan||"Not specified",
+      utilityPlan: input.scopeAnnotation.utilityPlan||"Not specified",
+      doneStandard: input.scopeAnnotation.doneStandard||"Not specified",
       concernsNoted: input.customerAnswers.accessUtilitySafetyConcerns||"None reported",
     },
     intakeCompleteness: isIntakeComplete(input)?"Complete for preliminary screening":"Incomplete — missing required fields",
     missingItems: getMissingItems(input),
     onePhotoReadiness: onePhoto,
     obsessedScope,
+    annotationSpec,
     photoPacketScore: {
       singlePhotoScore: input.photo.score,
       fullPacketStatus: onePhoto.status,
@@ -968,7 +1295,12 @@ function isIntakeComplete(input) {
     input.customerAnswers.accessUtilitySafetyConcerns &&
     input.estimateAnswers.treeSizeClass &&
     input.estimateAnswers.accessClass &&
-    input.estimateAnswers.nearestTargetDistanceFeet !== ""
+    input.estimateAnswers.nearestTargetDistanceFeet !== "" &&
+    input.scopeAnnotation.treeCondition &&
+    input.scopeAnnotation.primaryRiskTarget &&
+    input.scopeAnnotation.equipmentPlan &&
+    input.scopeAnnotation.utilityPlan &&
+    input.scopeAnnotation.doneStandard
   );
 }
 
@@ -978,6 +1310,9 @@ function getMissingItems(input) {
   if (!input.jobInfo.phone) m.push("Phone number");
   if (!input.jobInfo.email) m.push("Email address");
   if (!input.jobInfo.address) m.push("Job address / GPS");
+  if (!input.scopeAnnotation.treeId) m.push("Tree ID / scope tag");
+  if (!input.scopeAnnotation.dbhInches) m.push("DBH / trunk diameter field check");
+  if (!input.scopeAnnotation.estimatedHeightFeet) m.push("Estimated height field check");
   if (input.photo.checklist && input.photo.checklist.length < 4) m.push("More photo context: " + onePhotoReadiness(input).missing.join(", "));
   m.push("Manager or estimator approval before final price delivery");
   return m;
@@ -1000,6 +1335,9 @@ function buildRiskFlags(input, riskLevel) {
   if (includesAny(c,["roof","house","garage","pool","shed","fence","driveway","road","sidewalk"])) flags.push("Nearby structure or target concern");
   if (includesAny(c,["storm","hanging","dead","split","crack","lean","uproot"])) flags.push("Hazard or storm damage concern");
   if (input.estimateAnswers.accessClass==="Tight") flags.push("Tight crew access");
+  if (includesAny(input.scopeAnnotation.utilityPlan || "",["wires","service drop","Line-clearance"])) flags.push("Utility plan requires extra review");
+  if (includesAny(input.scopeAnnotation.equipmentPlan || "",["Crane","advanced rigging","Traffic"])) flags.push("Special equipment or control plan likely");
+  if (includesAny(input.scopeAnnotation.treeCondition || "",["Dead tree","Leaning","Cracked","split","hollow","Storm damaged","hanging"])) flags.push("Condition trigger — verify structure before work");
   if (riskLevel==="Site Visit Required") flags.push("Automatic site visit / human review trigger activated");
   if (!flags.length) flags.push("No major concern reported — subject to photo and field review");
   return flags;
@@ -1028,15 +1366,23 @@ function buildCustomerMessage(input, servicePreset, riskLevel, low, expected, hi
 function buildCrewNotes(input, servicePreset, riskLevel, hours, debrisYards) {
   const lines = [
     `Work tree: Use uploaded record photo as reference.`,
+    `Tree ID / tag: ${input.scopeAnnotation.treeId || "T-001"}`,
     `Obsessed scope headline: ${buildObsessedScope(input, servicePreset, riskLevel, guessSpecies(input.estimateAnswers.treeSpeciesGuess)).headline}`,
     `Plant type: ${input.photo.plantType}`,
+    `Observed condition: ${input.scopeAnnotation.treeCondition || "Not specified"}`,
     `Work zone: ${input.customerAnswers.workSide}`,
+    `Primary risk target: ${input.scopeAnnotation.primaryRiskTarget || "Not specified"}`,
     `Finish standard: ${input.customerAnswers.clearanceGoal}`,
+    `Done means: ${input.scopeAnnotation.doneStandard || "Not specified"}`,
     `Requested work: ${input.customerAnswers.requestedWork}`,
     `Service preset: ${servicePreset}`,
     `Photo score: ${input.photo.score}`,
     `Tree size class: ${input.estimateAnswers.treeSizeClass}`,
+    `DBH / trunk diameter: ${input.scopeAnnotation.dbhInches || "Field check required"} in`,
+    `Estimated height: ${input.scopeAnnotation.estimatedHeightFeet || "Field check required"} ft`,
     `Access class: ${input.estimateAnswers.accessClass}`,
+    `Equipment / access plan: ${input.scopeAnnotation.equipmentPlan || "Not specified"}`,
+    `Utility / underground check: ${input.scopeAnnotation.utilityPlan || "Not specified"}`,
     `Nearest target: ${input.estimateAnswers.nearestTargetDistanceFeet} ft`,
     `Cleanup preference: ${input.customerAnswers.cleanupPreference}`,
     `Urgency: ${input.estimateAnswers.urgencyLevel}`,
@@ -1096,6 +1442,16 @@ function getFormInput() {
       urgencyLevel: document.getElementById("urgencyLevel").value,
       completionWindow: document.getElementById("completionWindow").value,
     },
+    scopeAnnotation: {
+      treeId: document.getElementById("treeId").value.trim(),
+      dbhInches: document.getElementById("dbhInches").value,
+      estimatedHeightFeet: document.getElementById("estimatedHeightFeet").value,
+      treeCondition: document.getElementById("treeCondition").value,
+      primaryRiskTarget: document.getElementById("primaryRiskTarget").value,
+      equipmentPlan: document.getElementById("equipmentPlan").value,
+      utilityPlan: document.getElementById("utilityPlan").value,
+      doneStandard: document.getElementById("doneStandard").value.trim(),
+    },
     jobInfo: {
       customerName: document.getElementById("customerName").value.trim(),
       phone: document.getElementById("phone").value.trim(),
@@ -1111,6 +1467,8 @@ function getFormInput() {
 // RENDER — 4 TABS
 // ============================================================
 function renderResults(estimate) {
+  currentEstimate = estimate;
+  setFieldActionState(true);
   document.getElementById("resultsTitle").textContent = estimate.servicePreset;
   const dangerClass = estimate.siteVisitRequired?"danger":estimate.riskLevel==="High"?"high":estimate.riskLevel==="Medium"?"warning":"success";
 
@@ -1179,6 +1537,20 @@ function renderCustomerTab(e, dangerClass) {
         <p style="margin-top:10px"><strong>Approval gate:</strong> ${esc(e.obsessedScope.approvalGate)}</p>
       </div>
       <div class="result-section full">
+        <h3>Scope Annotation Block</h3>
+        <div class="annotation-spec-grid">
+          <div><strong>Tree ID</strong><span>${esc(e.annotationSpec.treeId)}</span></div>
+          <div><strong>Action</strong><span>${esc(e.annotationSpec.action)}</span></div>
+          <div><strong>Condition</strong><span>${esc(e.annotationSpec.condition)}</span></div>
+          <div><strong>Risk target</strong><span>${esc(e.annotationSpec.riskTarget)}</span></div>
+          <div><strong>Priority</strong><span>${esc(e.annotationSpec.priority)}</span></div>
+          <div><strong>Access / equipment</strong><span>${esc(e.annotationSpec.access)}</span></div>
+          <div><strong>Utility / 811</strong><span>${esc(e.annotationSpec.utility)}</span></div>
+          <div><strong>Cleanup</strong><span>${esc(e.annotationSpec.cleanup)}</span></div>
+        </div>
+        <p style="margin-top:10px"><strong>Done means:</strong> ${esc(e.annotationSpec.doneStandard)}</p>
+      </div>
+      <div class="result-section full">
         <h3>Customer Message Draft</h3>
         <pre>${esc(e.customerMessage)}</pre>
         <button class="copy-btn" onclick="copyText(this,'${btoa(encodeURIComponent(e.customerMessage))}')">Copy Message</button>
@@ -1218,22 +1590,37 @@ function renderAssessmentTab(e, dangerClass) {
           <li><strong>Missing:</strong> ${e.onePhotoReadiness.missing.length ? esc(e.onePhotoReadiness.missing.join(", ")) : "None"}</li>
         </ul>
       </div>
+      <div class="result-section full">
+        <h3>5. Bid-Ready Annotation Standard</h3>
+        <div class="annotation-spec-grid">
+          <div><strong>Title</strong><span>${esc(e.annotationSpec.title)}</span></div>
+          <div><strong>Measurements</strong><span>${esc(e.annotationSpec.measurements.join(" · "))}</span></div>
+          <div><strong>Condition</strong><span>${esc(e.annotationSpec.condition)}</span></div>
+          <div><strong>Risk target</strong><span>${esc(e.annotationSpec.riskTarget)}</span></div>
+          <div><strong>Access</strong><span>${esc(e.annotationSpec.access)}</span></div>
+          <div><strong>Utility / 811</strong><span>${esc(e.annotationSpec.utility)}</span></div>
+          <div><strong>Cleanup</strong><span>${esc(e.annotationSpec.cleanup)}</span></div>
+          <div><strong>Quote gate</strong><span>${esc(e.annotationSpec.quoteReadyGate)}</span></div>
+        </div>
+        <h3 style="margin-top:14px">Required Supporting Photos</h3>
+        <ul>${e.annotationSpec.photoRequirements.map(p=>`<li>${esc(p)}</li>`).join("")}</ul>
+      </div>
       <div class="result-section">
-        <h3>5. Visible Tree / Shrub Review</h3>
+        <h3>6. Visible Tree / Shrub Review</h3>
         <ul>
           ${Object.entries(e.visibleTreeReview).map(([k,v])=>`<li><strong>${labelize(k)}:</strong> ${esc(v)}</li>`).join("")}
         </ul>
       </div>
       <div class="result-section">
-        <h3>6. Recommended Service Preset</h3>
+        <h3>7. Recommended Service Preset</h3>
         <p><span class="badge ${dangerClass}">${esc(e.servicePreset)}</span></p>
       </div>
       <div class="result-section">
-        <h3>7. Safety / Risk Flags</h3>
+        <h3>8. Safety / Risk Flags</h3>
         <ul>${e.safetyRiskFlags.map(f=>`<li>${esc(f)}</li>`).join("")}</ul>
       </div>
       <div class="result-section">
-        <h3>8. Quote Factor Breakdown</h3>
+        <h3>9. Quote Factor Breakdown</h3>
         <ul>
           <li><strong>Labor:</strong> ${fmt(qf.labor)}</li>
           <li><strong>Travel:</strong> ${fmt(qf.travel)}</li>
@@ -1247,7 +1634,7 @@ function renderAssessmentTab(e, dangerClass) {
         </ul>
       </div>
       <div class="result-section">
-        <h3>9. Preliminary Estimate Range</h3>
+        <h3>10. Preliminary Estimate Range</h3>
         <ul>
           <li><strong>Low:</strong> ${fmt(e.preliminaryEstimateRange.low)}</li>
           <li><strong>Expected:</strong> ${fmt(e.preliminaryEstimateRange.expected)}</li>
@@ -1257,7 +1644,7 @@ function renderAssessmentTab(e, dangerClass) {
         </ul>
       </div>
       <div class="result-section">
-        <h3>10. Confidence Level</h3>
+        <h3>11. Confidence Level</h3>
         <ul>
           <li><strong>Photo confidence:</strong> ${esc(e.confidenceLevel.photoConfidence)}</li>
           <li><strong>Scope confidence:</strong> ${esc(e.confidenceLevel.scopeConfidence)}</li>
@@ -1265,12 +1652,12 @@ function renderAssessmentTab(e, dangerClass) {
         </ul>
       </div>
       <div class="result-section">
-        <h3>11. Site Visit Decision</h3>
+        <h3>12. Site Visit Decision</h3>
         <p><strong>${esc(e.siteVisitDecision.decision)}</strong></p>
         <p>${esc(e.siteVisitDecision.reason)}</p>
       </div>
       <div class="result-section full">
-        <h3>12. Obsessed Scope Details</h3>
+        <h3>13. Obsessed Scope Details</h3>
         <div class="scope-columns">
           <div>
             <h4>Included</h4>
@@ -1287,19 +1674,19 @@ function renderAssessmentTab(e, dangerClass) {
         </div>
       </div>
       <div class="result-section full">
-        <h3>13. What Could Change Final Price</h3>
+        <h3>14. What Could Change Final Price</h3>
         <ul>${e.priceChangeFactor.map(f=>`<li>${esc(f)}</li>`).join("")}</ul>
       </div>
       <div class="result-section full">
-        <h3>14. Customer Message Draft</h3>
+        <h3>15. Customer Message Draft</h3>
         <pre>${esc(e.customerMessage)}</pre>
       </div>
       <div class="result-section full">
-        <h3>15. Visual Preview Instructions</h3>
+        <h3>16. Visual Preview Instructions</h3>
         <pre>${esc(e.visualPreviewPrompt)}</pre>
       </div>
       <div class="result-section full">
-        <h3>16. Human Approval Requirement</h3>
+        <h3>17. Human Approval Requirement</h3>
         <p>${esc(e.humanApprovalRequirement)}</p>
       </div>
     </div>`;
@@ -1335,15 +1722,22 @@ function renderCrewTab(e, dangerClass) {
       <div class="crew-block">
         <h4>Scope &amp; Classification</h4>
         <div class="crew-field"><strong>Service preset:</strong><span>${esc(e.servicePreset)}</span></div>
+        <div class="crew-field"><strong>Tree ID:</strong><span>${esc(e.annotationSpec.treeId)}</span></div>
         <div class="crew-field"><strong>Obsessed scope:</strong><span>${esc(e.obsessedScope.headline)}</span></div>
         <div class="crew-field"><strong>Work zone:</strong><span>${esc(e.obsessedScope.workZone)}</span></div>
+        <div class="crew-field"><strong>Condition:</strong><span>${esc(e.annotationSpec.condition)}</span></div>
+        <div class="crew-field"><strong>Risk target:</strong><span>${esc(e.annotationSpec.riskTarget)}</span></div>
         <div class="crew-field"><strong>Finish:</strong><span>${esc(e.jobSnapshot.clearanceGoal)}</span></div>
+        <div class="crew-field"><strong>Done means:</strong><span>${esc(e.annotationSpec.doneStandard)}</span></div>
         <div class="crew-field"><strong>Requested work:</strong><span>${esc(j.requestedWork)}</span></div>
         <div class="crew-field"><strong>Cleanup:</strong><span>${esc(j.cleanupPreference)}</span></div>
         <div class="crew-field"><strong>Risk level:</strong><span><span class="badge ${dangerClass}" style="font-size:0.78rem">${esc(e.riskLevel)}</span></span></div>
         <div class="crew-field"><strong>Photo score:</strong><span>${esc(e.photoPacketScore.singlePhotoScore)}</span></div>
         <div class="crew-field"><strong>Tree size:</strong><span>${esc(e.jobSnapshot.requestedWork.includes("Shrub")?"Shrub":e.visibleTreeReview.approximateSizeClass)}</span></div>
+        <div class="crew-field"><strong>Measurements:</strong><span>${esc(e.annotationSpec.measurements.join(" · "))}</span></div>
         <div class="crew-field"><strong>Access:</strong><span>${esc(e.jobSnapshot.accessClass)}</span></div>
+        <div class="crew-field"><strong>Equipment:</strong><span>${esc(e.annotationSpec.access)}</span></div>
+        <div class="crew-field"><strong>Utility / 811:</strong><span>${esc(e.annotationSpec.utility)}</span></div>
         <div class="crew-field"><strong>Species guess:</strong><span>${esc(e.visibleTreeReview.likelySpecies)}</span></div>
       </div>
       <div class="crew-block">
@@ -1365,9 +1759,34 @@ function renderCrewTab(e, dangerClass) {
         <p style="margin-top:10px;font-size:0.85rem"><strong>Concerns noted:</strong> ${esc(e.jobSnapshot.concernsNoted)}</p>
       </div>
       <div class="crew-block full">
+        <h4>Required Photo / Annotation Checks</h4>
+        <ul class="stop-work-list">${e.annotationSpec.photoRequirements.map(p=>`<li>${esc(p)}</li>`).join("")}</ul>
+        <p style="margin-top:10px;font-size:0.85rem"><strong>Missing photo context:</strong> ${esc(e.annotationSpec.missingPhotoContext.join(", "))}</p>
+      </div>
+      <div class="crew-block full">
         <h4>Internal Crew Notes</h4>
         <ul class="stop-work-list">${e.internalCrewNotes.map(n=>n==="---"?`</ul><hr style="margin:8px 0;border-color:var(--line)"><ul class="stop-work-list">`:
           `<li>${esc(n)}</li>`).join("")}</ul>
+      </div>
+      <div class="crew-block full">
+        <h4>Field Completion Checklist</h4>
+        <div class="completion-grid">
+          <label><input type="checkbox"> Record photo matches the tree, target, access, and approved Tree ID</label>
+          <label><input type="checkbox"> Customer-approved scope and cleanup preference reviewed before cutting</label>
+          <label><input type="checkbox"> Utility, 811, traffic, and overhead-line concerns cleared or escalated</label>
+          <label><input type="checkbox"> Drop zone, targets, turf protection, and equipment staging confirmed</label>
+          <label><input type="checkbox"> Work completed to the "done means" standard</label>
+          <label><input type="checkbox"> Final cleanup, raking, debris handling, and customer walkthrough complete</label>
+        </div>
+      </div>
+      <div class="crew-block full">
+        <h4>Owner Approval Controls</h4>
+        <div class="owner-approval-grid">
+          <div><strong>Status</strong><span>Pending owner review</span></div>
+          <div><strong>Final price</strong><span>_______________</span></div>
+          <div><strong>Approved by</strong><span>_______________</span></div>
+          <div><strong>Schedule</strong><span>_______________</span></div>
+        </div>
       </div>
       <div class="crew-block full danger-block">
         <h4>Crew Stop-Work Triggers — Stop and call manager if:</h4>
@@ -1462,8 +1881,174 @@ function copyText(btn, encoded) {
 }
 
 // ============================================================
+// FIELD APP STATE — local browser job queue
+// ============================================================
+function loadFieldJobs() {
+  try {
+    return JSON.parse(localStorage.getItem(FIELD_JOB_STORE_KEY) || "[]");
+  } catch {
+    return [];
+  }
+}
+
+function saveFieldJobs(jobs) {
+  localStorage.setItem(FIELD_JOB_STORE_KEY, JSON.stringify(jobs.slice(0, 40)));
+  renderSavedJobs();
+}
+
+function estimateSummary(e) {
+  const j = e.jobSnapshot;
+  return [
+    `TreeVision job ${e.jobId}`,
+    `Customer: ${j.customer}`,
+    `Address: ${j.address}`,
+    `Service: ${e.servicePreset}`,
+    `Risk: ${e.riskLevel}`,
+    `Expected range: ${fmt(e.preliminaryEstimateRange.expected)} (${fmt(e.preliminaryEstimateRange.low)}-${fmt(e.preliminaryEstimateRange.high)})`,
+    `Scope: ${e.obsessedScope.headline}`,
+    `Done means: ${e.annotationSpec.doneStandard}`,
+    `Next step: ${e.siteVisitDecision.decision}`,
+  ].join("\n");
+}
+
+function buildFieldRecord(e) {
+  return {
+    id: e.jobId,
+    savedAt: new Date().toISOString(),
+    customer: e.jobSnapshot.customer,
+    address: e.jobSnapshot.address,
+    service: e.servicePreset,
+    riskLevel: e.riskLevel,
+    expectedPrice: e.preliminaryEstimateRange.expected,
+    summary: estimateSummary(e),
+    estimate: e,
+  };
+}
+
+function setFieldActionState(enabled) {
+  ["saveJob","shareJob","exportJob"].forEach(id => {
+    const btn = document.getElementById(id);
+    if (btn) btn.disabled = !enabled;
+  });
+}
+
+function renderSavedJobs() {
+  const jobs = loadFieldJobs();
+  const count = document.getElementById("savedJobCount");
+  const list = document.getElementById("savedJobs");
+  if (count) count.textContent = `${jobs.length} local record${jobs.length === 1 ? "" : "s"}`;
+  if (!list) return;
+  if (!jobs.length) {
+    list.innerHTML = "";
+    return;
+  }
+  list.innerHTML = jobs.slice(0, 5).map(job => `
+    <div class="saved-job-card">
+      <div>
+        <strong>${esc(job.customer || "Unnamed customer")} · ${esc(job.service)}</strong>
+        <span>${esc(job.address || "No address")} · ${esc(job.riskLevel)} · ${fmt(job.expectedPrice)} expected · ${new Date(job.savedAt).toLocaleString()}</span>
+      </div>
+      <div class="record-actions">
+        <button type="button" class="secondary small-btn" data-load-job="${esc(job.id)}">Load</button>
+        <button type="button" class="secondary small-btn" data-copy-job="${esc(job.id)}">Copy</button>
+      </div>
+    </div>`).join("");
+}
+
+function saveCurrentJob() {
+  if (!currentEstimate) return;
+  const jobs = loadFieldJobs().filter(job => job.id !== currentEstimate.jobId);
+  jobs.unshift(buildFieldRecord(currentEstimate));
+  saveFieldJobs(jobs);
+}
+
+async function shareCurrentJob() {
+  if (!currentEstimate) return;
+  const text = estimateSummary(currentEstimate);
+  if (navigator.share) {
+    await navigator.share({ title: `TreeVision ${currentEstimate.jobId}`, text });
+    return;
+  }
+  await navigator.clipboard.writeText(text);
+  alert("TreeVision summary copied.");
+}
+
+function exportCurrentJob() {
+  if (!currentEstimate) return;
+  const record = buildFieldRecord(currentEstimate);
+  const blob = new Blob([JSON.stringify(record, null, 2)], { type: "application/json" });
+  const a = document.createElement("a");
+  a.download = `${record.id}.json`;
+  a.href = URL.createObjectURL(blob);
+  a.click();
+  URL.revokeObjectURL(a.href);
+}
+
+function loadSavedJob(id) {
+  const record = loadFieldJobs().find(job => job.id === id);
+  if (!record) return;
+  currentEstimate = record.estimate;
+  setFieldActionState(true);
+  renderResults(record.estimate);
+}
+
+function applyMode(mode) {
+  document.body.classList.toggle("field-mode-owner", mode === "owner");
+  document.body.classList.toggle("field-mode-crew", mode === "crew");
+  document.querySelectorAll(".mode-btn").forEach(btn => btn.classList.toggle("active", btn.dataset.mode === mode));
+}
+
+// ============================================================
 // ACCORDION
 // ============================================================
+if ("serviceWorker" in navigator) {
+  navigator.serviceWorker.register("service-worker.js").catch(() => {});
+}
+
+renderSavedJobs();
+setFieldActionState(false);
+applyMode("crew");
+
+document.addEventListener("click", e => {
+  const modeBtn = e.target.closest(".mode-btn");
+  if (modeBtn) applyMode(modeBtn.dataset.mode);
+
+  const loadBtn = e.target.closest("[data-load-job]");
+  if (loadBtn) loadSavedJob(loadBtn.dataset.loadJob);
+
+  const copyBtn = e.target.closest("[data-copy-job]");
+  if (copyBtn) {
+    const record = loadFieldJobs().find(job => job.id === copyBtn.dataset.copyJob);
+    if (record) navigator.clipboard.writeText(record.summary);
+  }
+});
+
+["saveJob","saveJobFromResults"].forEach(id => {
+  const btn = document.getElementById(id);
+  if (btn) btn.addEventListener("click", saveCurrentJob);
+});
+
+["shareJob","shareJobFromResults"].forEach(id => {
+  const btn = document.getElementById(id);
+  if (btn) btn.addEventListener("click", () => shareCurrentJob().catch(() => alert("Unable to share this job from this browser.")));
+});
+
+["exportJob","exportJobFromResults"].forEach(id => {
+  const btn = document.getElementById(id);
+  if (btn) btn.addEventListener("click", exportCurrentJob);
+});
+
+document.getElementById("quickGps").addEventListener("click", () => {
+  if (!navigator.geolocation) {
+    alert("GPS is not available in this browser.");
+    return;
+  }
+  navigator.geolocation.getCurrentPosition(pos => {
+    const gps = document.getElementById("gpsPin");
+    gps.value = `${pos.coords.latitude.toFixed(6)}, ${pos.coords.longitude.toFixed(6)}`;
+  }, () => alert("GPS permission was not granted."));
+});
+
 document.addEventListener("click", e => {
   const btn = e.target.closest(".accordion-btn");
   if (!btn) return;
@@ -1478,11 +2063,30 @@ document.addEventListener("click", e => {
 // ============================================================
 // PHOTO UPLOAD + ANNOTATION
 // ============================================================
+function refreshPhotoVisuals() {
+  const preview = document.getElementById("photoPreview");
+  if (!preview || !preview.src || preview.hidden) return;
+  const input = getFormInput();
+  const servicePreset = classifyService(
+    input.customerAnswers.requestedWork,
+    input.customerAnswers.accessUtilitySafetyConcerns
+  );
+  const riskLevel = determineRiskLevel(input, servicePreset);
+  drawAnnotations(document.getElementById("annotationCanvas"), preview, input, servicePreset, riskLevel);
+  drawClientBeforeAfter(
+    document.getElementById("beforeCanvas"),
+    document.getElementById("afterCanvas"),
+    preview,
+    input,
+    servicePreset,
+    riskLevel
+  );
+}
+
 document.getElementById("photoUpload").addEventListener("change", evt => {
   const file = evt.target.files[0];
   const preview = document.getElementById("photoPreview");
   const wrap = document.getElementById("annotationWrap");
-  const canvas = document.getElementById("annotationCanvas");
 
   if (!file) { wrap.hidden = true; preview.removeAttribute("src"); return; }
 
@@ -1493,40 +2097,22 @@ document.getElementById("photoUpload").addEventListener("change", evt => {
     wrap.hidden = false;
 
     preview.onload = () => {
-      const input = getFormInput();
-      const servicePreset = classifyService(
-        input.customerAnswers.requestedWork,
-        input.customerAnswers.accessUtilitySafetyConcerns
-      );
-      const riskLevel = determineRiskLevel(input, servicePreset);
-      drawAnnotations(canvas, preview, input, servicePreset, riskLevel);
+      refreshPhotoVisuals();
     };
   };
   reader.readAsDataURL(file);
 });
 
 // Redraw annotation when key form fields change
-["requestedWork","photoScore","plantType","workSide","clearanceGoal","accessClass","treeSizeClass","concerns","nearestTargetDistanceFeet"].forEach(id => {
+["requestedWork","photoScore","plantType","workSide","cleanupPreference","clearanceGoal","accessClass","treeSizeClass","concerns","nearestTargetDistanceFeet","treeId","dbhInches","estimatedHeightFeet","treeCondition","primaryRiskTarget","equipmentPlan","utilityPlan","doneStandard","urgencyLevel","completionWindow"].forEach(id => {
   document.getElementById(id).addEventListener("change", () => {
-    const preview = document.getElementById("photoPreview");
-    const canvas = document.getElementById("annotationCanvas");
-    if (!preview.src || preview.hidden) return;
-    const input = getFormInput();
-    const sp = classifyService(input.customerAnswers.requestedWork, input.customerAnswers.accessUtilitySafetyConcerns);
-    const rl = determineRiskLevel(input, sp);
-    drawAnnotations(canvas, preview, input, sp, rl);
+    refreshPhotoVisuals();
   });
 });
 
 document.querySelectorAll(".photo-check").forEach(box => {
   box.addEventListener("change", () => {
-    const preview = document.getElementById("photoPreview");
-    const canvas = document.getElementById("annotationCanvas");
-    if (!preview.src || preview.hidden) return;
-    const input = getFormInput();
-    const sp = classifyService(input.customerAnswers.requestedWork, input.customerAnswers.accessUtilitySafetyConcerns);
-    const rl = determineRiskLevel(input, sp);
-    drawAnnotations(canvas, preview, input, sp, rl);
+    refreshPhotoVisuals();
   });
 });
 
@@ -1540,9 +2126,16 @@ document.getElementById("estimateForm").addEventListener("submit", evt => {
 
   // Redraw final annotation
   const preview = document.getElementById("photoPreview");
-  const canvas = document.getElementById("annotationCanvas");
   if (preview.src && !preview.hidden) {
-    drawAnnotations(canvas, preview, input, estimate.servicePreset, estimate.riskLevel);
+    drawAnnotations(document.getElementById("annotationCanvas"), preview, input, estimate.servicePreset, estimate.riskLevel);
+    drawClientBeforeAfter(
+      document.getElementById("beforeCanvas"),
+      document.getElementById("afterCanvas"),
+      preview,
+      input,
+      estimate.servicePreset,
+      estimate.riskLevel
+    );
   }
 
   renderResults(estimate);
@@ -1556,6 +2149,35 @@ document.getElementById("downloadAnnotation").addEventListener("click", () => {
   const a = document.createElement("a");
   a.download = "treevision-annotation.png";
   a.href = canvas.toDataURL("image/png");
+  a.click();
+});
+
+document.getElementById("downloadClientVisual").addEventListener("click", () => {
+  refreshPhotoVisuals();
+  const before = document.getElementById("beforeCanvas");
+  const after = document.getElementById("afterCanvas");
+  if (!before.width || !after.width) return;
+  const gap = 20;
+  const footerH = 54;
+  const out = document.createElement("canvas");
+  out.width = before.width + after.width + gap;
+  out.height = Math.max(before.height, after.height) + footerH;
+  const ctx = out.getContext("2d");
+  ctx.fillStyle = "#eef4ed";
+  ctx.fillRect(0, 0, out.width, out.height);
+  ctx.drawImage(before, 0, 0);
+  ctx.drawImage(after, before.width + gap, 0);
+  ctx.fillStyle = "#ffffff";
+  ctx.fillRect(0, out.height - footerH, out.width, footerH);
+  ctx.fillStyle = "#225431";
+  ctx.font = "bold 15px Arial";
+  ctx.fillText("TreeVision AI - Client Before / Proposed After Scope Visual", 16, out.height - 30);
+  ctx.fillStyle = "#607065";
+  ctx.font = "12px Arial";
+  ctx.fillText("Generated at estimate time. Illustrative only; final appearance and price require field/manager approval.", 16, out.height - 12);
+  const a = document.createElement("a");
+  a.download = "treevision-client-before-after.png";
+  a.href = out.toDataURL("image/png");
   a.click();
 });
 
@@ -1584,6 +2206,8 @@ document.getElementById("resetButton").addEventListener("click", () => {
   document.getElementById("photoPreview").hidden = true;
   document.getElementById("annotationWrap").hidden = true;
   document.getElementById("results").hidden = true;
+  currentEstimate = null;
+  setFieldActionState(false);
   // Reset tabs
   document.querySelectorAll(".tab-btn").forEach((b,i) => { b.classList.toggle("active",i===0); });
   document.querySelectorAll(".tab-panel").forEach((p,i) => { p.hidden = i!==0; });

@@ -5,6 +5,8 @@
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
   <title>TreeVision AI — Dynamic Tree Canopy Estimator</title>
   <meta name="description" content="Professional tree and shrub preliminary estimator with photo annotation, ISA arborist science, ANSI A300 standards, and complete crew documentation for Dynamic Tree." />
+  <meta name="theme-color" content="#225431" />
+  <link rel="manifest" href="manifest.json" />
   <link rel="stylesheet" href="styles.css" />
 </head>
 <body>
@@ -51,6 +53,52 @@
     approval, insurance determination, or final quote. Hidden decay, root issues, utility conflicts, access limitations,
     and field conditions require on-site human review. Photo annotations are illustrative and algorithmically positioned
     from form inputs — not computer vision. They do not replace a qualified arborist inspection.
+  </section>
+
+  <section class="field-app-panel" aria-label="TreeVision field app workspace">
+    <div class="field-app-header">
+      <div>
+        <p class="eyebrow">Field App Workspace</p>
+        <h2>Built for crews in the field and owners in review.</h2>
+        <p>Capture the tree, lock the scope, save the job locally, then hand owners a clean approval packet before the crew rolls.</p>
+      </div>
+      <div class="mode-toggle" role="group" aria-label="Choose app mode">
+        <button type="button" class="mode-btn active" data-mode="crew">Crew</button>
+        <button type="button" class="mode-btn" data-mode="owner">Owner</button>
+      </div>
+    </div>
+
+    <div class="field-command-grid">
+      <div class="command-card">
+        <span>1</span>
+        <strong>Field Capture</strong>
+        <p>Photo, GPS, tree ID, condition, access, targets, and the exact done standard.</p>
+      </div>
+      <div class="command-card">
+        <span>2</span>
+        <strong>AI Scope Builder</strong>
+        <p>Risk flags, price range, annotation block, required photos, and crew package.</p>
+      </div>
+      <div class="command-card">
+        <span>3</span>
+        <strong>Owner Approval</strong>
+        <p>Saved queue, print packet, share summary, export record, and approval fields.</p>
+      </div>
+    </div>
+
+    <div class="job-dock">
+      <div>
+        <strong>Saved Field Jobs</strong>
+        <span id="savedJobCount">0 local records</span>
+      </div>
+      <div class="job-dock-actions">
+        <button type="button" id="quickGps" class="secondary small-btn">Use My GPS</button>
+        <button type="button" id="saveJob" class="secondary small-btn" disabled>Save Job</button>
+        <button type="button" id="shareJob" class="secondary small-btn" disabled>Share Summary</button>
+        <button type="button" id="exportJob" class="secondary small-btn" disabled>Export JSON</button>
+      </div>
+    </div>
+    <div id="savedJobs" class="saved-jobs" aria-live="polite"></div>
   </section>
 
   <section id="purchase-confidence" class="conversion-strip">
@@ -114,7 +162,13 @@
         </div>
 
         <div class="field full" id="annotationWrap" hidden>
-          <label>Photo Analysis &amp; Annotated Work Zone Preview</label>
+          <div class="annotation-heading">
+            <label>Photo Analysis &amp; Annotated Work Zone Preview</label>
+            <div class="annotation-actions">
+              <button type="button" id="downloadAnnotation" class="secondary small-btn">Download Annotated Photo</button>
+              <button type="button" id="downloadClientVisual" class="secondary small-btn">Download Client Before / After</button>
+            </div>
+          </div>
           <div class="photo-compare">
             <div class="photo-panel">
               <div class="photo-panel-label">Original Record Photo</div>
@@ -123,6 +177,25 @@
             <div class="photo-panel">
               <div class="photo-panel-label">Annotated Work Zone Preview</div>
               <canvas id="annotationCanvas"></canvas>
+            </div>
+          </div>
+          <div class="client-visual-pack" aria-label="Client before and after estimate visual">
+            <div class="client-visual-head">
+              <div>
+                <span>Client Scope Visual</span>
+                <strong>Before photo + proposed after preview</strong>
+              </div>
+              <p>Created at estimate time from the uploaded record photo and selected scope. The proposed after image is an illustrative client visual, not a guaranteed final appearance.</p>
+            </div>
+            <div class="before-after-grid">
+              <div class="photo-panel">
+                <div class="photo-panel-label">Before · Estimate Record</div>
+                <canvas id="beforeCanvas"></canvas>
+              </div>
+              <div class="photo-panel">
+                <div class="photo-panel-label">Proposed After · Scope Visual</div>
+                <canvas id="afterCanvas"></canvas>
+              </div>
             </div>
           </div>
           <div class="annotation-meta">
@@ -135,8 +208,7 @@
               <div class="legend-item"><span class="legend-dot" style="background:rgba(120,75,35,0.8)"></span>Trunk / Root Zone</div>
               <div class="legend-item"><span class="legend-dot" style="background:rgba(210,165,0,0.9)"></span>ISA Cut Points</div>
             </div>
-            <p class="annotation-disclaimer">Zones are illustrative — positioned from selected service and risk inputs, not computer vision.<br><strong>Illustrative Preview · Final result may vary after field inspection.</strong></p>
-            <button type="button" id="downloadAnnotation" class="secondary small-btn">Download Annotated Photo</button>
+            <p class="annotation-disclaimer"><strong>Illustrative Preview</strong> · Zones are positioned from selected service and risk inputs. Final scope may vary after field inspection.</p>
           </div>
         </div>
 
@@ -294,6 +366,88 @@
         </div>
 
         <div class="field">
+          <label for="treeId">Tree ID / scope tag</label>
+          <input id="treeId" type="text" placeholder="e.g. T-001, backyard oak, front maple" />
+          <small>Use one clear ID per tree so the quote, photo, and crew packet match.</small>
+        </div>
+
+        <div class="field">
+          <label for="dbhInches">DBH / trunk diameter (inches)</label>
+          <input id="dbhInches" type="number" min="0" step="0.5" placeholder="e.g. 22" />
+          <small>Diameter at breast height if known. Leave blank if photo-only.</small>
+        </div>
+
+        <div class="field">
+          <label for="estimatedHeightFeet">Estimated height (feet)</label>
+          <input id="estimatedHeightFeet" type="number" min="0" step="1" placeholder="e.g. 55" />
+        </div>
+
+        <div class="field">
+          <label for="treeCondition">Observed condition</label>
+          <select id="treeCondition" required>
+            <option value="">Choose one</option>
+            <option>Healthy / routine maintenance</option>
+            <option>Deadwood visible</option>
+            <option>Declining / sparse canopy</option>
+            <option>Dead tree</option>
+            <option>Leaning</option>
+            <option>Cracked, split, or hollow</option>
+            <option>Storm damaged / hanging limbs</option>
+            <option>Unknown from photo</option>
+          </select>
+        </div>
+
+        <div class="field">
+          <label for="primaryRiskTarget">Primary risk target</label>
+          <select id="primaryRiskTarget" required>
+            <option value="">Choose one</option>
+            <option>House / roof / gutter</option>
+            <option>Garage / shed / outbuilding</option>
+            <option>Driveway / parked vehicles</option>
+            <option>Sidewalk / pedestrian area</option>
+            <option>Road / right-of-way</option>
+            <option>Fence / neighbor property</option>
+            <option>Overhead utility / service drop</option>
+            <option>Open yard / low target exposure</option>
+            <option>Unknown from photo</option>
+          </select>
+        </div>
+
+        <div class="field">
+          <label for="equipmentPlan">Likely equipment / access method</label>
+          <select id="equipmentPlan" required>
+            <option value="">Choose one</option>
+            <option>Ground crew / pole tools</option>
+            <option>Climber required</option>
+            <option>Bucket truck possible</option>
+            <option>Crane / advanced rigging review</option>
+            <option>Stump grinder</option>
+            <option>Mats / turf protection needed</option>
+            <option>Traffic or pedestrian control needed</option>
+            <option>Unknown until site review</option>
+          </select>
+        </div>
+
+        <div class="field">
+          <label for="utilityPlan">Utility / underground check</label>
+          <select id="utilityPlan" required>
+            <option value="">Choose one</option>
+            <option>No visible utility conflict reported</option>
+            <option>Overhead wires or service drop nearby</option>
+            <option>Call 811 before stump grinding or excavation</option>
+            <option>Possible irrigation, septic, gas, fiber, or invisible fence</option>
+            <option>Line-clearance qualified crew required</option>
+            <option>Unknown from photo</option>
+          </select>
+        </div>
+
+        <div class="field full">
+          <label for="doneStandard">Done means</label>
+          <textarea id="doneStandard" rows="3" placeholder="Example: Remove T-001 to near grade, haul all brush/logs, grind stump 6 inches below grade, rake work area, protect fence and driveway." required></textarea>
+          <small>This is the acceptance standard: what the customer, estimator, and crew agree counts as complete.</small>
+        </div>
+
+        <div class="field">
           <label for="urgencyLevel">Urgency level</label>
           <select id="urgencyLevel">
             <option value="Routine">Routine — schedule within 2–4 weeks</option>
@@ -366,6 +520,9 @@
         <h2 id="resultsTitle">Assessment Ready</h2>
       </div>
       <div class="results-actions">
+        <button type="button" id="saveJobFromResults" class="secondary small-btn">Save Job</button>
+        <button type="button" id="shareJobFromResults" class="secondary small-btn">Share</button>
+        <button type="button" id="exportJobFromResults" class="secondary small-btn">Export</button>
         <button type="button" id="printCrew" class="secondary small-btn">Print Crew Package</button>
       </div>
     </div>
