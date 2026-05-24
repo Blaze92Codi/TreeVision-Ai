@@ -1,261 +1,187 @@
-
-import OpenAI from "openai";
-
-const client = new OpenAI({ apiKey: process.env.OPENAI_API_KEY });
-
-function cors(res) {
-  res.setHeader("Access-Control-Allow-Origin", "*");
-  res.setHeader("Access-Control-Allow-Methods", "POST, OPTIONS");
-  res.setHeader("Access-Control-Allow-Headers", "Content-Type, Authorization");
-}
-
-function jsonResponse(res, status, body) {
-  cors(res);
-  res.status(status).json(body);
-}
-
-function safeJsonParse(text) {
-  if (!text) return null;
-  const cleaned = text
-    .replace(/^```json\s*/i, "")
-    .replace(/^```\s*/i, "")
-    .replace(/```$/i, "")
-    .trim();
-
-  try {
-    return JSON.parse(cleaned);
-  } catch {
-    const match = cleaned.match(/\{[\s\S]*\}/);
-    if (match) {
-      try { return JSON.parse(match[0]); } catch {}
-    }
-  }
-  return null;
-}
-
-function clampLabel(label) {
-  const n = (v, fallback) => {
-    const x = Number(v);
-    if (!Number.isFinite(x)) return fallback;
-    return Math.max(0, Math.min(100, x));
-  };
-
-  return {
-    code: String(label.code || "E").slice(0, 1).toUpperCase(),
-    title: String(label.title || "Review area").slice(0, 80),
-    description: String(label.description || "").slice(0, 220),
-    x: n(label.x, 50),
-    y: n(label.y, 50),
-    w: n(label.w, 18),
-    h: n(label.h, 12)
-  };
-}
-
-function buildFormattedText(result, annotatedImageUrl) {
-  const risks = Array.isArray(result.risk_flags) && result.risk_flags.length
-    ? result.risk_flags.join(", ")
-    : "None clearly visible from the photo.";
-
-  const labelText = (result.labels || [])
-    .map(l => `${l.code} = ${l.title}:\n${l.description || "No additional detail provided."}`)
-    .join("\n\n");
-
-  return `TREEVISION PRELIMINARY PHOTO ANNOTATION
-
-Service Type:
-${result.service_type || "Photo-based tree-service review"}
-
-Visible Complexity:
-${result.complexity || "Needs review"}
-
-A-E Annotation Map:
-${labelText || "A-E map could not be generated from the available photo."}
-
-Visible Risk Flags:
-${risks}
-
-Preliminary Scope:
-${result.preliminary_scope || "Preliminary scope should be confirmed by Dynamic Tree Service."}
-
-Next Best Step:
-${result.next_best_step || "Confirm service requested, haul-away preference, location/ZIP, timeline, and any nearby wires or structures."}
-
-Scheduling Readiness:
-${result.scheduling_readiness || "Needs review"}
-
-Annotated Concept Link:
-${annotatedImageUrl}
-
-Safety Note:
-This is a preliminary photo-based scope only. Final pricing and work approval should be confirmed by Dynamic Tree Service.`;
-}
-
 export default async function handler(req, res) {
-  cors(res);
-
-  if (req.method === "OPTIONS") {
-    return res.status(204).end();
-  }
-
-  if (req.method !== "POST") {
-    return jsonResponse(res, 405, { error: "Use POST /api/annotate" });
-  }
-
   try {
+    if (req.method === "GET") {
+      return res.status(200).json({
+        ok: true,
+        message: "TreeVision annotate API is live. Use POST with image_url and customer_request."
+      });
+    }
+
+    if (req.method !== "POST") {
+      return res.status(405).json({
+        ok: false,
+        error: "Method not allowed. Use POST."
+      });
+    }
+
+    const apiKey = process.env.OPENAI_API_KEY;
+    const model = process.env.OPENAI_VISION_MODEL || "gpt-4.1-mini";
+    const publicBaseUrl = process.env.PUBLIC_BASE_URL || "https://tree-vision-ai.vercel.app";
+
+    if (!apiKey) {
+      return res.status(500).json({
+        ok: false,
+        error: "OPENAI_API_KEY is missing in Vercel environment variables."
+      });
+    }
+
     const {
       image_url,
-      customer_request = "",
+      customer_request = "No written request provided.",
       zip_code = "",
       service_type = ""
     } = req.body || {};
 
-    if (!image_url || typeof image_url !== "string" || !image_url.startsWith("http")) {
-      return jsonResponse(res, 400, {
-        error: "Missing valid image_url. The image must be a public https URL."
+    if (!image_url) {
+      return res.status(400).json({
+        ok: false,
+        error: "Missing image_url. Send a POST body with image_url."
       });
     }
-
-    if (!process.env.OPENAI_API_KEY) {
-      return jsonResponse(res, 500, {
-        error: "OPENAI_API_KEY is not configured in Vercel environment variables."
-      });
-    }
-
-    const model = process.env.OPENAI_VISION_MODEL || "gpt-4.1-mini";
 
     const prompt = `
-You are TreeVision AI, a preliminary tree-service photo assessment assistant for Dynamic Tree Service.
+You are TreeVision AI, a tree-service photo assessment assistant.
 
-Analyze the uploaded tree-service photo and customer request. Return JSON only.
+Create a preliminary photo-based A-E annotation map for a tree-service estimate.
 
-Important safety rules:
-- This is preliminary photo-based intake only.
-- Do not guarantee final pricing or tree safety.
-- Do not provide chainsaw, climbing, rigging, crane, bucket truck, or powerline instructions.
-- Recommend onsite review when power lines, large removals, severe lean, storm damage, structure risk, hanging limbs, limited access, or unclear photo quality are present.
+Customer request:
+${customer_request}
 
-Customer request: ${customer_request || "No written request provided."}
-ZIP/location: ${zip_code || "Not provided"}
-Requested service type: ${service_type || "Not provided"}
+ZIP code:
+${zip_code || "Not provided"}
 
-Return exactly this JSON shape:
-{
-  "service_type": "light trim | shape-up | canopy raise | clearance trim | deadwood removal | hazard limb removal | storm cleanup | removal | stump grinding | haul-away | onsite review required",
-  "complexity": "Simple | Moderate | Complex | High-Risk",
-  "risk_flags": ["short risk flag strings"],
-  "labels": [
-    {
-      "code": "A",
-      "title": "Trim / shape area",
-      "description": "specific visible area or if not visible, say not clearly visible",
-      "x": 50,
-      "y": 35,
-      "w": 20,
-      "h": 12
-    },
-    {
-      "code": "B",
-      "title": "Canopy raise / clearance area",
-      "description": "specific visible area or not applicable",
-      "x": 50,
-      "y": 65,
-      "w": 20,
-      "h": 12
-    },
-    {
-      "code": "C",
-      "title": "Deadwood or hazard limb",
-      "description": "specific visible concern or none clearly visible",
-      "x": 65,
-      "y": 40,
-      "w": 18,
-      "h": 12
-    },
-    {
-      "code": "D",
-      "title": "Brush / haul-away zone",
-      "description": "cleanup area or haul-away note",
-      "x": 50,
-      "y": 85,
-      "w": 25,
-      "h": 10
-    },
-    {
-      "code": "E",
-      "title": "Onsite review concern",
-      "description": "wires, structures, lean, access, photo quality, or none clearly visible",
-      "x": 80,
-      "y": 20,
-      "w": 18,
-      "h": 12
-    }
-  ],
-  "preliminary_scope": "short professional scope summary",
-  "next_best_step": "ask for only 1-3 missing photos/details",
-  "scheduling_readiness": "Ready for preliminary review | Needs more photos | Onsite review recommended",
-  "onsite_review_required": true
-}
+Requested service type:
+${service_type || "Not provided"}
 
-Coordinate rules:
-- x, y, w, h are approximate percentages from 0 to 100.
-- Put labels near visible areas if possible.
-- If the exact area is unclear, place label near the general tree zone and explain uncertainty.
-`.trim();
+Rules:
+- Do not claim this is a final arborist inspection.
+- Do not provide chainsaw, climbing, rigging, crane, bucket truck, or powerline work instructions.
+- Use preliminary estimate language only.
+- Flag onsite review if wires, structures, severe lean, storm damage, poor access, or large removal risk is visible or described.
 
-    const ai = await client.responses.create({
-      model,
-      input: [
-        {
-          role: "user",
-          content: [
-            { type: "input_text", text: prompt },
-            { type: "input_image", image_url }
-          ]
-        }
-      ]
+Return this exact structure:
+
+TREEVISION PRELIMINARY PHOTO ANNOTATION
+
+Service Type:
+[service type]
+
+Visible Complexity:
+[Simple / Moderate / Complex / High-Risk]
+
+A-E Annotation Map:
+A = Trim / shape area:
+[description]
+
+B = Canopy raise / clearance area:
+[description]
+
+C = Deadwood / hazard limb:
+[description]
+
+D = Brush / haul-away zone:
+[description]
+
+E = Onsite review concern:
+[description]
+
+Preliminary Scope:
+[short scope]
+
+Next Best Step:
+[1-3 missing photos/details]
+
+Scheduling Readiness:
+[Ready for preliminary review / Needs more photos / Onsite review recommended]
+
+Safety Note:
+This is a preliminary photo-based scope only. Final pricing and work approval should be confirmed by Dynamic Tree Service.
+`;
+
+    const openaiResponse = await fetch("https://api.openai.com/v1/responses", {
+      method: "POST",
+      headers: {
+        "Authorization": `Bearer ${apiKey}`,
+        "Content-Type": "application/json"
+      },
+      body: JSON.stringify({
+        model,
+        input: [
+          {
+            role: "user",
+            content: [
+              {
+                type: "input_text",
+                text: prompt
+              },
+              {
+                type: "input_image",
+                image_url
+              }
+            ]
+          }
+        ],
+        max_output_tokens: 900
+      })
     });
 
-    const parsed = safeJsonParse(ai.output_text);
+    const raw = await openaiResponse.text();
 
-    if (!parsed) {
-      return jsonResponse(res, 502, {
-        error: "Vision model did not return valid JSON.",
-        raw: ai.output_text
+    if (!openaiResponse.ok) {
+      return res.status(500).json({
+        ok: false,
+        error: "OpenAI request failed.",
+        details: raw
       });
     }
 
-    const labels = Array.isArray(parsed.labels) ? parsed.labels.map(clampLabel) : [];
-    const result = { ...parsed, labels };
+    const data = JSON.parse(raw);
 
-    const host = req.headers["x-forwarded-host"] || req.headers.host;
-    const proto = req.headers["x-forwarded-proto"] || "https";
-    const baseUrl = process.env.PUBLIC_BASE_URL || `${proto}://${host}`;
+    let formattedText = "";
 
-    const renderPayload = Buffer.from(
-      JSON.stringify({ imageUrl: image_url, labels }),
-      "utf8"
-    ).toString("base64url");
+    if (data.output_text) {
+      formattedText = data.output_text;
+    } else if (Array.isArray(data.output)) {
+      formattedText = data.output
+        .flatMap(item => item.content || [])
+        .map(content => content.text || "")
+        .join("\n")
+        .trim();
+    }
 
-    const annotatedImageUrl = `${baseUrl}/api/render?d=${renderPayload}`;
-    const formattedText = buildFormattedText(result, annotatedImageUrl);
+    if (!formattedText) {
+      formattedText = "TreeVision analysis completed, but no text output was returned.";
+    }
 
-    return jsonResponse(res, 200, {
+    const annotatedSvg = `
+<svg xmlns="http://www.w3.org/2000/svg" width="1200" height="800">
+  <rect width="1200" height="800" fill="#f4f4f4"/>
+  <image href="${image_url}" x="0" y="0" width="1200" height="800" preserveAspectRatio="xMidYMid meet"/>
+  <rect x="30" y="30" width="420" height="250" fill="white" opacity="0.92" rx="18"/>
+  <text x="55" y="75" font-size="34" font-family="Arial" font-weight="bold" fill="#123">
+    TreeVision A-E Markup
+  </text>
+  <text x="55" y="120" font-size="24" font-family="Arial" fill="#123">A = Trim / shape area</text>
+  <text x="55" y="155" font-size="24" font-family="Arial" fill="#123">B = Canopy raise / clearance</text>
+  <text x="55" y="190" font-size="24" font-family="Arial" fill="#123">C = Deadwood / hazard limb</text>
+  <text x="55" y="225" font-size="24" font-family="Arial" fill="#123">D = Brush / haul-away zone</text>
+  <text x="55" y="260" font-size="24" font-family="Arial" fill="#123">E = Onsite review concern</text>
+</svg>`;
+
+    const encodedSvg = Buffer.from(annotatedSvg).toString("base64");
+    const annotatedImageUrl = `data:image/svg+xml;base64,${encodedSvg}`;
+
+    return res.status(200).json({
       ok: true,
-      annotated_image_url: annotatedImageUrl,
       formatted_text: formattedText,
-      service_type: result.service_type,
-      complexity: result.complexity,
-      risk_flags: result.risk_flags || [],
-      labels,
-      preliminary_scope: result.preliminary_scope,
-      next_best_step: result.next_best_step,
-      scheduling_readiness: result.scheduling_readiness,
-      onsite_review_required: Boolean(result.onsite_review_required)
+      annotated_image_url: annotatedImageUrl,
+      public_base_url: publicBaseUrl
     });
+
   } catch (error) {
-    return jsonResponse(res, 500, {
-      error: "TreeVision annotation failed.",
-      detail: error?.message || String(error)
+    return res.status(500).json({
+      ok: false,
+      error: error.message || String(error)
     });
   }
 }
