@@ -1,5 +1,3 @@
-Total output lines: 1593
-
 /*
   TreeVision AI — Dynamic Tree Canopy Estimator
   Full rebuild: ISA arborist science, ANSI A300, photo annotation canvas,
@@ -185,6 +183,522 @@ function guessSpecies(input) {
 }
 
 // ============================================================
+// UTILITY HELPERS
+// ============================================================
+function esc(s) {
+  return String(s ?? "")
+    .replace(/&/g,"&amp;").replace(/</g,"&lt;").replace(/>/g,"&gt;")
+    .replace(/"/g,"&quot;").replace(/'/g,"&#39;");
+}
+
+function fmt(n) {
+  const v = Number(n) || 0;
+  return "$" + v.toFixed(2).replace(/\B(?=(\d{3})+(?!\d))/g, ",");
+}
+
+function labelize(k) {
+  return k.replace(/([A-Z])/g," $1").replace(/^./, s => s.toUpperCase()).trim();
+}
+
+// ============================================================
+// FORM INPUT EXTRACTION
+// ============================================================
+function getFormInput() {
+  const val  = id => (document.getElementById(id)?.value || "").trim();
+  const sel  = id => document.getElementById(id)?.value || "";
+  const checks = Array.from(document.querySelectorAll(".photo-check:checked")).map(c => c.value);
+  return {
+    customerAnswers: {
+      requestedWork: sel("requestedWork"),
+      workSide: sel("workSide"),
+      cleanupPreference: sel("cleanupPreference"),
+      clearanceGoal: sel("clearanceGoal"),
+      accessUtilitySafetyConcerns: val("concerns"),
+    },
+    estimateAnswers: {
+      treeSizeClass: sel("treeSizeClass"),
+      accessClass: sel("accessClass"),
+      nearestTargetDistanceFeet: val("nearestTargetDistanceFeet"),
+      treeSpeciesGuess: val("treeSpeciesGuess"),
+      urgencyLevel: sel("urgencyLevel"),
+      completionWindow: val("completionWindow"),
+    },
+    contactInfo: {
+      customerName: val("customerName"),
+      phone: val("phone"),
+      email: val("email"),
+      address: val("address"),
+      gpsPin: val("gpsPin"),
+      preferredContact: sel("preferredContact"),
+    },
+    photoInfo: {
+      photoScore: sel("photoScore"),
+      plantType: sel("plantType"),
+      checklist: checks,
+    },
+  };
+}
+
+// ============================================================
+// SERVICE CLASSIFICATION
+// ============================================================
+function classifyService(requestedWork, concerns) {
+  const w = (requestedWork || "").toLowerCase();
+  const c = (concerns || "").toLowerCase();
+  const combined = w + " " + c;
+
+  if (SITE_VISIT_KEYWORDS.some(kw => combined.includes(kw))) return "Site Visit Required";
+  if (/storm|hanging limb|dead limb|dead tree|split|hazard/.test(combined)) return "Hazard / Storm Damage Review";
+  if (/shrub removal/.test(w)) return "Shrub Trim / Shrub Removal";
+  if (/shrub trim|shrub shaping|shrub/.test(w)) return "Shrub Trim / Shrub Removal";
+  if (/stump/.test(w)) return "Stump Grinding";
+  if (/full tree removal.*medium|full tree removal.*large|medium or large/.test(w)) return "Medium / Large Tree Removal";
+  if (/full tree removal.*small|full tree removal/.test(w)) return "Small Tree Removal";
+  if (/reduce overhang|cutback|cut back|reduction/.test(w)) return "Reduction / Cutback";
+  if (/trim away|raise canopy|clearance|driveway|sidewalk/.test(w)) return "Structural / Clearance Trim";
+  if (/shape|light trim/.test(w)) return "Light Trim";
+  if (/remove dead|dead or hanging/.test(w)) return "Structural / Clearance Trim";
+  return "Light Trim";
+}
+
+// ============================================================
+// RISK LEVEL DETERMINATION
+// ============================================================
+function determineRiskLevel(input, servicePreset) {
+  const c    = (input.customerAnswers.accessUtilitySafetyConcerns || "").toLowerCase();
+  const size = input.estimateAnswers.treeSizeClass || "Medium";
+  const access = input.estimateAnswers.accessClass || "Moderate";
+  const dist = parseFloat(input.estimateAnswers.nearestTargetDistanceFeet) || 15;
+
+  if (servicePreset === "Site Visit Required") return "Site Visit Required";
+  if (SITE_VISIT_KEYWORDS.some(kw => c.includes(kw))) return "Site Visit Required";
+
+  const isHighService = /Removal|Hazard/.test(servicePreset);
+  if (isHighService || size === "Very Large" || dist < 5 || access === "Tight") return "High";
+  if (size === "Large" || dist < 15 || access === "Moderate") return "Medium";
+  return "Low";
+}
+
+// ============================================================
+// CORE ESTIMATION ENGINE
+// ============================================================
+function buildEstimate(input) {
+  const ca  = input.customerAnswers;
+  const ea  = input.estimateAnswers;
+  const ci  = input.contactInfo;
+  const pi  = input.photoInfo;
+  const R   = DEFAULT_RATES;
+
+  const servicePreset = classifyService(ca.requestedWork, ca.accessUtilitySafetyConcerns);
+  const riskLevel     = determineRiskLevel(input, servicePreset);
+  const species       = guessSpecies(ea.treeSpeciesGuess);
+  const dist          = parseFloat(ea.nearestTargetDistanceFeet) || 15;
+  const size          = ea.treeSizeClass || "Medium";
+  const access        = ea.accessClass || "Moderate";
+  const concerns      = (ca.accessUtilitySafetyConcerns || "").toLowerCase();
+
+  // Photo readiness
+  const checklistItems = ["Full crown visible","Trunk or base visible","Nearest target visible","Crew access visible"];
+  const missing = checklistItems.filter(item => !pi.checklist.includes(item));
+  const readinessScore = Math.round(((4 - missing.length) / 4) * 100);
+
+  const photoScoreMap = {
+    "Excellent": "Excellent — full photo packet",
+    "Usable":    "Usable — minor details absent",
+    "Limited":   "Limited — key elements missing",
+    "Not Quote-Ready": "Not Quote-Ready — reshooting recommended",
+  };
+  const singlePhotoScore = photoScoreMap[pi.photoScore] || pi.photoScore;
+  const fullPacketStatus = "Single photo only";
+  const photoReason = missing.length === 0
+    ? "All checklist items confirmed visible."
+    : `Missing: ${missing.join(", ")}. Tighter estimate range applied.`;
+
+  // Crew hours by size + service category
+  const hoursTable = {
+    "Shrub":      { "Shrub Trim / Shrub Removal": 0.75, default: 1.0 },
+    "Small":      { "Light Trim": 1.5, "Structural / Clearance Trim": 2.0, "Reduction / Cutback": 2.0,
+                    "Small Tree Removal": 3.0, "Stump Grinding": 1.5, "Shrub Trim / Shrub Removal": 1.0,
+                    "Hazard / Storm Damage Review": 2.5, "Medium / Large Tree Removal": 4.0, default: 2.0 },
+    "Medium":     { "Light Trim": 2.5, "Structural / Clearance Trim": 3.0, "Reduction / Cutback": 3.5,
+                    "Small Tree Removal": 4.0, "Stump Grinding": 2.5, "Shrub Trim / Shrub Removal": 1.5,
+                    "Hazard / Storm Damage Review": 4.0, "Medium / Large Tree Removal": 5.0, default: 3.0 },
+    "Large":      { "Light Trim": 4.0, "Structural / Clearance Trim": 5.0, "Reduction / Cutback": 5.0,
+                    "Small Tree Removal": 5.0, "Stump Grinding": 3.5, "Shrub Trim / Shrub Removal": 2.0,
+                    "Hazard / Storm Damage Review": 6.0, "Medium / Large Tree Removal": 7.0, default: 5.0 },
+    "Very Large": { "Light Trim": 6.0, "Structural / Clearance Trim": 7.0, "Reduction / Cutback": 7.0,
+                    "Stump Grinding": 5.0, "Hazard / Storm Damage Review": 8.0,
+                    "Medium / Large Tree Removal": 10.0, default: 8.0 },
+  };
+  const sizeRow = hoursTable[size] || hoursTable["Medium"];
+  const crewHours = sizeRow[servicePreset] ?? sizeRow.default;
+
+  // Debris by size
+  const debrisMap = { "Shrub": 0.5, "Small": 1, "Medium": 3, "Large": 6, "Very Large": 12 };
+  const debrisCubicYards = /Stump|Shrub/.test(servicePreset) && /leave|onsite/.test((ca.cleanupPreference||"").toLowerCase())
+    ? 0 : (debrisMap[size] || 3);
+
+  // Crew profile
+  const crewProfileMap = {
+    "Shrub":      "2-person shrub crew — hand tools, small trailer",
+    "Small":      "2–3 person crew — pole saw, small chainsaw, chip truck",
+    "Medium":     "3–4 person crew — chainsaw, climb gear or aerial lift, chipper",
+    "Large":      "4–5 person crew — chainsaw, aerial lift or climbing, rigging, log truck",
+    "Very Large": "5–6 person crew — full climb/rigging, possible crane, large chipper + log truck",
+  };
+  const crewProfile = crewProfileMap[size] || crewProfileMap["Medium"];
+
+  // Equipment multiplier
+  const equipMultiplier = { "Small": 0.8, "Medium": 1.0, "Large": 1.5, "Very Large": 2.2, "Shrub": 0.5 };
+  const equipMult = equipMultiplier[size] || 1.0;
+
+  // Risk buffer percent
+  const riskBufferPct = { "Low": 0.05, "Medium": 0.10, "High": 0.18, "Site Visit Required": 0 }[riskLevel] || 0.10;
+
+  // Cost-plus calculation
+  const labor     = crewHours * R.laborRatePerCrewHour;
+  const travel    = R.travelBaseCharge;
+  const fuel      = R.fuelCharge;
+  const equipment = R.equipmentBaseCharge * equipMult;
+  const disposal  = debrisCubicYards * R.disposalPerCubicYard;
+  const materials = R.materialCharge;
+  const subtotal  = labor + travel + fuel + equipment + disposal + materials;
+  const overhead  = subtotal * R.overheadPercent;
+  const riskBuffer = subtotal * riskBufferPct;
+  const profitBase = subtotal + overhead + riskBuffer;
+  const profit    = profitBase * R.profitMarginPercent;
+  const expected  = Math.max(profitBase + profit, R.minimumJobCharge);
+  const low       = Math.max(expected * 0.88, R.minimumJobCharge);
+  const high      = expected * 1.18;
+
+  // Safety / risk flags
+  const safetyRiskFlags = [];
+  SITE_VISIT_KEYWORDS.forEach(kw => {
+    if (concerns.includes(kw)) safetyRiskFlags.push(`Site-visit keyword detected: "${kw}"`);
+  });
+  if (size === "Very Large") safetyRiskFlags.push("Very large tree — crane or full rigging may be required");
+  if (dist < 5) safetyRiskFlags.push(`Target within ${dist} ft — elevated drop and damage risk`);
+  if (access === "Tight") safetyRiskFlags.push("Tight access — crew staging and equipment entry may be constrained");
+  if (/Removal/.test(servicePreset)) safetyRiskFlags.push("Full removal — section-by-section rigging and drop zone required");
+  if (servicePreset === "Hazard / Storm Damage Review") safetyRiskFlags.push("Hazard / storm work — elevated personal safety risk; on-site risk assessment required");
+  if (safetyRiskFlags.length === 0) safetyRiskFlags.push("No specific site-visit triggers detected from form inputs");
+
+  // Confidence levels
+  const photoConfMap = { "Excellent": "High", "Usable": "Moderate", "Limited": "Low", "Not Quote-Ready": "Very Low" };
+  const photoConfidence  = (photoConfMap[pi.photoScore] || "Moderate") + " photo confidence";
+  const scopeConfidence  = readinessScore >= 75 ? "Moderate scope confidence — key elements visible"
+                         : "Low scope confidence — checklist items missing";
+  const pricingConfidence = readinessScore >= 75 ? "Moderate — photo supports preliminary pricing"
+                          : "Low — reshooting recommended before final quote";
+
+  // Site visit decision
+  const svr = riskLevel === "Site Visit Required";
+  const siteVisitDecision = {
+    decision: svr ? "Site Visit Required" : "Preliminary estimate issued — human review required before final quote",
+    reason: svr
+      ? "One or more site-visit triggers detected from form inputs. No remote estimate will be issued for this job."
+      : "Inputs are within remote-estimate limits. Standard human approval required before final quote is sent.",
+  };
+
+  // Obsessed scope
+  const baseIncluded = {
+    "Light Trim":                  ["Crown cleaning — dead, crossing, and rubbing branches", "Canopy balancing to maintain natural form", "Debris chipping and haul-away per cleanup selection"],
+    "Structural / Clearance Trim": ["Clearance pruning per selected clearance goal", "Crown raising — lower limb removal to target height", "Debris chipping and haul-away per cleanup selection"],
+    "Reduction / Cutback":         ["Selective reduction — lateral cuts to live branches only", "End-weight removal from outer canopy tips", "Debris chipping and haul-away per cleanup selection"],
+    "Small Tree Removal":          ["Full tree removal — section-by-section felling", "Stump cut to ground level", "Debris chipping and haul-away per cleanup selection"],
+    "Medium / Large Tree Removal": ["Full tree removal — climbing, rigging, and staged sections", "Stump cut to ground level", "Debris chipping, log hauling per cleanup selection"],
+    "Hazard / Storm Damage Review":["Hazard limb assessment and removal as approved", "Debris cleanup from work area", "On-site arborist risk review"],
+    "Stump Grinding":              ["Stump grinding to 6–8 in. below grade", "Chips raked back into void", "Major root flares ground at surface"],
+    "Shrub Trim / Shrub Removal":  ["Shrub shaping / removal per scope", "Debris chipping or haul-away per cleanup selection"],
+    "Site Visit Required":         ["On-site scope review required before any work is scheduled"],
+  };
+  const included = baseIncluded[servicePreset] || baseIncluded["Light Trim"];
+
+  const excluded = [
+    "Utility-adjacent work (within 10 ft of energized lines) — requires line-clearance arborist",
+    "Stump grinding (unless selected as service)",
+    "Additional trees or shrubs not shown in record photo",
+    "Sod repair, landscaping, or soil amendment after work",
+    "Permit coordination (available at additional cost)",
+    "Emergency or same-day response surcharge not included in estimate",
+  ];
+
+  const measurementAssumptions = [
+    `Tree size class: ${size}`,
+    `Estimated crew hours: ${crewHours} hrs`,
+    `Estimated debris: ${debrisCubicYards} cu yd`,
+    `Nearest target distance: ${dist} ft`,
+    `Crew access: ${access}`,
+    `Cleanup: ${ca.cleanupPreference || "Not specified"}`,
+    `Risk level: ${riskLevel}`,
+  ];
+
+  const headline = `${servicePreset} — ${size} ${pi.plantType || "Tree"}`;
+  const workZone = ca.workSide || "Open yard side";
+
+  // Price change factors
+  const priceChangeFactor = [
+    "Hidden decay, hollow sections, or unstable wood discovered on-site",
+    "Tree size larger or smaller than estimated from photo",
+    "Access more restricted than shown in photo",
+    "Additional trees, limbs, or stumps added to scope on arrival",
+    "Unexpected underground utilities, roots, or structures",
+    "Emergency or same-day scheduling surcharge",
+    `Urgency level: ${ea.urgencyLevel || "Routine"} — priority/emergency adds 20–35%`,
+  ];
+  if (dist < 10) priceChangeFactor.push(`Target within ${dist} ft — precision rigging may add cost`);
+
+  // Customer message
+  const estRange = `${fmt(low)}–${fmt(high)}`;
+  const customerMessage = `Hi ${ci.customerName || "there"},
+
+Thank you for sending over your tree photo. Based on what I can see, here's where we stand:
+
+Service: ${servicePreset}
+Preliminary Estimate: ${estRange}
+Risk Level: ${riskLevel}
+
+What's included: ${included.slice(0,2).join("; ")}.
+
+${svr ? "I'd like to schedule a quick on-site visit before we finalize anything — a few things I noticed need eyes on before we can quote accurately." : "This is a preliminary range based on the photo. Final price is confirmed on-site before any work begins."}
+
+${ea.urgencyLevel === "Emergency" ? "I see you marked this as an emergency. I'll reach out right away to get something scheduled." : `I'll be in touch to confirm scheduling. Preferred contact: ${ci.preferredContact || "any"}.`}
+
+— Dynamic Tree Services
+(555) 555-5555 · dynamictreeservices.com`;
+
+  // Visual preview prompt
+  const visualPreviewPrompt = `Photorealistic tree service illustration: ${size} ${pi.plantType || "tree"}, ${servicePreset.toLowerCase()} in progress. Work zone: ${workZone}. Crew of ${crewProfile.split("—")[0].trim()} visible. ISA-standard cuts, proper PPE, professional equipment. Illustrative style — not a final arborist assessment.`;
+
+  // Human approval
+  const humanApprovalRequirement = "This preliminary estimate requires authorized human review and approval before being sent to the customer as a final quote. Field conditions, hidden decay, access limitations, and site-specific factors may change the final scope and price significantly.";
+
+  // Internal crew notes
+  const internalCrewNotes = [
+    `Service: ${servicePreset} | Risk: ${riskLevel} | Size: ${size} | Access: ${access}`,
+    `Crew profile: ${crewProfile}`,
+    `Estimated crew hours: ${crewHours} | Debris: ${debrisCubicYards} cu yd`,
+    `Nearest target: ${dist} ft | Work zone: ${workZone}`,
+    "---",
+    "Review record photo before arrival — verify tree size, access route, and target proximity match estimate.",
+    "Confirm cleanup scope with customer before starting work.",
+    species ? `Species note — ${species.name}: ${species.alert || species.pruningWindow}` : "Species unknown — standard ISA BMP applies.",
+    ...(safetyRiskFlags.filter(f => !f.includes("No specific"))),
+    "---",
+    "All cuts: branch collar only. No flush cuts. No topping. No stub cuts.",
+    "25% live crown rule applies unless removal job.",
+    "Stop-work authority: any crew member may stop work if conditions are unsafe.",
+  ];
+
+  // Job snapshot for crew tab
+  const jobSnapshot = {
+    customer: ci.customerName || "Not provided",
+    phone: ci.phone || "Not provided",
+    email: ci.email || "Not provided",
+    address: ci.address || "Not provided",
+    gps: ci.gpsPin || "Not provided",
+    preferredContact: ci.preferredContact || "Not specified",
+    urgency: ea.urgencyLevel || "Routine",
+    completionWindow: ea.completionWindow || "Not specified",
+    requestedWork: ca.requestedWork,
+    cleanupPreference: ca.cleanupPreference,
+    clearanceGoal: ca.clearanceGoal,
+    accessClass: access,
+    concernsNoted: ca.accessUtilitySafetyConcerns || "None",
+  };
+
+  // Job ID
+  const jobId = "TV-" + Date.now().toString(36).toUpperCase().slice(-6);
+
+  return {
+    jobId,
+    servicePreset,
+    riskLevel,
+    species,
+    photoPacketScore: { singlePhotoScore, fullPacketStatus, reason: photoReason },
+    onePhotoReadiness: { score: readinessScore, missing },
+    visibleTreeReview: {
+      plantType: pi.plantType || "Tree",
+      approximateSizeClass: size,
+      accessAssessment: access,
+      likelySpecies: species ? species.name : (ea.treeSpeciesGuess || "Unknown / Not specified"),
+      distanceToNearestTarget: `${dist} ft`,
+      urgencyLevel: ea.urgencyLevel || "Routine",
+    },
+    safetyRiskFlags,
+    quoteFactorBreakdown: { labor, travel, fuel, equipment, disposal, materials, overhead, riskBuffer, profit },
+    preliminaryEstimateRange: { low, expected, high },
+    confidenceLevel: { photoConfidence, scopeConfidence, pricingConfidence },
+    siteVisitDecision,
+    obsessedScope: { headline, workZone, included, excluded, measurementAssumptions },
+    priceChangeFactor,
+    customerMessage,
+    visualPreviewPrompt,
+    humanApprovalRequirement,
+    internalCrewNotes,
+    jobSnapshot,
+    meta: { estimatedCrewHours: crewHours, crewProfile, debrisCubicYards },
+  };
+}
+
+// ============================================================
+// RESULTS RENDERING
+// ============================================================
+function renderResults(estimate) {
+  const dangerMap = {
+    "Low":                 "badge-low",
+    "Medium":              "badge-medium",
+    "High":                "badge-danger",
+    "Site Visit Required": "badge-svr",
+  };
+  const dangerClass = dangerMap[estimate.riskLevel] || "badge-medium";
+
+  document.getElementById("resultsTitle").textContent =
+    estimate.servicePreset + " — " + estimate.riskLevel;
+
+  renderCustomerTab(estimate);
+  renderAssessmentTab(estimate, dangerClass);
+  renderCrewTab(estimate, dangerClass);
+  renderScienceTab(estimate);
+
+  const results = document.getElementById("results");
+  results.hidden = false;
+  results.scrollIntoView({ behavior: "smooth", block: "start" });
+}
+
+function renderCustomerTab(e) {
+  const svr = e.riskLevel === "Site Visit Required";
+  const r   = e.preliminaryEstimateRange;
+  document.getElementById("tab-customer").innerHTML = `
+    <div class="customer-summary">
+      <div class="customer-hero">
+        <div>
+          <p class="eyebrow">Preliminary Estimate · Requires Human Approval</p>
+          <h3>${esc(e.obsessedScope.headline)}</h3>
+          <p class="customer-range">
+            ${svr
+              ? `<span class="badge badge-svr">Site Visit Required</span>`
+              : `${fmt(r.low)} &ndash; ${fmt(r.high)} <span class="range-label">preliminary range</span>`}
+          </p>
+        </div>
+      </div>
+
+      <div class="customer-blocks">
+        <div class="customer-block">
+          <h4>What's Included</h4>
+          <ul>${e.obsessedScope.included.map(i=>`<li>${esc(i)}</li>`).join("")}</ul>
+        </div>
+        <div class="customer-block">
+          <h4>What Could Change the Price</h4>
+          <ul>${e.priceChangeFactor.slice(0,4).map(f=>`<li>${esc(f)}</li>`).join("")}</ul>
+        </div>
+      </div>
+
+      <div class="customer-block full">
+        <h4>Next Step</h4>
+        <p>${esc(e.siteVisitDecision.decision)}</p>
+        <p style="color:var(--muted);font-size:0.9rem">${esc(e.siteVisitDecision.reason)}</p>
+      </div>
+
+      <div class="customer-block full">
+        <h4>Customer Message Draft</h4>
+        <pre class="customer-message">${esc(e.customerMessage)}</pre>
+        <button class="copy-btn" onclick="copyText(this,'${btoa(encodeURIComponent(e.customerMessage))}')">Copy Message</button>
+      </div>
+    </div>`;
+}
+
+// ============================================================
+// CANVAS DRAWING PRIMITIVES
+// ============================================================
+function drawZone(ctx, z) {
+  ctx.save();
+  ctx.fillStyle = z.fill;
+  ctx.strokeStyle = z.stroke;
+  ctx.lineWidth = 1.8;
+  if (z.dash) ctx.setLineDash([7, 5]);
+  else ctx.setLineDash([]);
+  ctx.beginPath();
+  ctx.roundRect(z.x, z.y, z.w, z.h, 6);
+  ctx.fill();
+  ctx.stroke();
+
+  // Label
+  const fontSize = Math.max(9, Math.min(12, z.w / 14));
+  ctx.font = `bold ${fontSize}px Arial`;
+  ctx.fillStyle = z.stroke.replace(/[\d.]+\)$/, "0.95)");
+  ctx.textAlign = "center";
+  ctx.setLineDash([]);
+  const labelX = z.x + z.w / 2;
+  const labelY = z.lpos === "bottom" ? z.y + z.h - 7 : z.y + fontSize + 5;
+  // White halo behind text
+  ctx.strokeStyle = "rgba(255,255,255,0.8)";
+  ctx.lineWidth = 3;
+  ctx.strokeText(z.label, labelX, labelY);
+  ctx.fillText(z.label, labelX, labelY);
+  ctx.restore();
+}
+
+function buildCutPoints(servicePreset, W, H) {
+  const cuts = [];
+  if (/Trim|Clearance|Reduction/.test(servicePreset)) {
+    cuts.push({ x: W*0.30, y: H*0.22, label: "Cut A" });
+    cuts.push({ x: W*0.70, y: H*0.18, label: "Cut B" });
+    cuts.push({ x: W*0.50, y: H*0.38, label: "Cut C" });
+  } else if (/Removal/.test(servicePreset)) {
+    cuts.push({ x: W*0.50, y: H*0.30, label: "Section 1" });
+    cuts.push({ x: W*0.50, y: H*0.55, label: "Section 2" });
+    cuts.push({ x: W*0.50, y: H*0.74, label: "Fell Cut" });
+  }
+  return cuts;
+}
+
+function drawCutPoints(ctx, cuts) {
+  cuts.forEach(pt => {
+    ctx.save();
+    ctx.fillStyle = "rgba(210,165,0,0.92)";
+    ctx.strokeStyle = "rgba(255,255,255,0.9)";
+    ctx.lineWidth = 1.5;
+    ctx.beginPath();
+    const s = 8;
+    ctx.moveTo(pt.x, pt.y - s);
+    ctx.lineTo(pt.x + s, pt.y);
+    ctx.lineTo(pt.x, pt.y + s);
+    ctx.lineTo(pt.x - s, pt.y);
+    ctx.closePath();
+    ctx.fill();
+    ctx.stroke();
+
+    ctx.font = "bold 9px Arial";
+    ctx.fillStyle = "rgba(120,90,0,0.95)";
+    ctx.textAlign = "center";
+    ctx.strokeStyle = "rgba(255,255,255,0.85)";
+    ctx.lineWidth = 2.5;
+    ctx.strokeText(pt.label, pt.x, pt.y + s + 11);
+    ctx.fillText(pt.label, pt.x, pt.y + s + 11);
+    ctx.restore();
+  });
+}
+
+function drawChip(ctx, label, x, y, align, bgColor, textColor) {
+  ctx.save();
+  ctx.font = "bold 10px Arial";
+  const tw = ctx.measureText(label).width;
+  const padH = 8, padV = 5;
+  const chipW = tw + padH * 2;
+  const chipH = 18 + padV * 2;
+  const chipX = align === "right" ? x - chipW : x;
+  ctx.fillStyle = bgColor;
+  ctx.beginPath();
+  ctx.roundRect(chipX, y, chipW, chipH, 5);
+  ctx.fill();
+  ctx.fillStyle = textColor;
+  ctx.textAlign = "left";
+  ctx.fillText(label, chipX + padH, y + chipH - padV - 3);
+  ctx.restore();
+}
+
+// ============================================================
 // ANNOTATION ENGINE — ISA/ANSI A300 · Knowledge Base aligned
 // Visual Preview Policy: Illustrative only. Preserves structure.
 // Zones use ISA BMP language. Risk colors match Risk Rating Matrix.
@@ -342,7 +856,66 @@ function buildAnnotationZones(input, servicePreset, riskLevel, W, H) {
 
     case "Small Tree Removal":
       zones.push({ x: W*0.06, y: H*0.03, w: W*0.88, h: H*(canopyH + 0.06),
-        fill: "rgba(190,40,40,0.15)", stroke: "rgba(165,20,20,0.…11022 tokens truncated…e:</strong> ${esc(e.photoPacketScore.singlePhotoScore)}</li>
+        fill: "rgba(190,40,40,0.15)", stroke: "rgba(165,20,20,0.82)",
+        label: "FULL REMOVAL — SECTION-BY-SECTION", lpos: "top", dash: false });
+      zones.push({ x: W*0.12, y: H*0.75, w: W*0.76, h: H*0.11,
+        fill: "rgba(190,30,30,0.10)", stroke: "rgba(165,15,15,0.50)",
+        label: "DROP ZONE — CREW STAGING", lpos: "bottom", dash: true });
+      break;
+
+    case "Medium / Large Tree Removal":
+      zones.push({ x: W*0.04, y: H*0.02, w: W*0.92, h: H*(canopyH + 0.07),
+        fill: "rgba(190,30,30,0.18)", stroke: "rgba(165,15,15,0.88)",
+        label: "FULL REMOVAL — RIGGING / STAGED SECTIONS", lpos: "top", dash: false });
+      zones.push({ x: W*0.08, y: H*0.75, w: W*0.84, h: H*0.12,
+        fill: "rgba(190,30,30,0.12)", stroke: "rgba(165,15,15,0.55)",
+        label: "DROP ZONE / HAUL ZONE", lpos: "bottom", dash: true });
+      break;
+
+    case "Hazard / Storm Damage Review":
+      zones.push({ x: W*0.04, y: H*0.02, w: W*0.92, h: H*canopyH,
+        fill: "rgba(190,30,30,0.22)", stroke: "rgba(165,15,15,0.90)",
+        label: "HAZARD / STORM ZONE — ON-SITE REVIEW REQUIRED", lpos: "top", dash: false });
+      break;
+
+    case "Stump Grinding":
+      zones.push({ x: W*0.32, y: H*0.68, w: W*0.36, h: H*0.22,
+        fill: "rgba(120,75,35,0.18)", stroke: "rgba(90,55,20,0.75)",
+        label: "STUMP GRINDING ZONE — BELOW GRADE", lpos: "bottom", dash: false });
+      break;
+
+    case "Shrub Trim / Shrub Removal":
+      zones.push({ x: W*0.08, y: H*0.25, w: W*0.84, h: H*0.60,
+        fill: "rgba(40,160,70,0.10)", stroke: "rgba(30,130,55,0.65)",
+        label: "SHRUB WORK ZONE", lpos: "top", dash: false });
+      break;
+
+    case "Site Visit Required":
+      zones.push({ x: W*0.04, y: H*0.03, w: W*0.92, h: H*0.90,
+        fill: "rgba(190,30,30,0.12)", stroke: "rgba(165,15,15,0.75)",
+        label: "SITE VISIT REQUIRED — NO REMOTE ESTIMATE", lpos: "top", dash: true });
+      break;
+
+    default:
+      zones.push({ x: W*0.06, y: H*0.04, w: W*0.88, h: H*canopyH,
+        fill: "rgba(40,160,70,0.09)", stroke: "rgba(30,130,55,0.58)",
+        label: "CANOPY WORK ZONE", lpos: "top", dash: true });
+  }
+
+  return zones;
+}
+
+// ============================================================
+// ASSESSMENT TAB RENDERER
+// ============================================================
+function renderAssessmentTab(e, dangerClass) {
+  const qf = e.quoteFactorBreakdown;
+  document.getElementById("tab-assessment").innerHTML = `
+    <div class="results-grid">
+      <div class="result-section">
+        <h3>4. Photo Packet Score</h3>
+        <ul>
+          <li><strong>Single-photo score:</strong> ${esc(e.photoPacketScore.singlePhotoScore)}</li>
           <li><strong>Full packet status:</strong> ${esc(e.photoPacketScore.fullPacketStatus)}</li>
           <li><strong>Reason:</strong> ${esc(e.photoPacketScore.reason)}</li>
           <li><strong>Checklist score:</strong> ${e.onePhotoReadiness.score}%</li>
@@ -352,7 +925,7 @@ function buildAnnotationZones(input, servicePreset, riskLevel, W, H) {
       <div class="result-section">
         <h3>5. Visible Tree / Shrub Review</h3>
         <ul>
-          ${Object.entries(e.visibleTreeReview).map(([k,v])=>`<li><strong>${labelize(k)}:</strong> ${esc(v)}</li>`).join("")}
+          ${Object.entries(e.visibleTreeReview).map(([k,v])=>`<li><strong>${labelize(k)}:</strong> ${esc(String(v))}</li>`).join("")}
         </ul>
       </div>
       <div class="result-section">
@@ -666,6 +1239,36 @@ document.querySelectorAll(".photo-check").forEach(box => {
 // ============================================================
 document.getElementById("estimateForm").addEventListener("submit", evt => {
   evt.preventDefault();
+
+  // Validation
+  const validationErrors = [];
+  const reqSel  = id => document.getElementById(id)?.value;
+  const reqNum  = id => document.getElementById(id)?.value;
+  if (!document.getElementById("photoUpload")?.files?.length) validationErrors.push("Photo upload is required");
+  if (!reqSel("requestedWork"))  validationErrors.push("Requested work type is required");
+  if (!reqSel("cleanupPreference")) validationErrors.push("Cleanup preference is required");
+  if (!reqSel("treeSizeClass"))  validationErrors.push("Tree or shrub size class is required");
+  if (!reqSel("accessClass"))    validationErrors.push("Crew access class is required");
+  const distVal = parseFloat(reqNum("nearestTargetDistanceFeet"));
+  if (!reqNum("nearestTargetDistanceFeet") || isNaN(distVal)) validationErrors.push("Nearest target distance is required");
+  else if (distVal < 0 || distVal > 500) validationErrors.push("Nearest target distance must be between 0 and 500 ft");
+
+  let errBox = document.getElementById("formValidationErrors");
+  if (!errBox) {
+    errBox = document.createElement("div");
+    errBox.id = "formValidationErrors";
+    errBox.className = "validation-error-box";
+    document.querySelector(".form-footer").prepend(errBox);
+  }
+  if (validationErrors.length) {
+    errBox.innerHTML = "<strong>Please fix the following before submitting:</strong><ul>" +
+      validationErrors.map(e => `<li>${esc(e)}</li>`).join("") + "</ul>";
+    errBox.hidden = false;
+    errBox.scrollIntoView({ behavior: "smooth", block: "nearest" });
+    return;
+  }
+  errBox.hidden = true;
+
   const input = getFormInput();
   const estimate = buildEstimate(input);
 
