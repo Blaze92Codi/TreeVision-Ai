@@ -1,0 +1,7 @@
+__pycache__/
+*.pyc
+certificates_inbox/
+certificates_processed/
+certificates_error/
+*.xlsx
+.env
