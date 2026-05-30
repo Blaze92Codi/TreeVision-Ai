@@ -400,6 +400,14 @@ button {
   margin-top: 20px;
 }
 
+.results-grid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0,1fr));
+  gap: 18px;
+  padding: 4px 0;
+}
+.results-grid .result-section.full { grid-column: 1 / -1; }
+
 .result-section {
   border-top: 1px solid var(--line);
   padding-top: 16px;
@@ -611,9 +619,9 @@ pre {
 
 /* ── RESPONSIVE ── */
 @media (max-width: 860px) {
-  .hero, .form-grid, .section-grid, .price-range,
+  .hero, .form-grid, .section-grid, .results-grid, .price-range,
   .photo-compare, .crew-grid, .science-grid,
-  .check-grid, .scope-hero, .scope-columns { grid-template-columns: 1fr; }
+  .check-grid, .scope-hero, .scope-columns, .customer-blocks { grid-template-columns: 1fr; }
   .result-header-row { flex-direction: column; }
   .app-shell { width: min(100% - 20px, 1160px); padding-top: 22px; }
   .form-section { padding: 20px 18px; }

@@ -610,6 +610,19 @@ function renderCustomerTab(e) {
 
 // ============================================================
 // CANVAS DRAWING PRIMITIVES
+// Polyfill for ctx.roundRect — not available in older Safari/Chrome
+if (typeof CanvasRenderingContext2D !== "undefined" && !CanvasRenderingContext2D.prototype.roundRect) {
+  CanvasRenderingContext2D.prototype.roundRect = function(x, y, w, h, r) {
+    const rad = Math.min(Number(r) || 0, w / 2, h / 2);
+    this.moveTo(x + rad, y);
+    this.arcTo(x + w, y,     x + w, y + h, rad);
+    this.arcTo(x + w, y + h, x,     y + h, rad);
+    this.arcTo(x,     y + h, x,     y,     rad);
+    this.arcTo(x,     y,     x + w, y,     rad);
+    this.closePath();
+  };
+}
+
 // ============================================================
 function drawZone(ctx, z) {
   ctx.save();

@@ -500,3 +500,9 @@ textarea { resize: vertical; }
   .upload-preview { grid-template-columns: 1fr; }
   .upload-preview img { width: 100%; height: 180px; }
 }
+
+/* ── PORTAL PANEL VARIANTS ── */
+.work-panel    { border-top: 3px solid var(--brand); }
+.preview-panel { border-top: 3px solid var(--accent); }
+.intake-form   { background: var(--soft); }
+.plan-panel    { border-top: 3px solid var(--muted); background: var(--soft); }
