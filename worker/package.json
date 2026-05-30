@@ -9,12 +9,7 @@
     "db:migrate:local": "wrangler d1 migrations apply treevision --local",
     "db:migrate:remote": "wrangler d1 migrations apply treevision --remote",
     "r2:create": "wrangler r2 bucket create treevision-photos",
-    "tail": "wrangler tail",
-    "deploy:sandbox": "wrangler deploy --env sandbox",
-    "db:create:sandbox": "wrangler d1 create treevision-sandbox",
-    "db:migrate:sandbox": "wrangler d1 migrations apply treevision-sandbox --remote",
-    "r2:create:sandbox": "wrangler r2 bucket create treevision-sandbox-photos",
-    "tail:sandbox": "wrangler tail --env sandbox"
+    "tail": "wrangler tail"
   },
   "dependencies": {
     "hono": "^4.6.14"

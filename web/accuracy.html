@@ -1,0 +1,275 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>TreeVision — AI Accuracy Test</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Bricolage+Grotesque:opsz,wght@12..96,400;12..96,600;12..96,800&family=Spline+Sans:wght@400;500;600&display=swap" rel="stylesheet">
+<style>
+:root{--green:#2faa5e;--green-deep:#1c7a42;--green-soft:#eaf7ef;--green-mid:#c6ecd6;--ink:#0f1a12;--muted:#6b7c70;--line:#d9e6dd;--bg:#f6f8f6;--card:#fff;--danger:#b3261e;--warn:#7a5c00;--warn-bg:#fff8e1}
+*,*::before,*::after{margin:0;padding:0;box-sizing:border-box}
+body{font-family:'Spline Sans',sans-serif;background:var(--bg);color:var(--ink);min-height:100vh}
+button{cursor:pointer;font-family:inherit;border:none}
+input,select{font-family:inherit}
+a{color:var(--green-deep)}
+.topbar{background:var(--ink);color:#fff;padding:14px 20px;display:flex;align-items:center;gap:12px}
+.topbar h1{font-family:'Bricolage Grotesque',sans-serif;font-size:1.2rem;font-weight:800;letter-spacing:-.02em}
+.topbar .sub{font-size:.75rem;color:rgba(255,255,255,.55)}
+.topbar .grow{flex:1}
+.topbar button{background:rgba(255,255,255,.15);color:#fff;padding:6px 12px;border-radius:8px;font-size:.85rem;white-space:nowrap}
+.wrap{max-width:1100px;margin:0 auto;padding:24px 20px 80px}
+.btn{background:var(--green);color:#fff;padding:12px 18px;border-radius:10px;font-weight:700;font-size:.95rem}
+.btn:hover{background:var(--green-deep)}.btn:disabled{opacity:.5;pointer-events:none}
+.btn-ghost{background:transparent;color:var(--green-deep);border:1.5px solid var(--green-mid);padding:10px 16px;border-radius:10px;font-weight:600;font-size:.9rem}
+.btn-ghost:hover{background:var(--green-soft)}
+.field{display:flex;flex-direction:column;gap:6px;margin-bottom:14px}
+.field label{font-size:.82rem;font-weight:600}
+.field input,.field select{border:1px solid var(--line);border-radius:10px;padding:10px 12px;font-size:.95rem;background:#fff}
+.field input:focus,.field select:focus{outline:none;border-color:var(--green);box-shadow:0 0 0 3px var(--green-soft)}
+.login-card{max-width:420px;margin:80px auto 0;background:var(--card);border:1px solid var(--line);border-radius:20px;padding:32px;box-shadow:0 4px 24px rgba(0,0,0,.04)}
+.login-card h2{font-family:'Bricolage Grotesque',sans-serif;font-size:1.6rem;font-weight:800;margin-bottom:6px}
+.login-card p{color:var(--muted);font-size:.9rem;margin-bottom:20px}
+.intro{background:var(--warn-bg);border:1px solid #f0d97a;border-radius:14px;padding:14px 18px;font-size:.88rem;color:#4a3d10;line-height:1.55;margin-bottom:20px}
+.intro strong{color:var(--warn)}
+h2.sec{font-family:'Bricolage Grotesque',sans-serif;font-size:1.5rem;font-weight:800;letter-spacing:-.02em;margin-bottom:4px}
+.muted{color:var(--muted);font-size:.9rem}
+
+/* Input rows */
+.rows{display:flex;flex-direction:column;gap:10px;margin:16px 0}
+.input-row{display:grid;grid-template-columns:64px 1fr 130px 160px 36px;gap:12px;align-items:center;background:var(--card);border:1px solid var(--line);border-radius:14px;padding:10px 12px}
+.input-row .thumb{width:56px;height:56px;border-radius:10px;object-fit:cover;background:var(--bg);border:1px solid var(--line)}
+.input-row .thumb-empty{width:56px;height:56px;border-radius:10px;background:var(--bg);border:1px dashed var(--line);display:flex;align-items:center;justify-content:center;font-size:1.3rem;color:var(--muted)}
+.input-row input[type=file]{display:none}
+.input-row .filelabel{font-size:.85rem;color:var(--green-deep);font-weight:600;cursor:pointer;text-decoration:underline}
+.input-row input,.input-row select{border:1px solid var(--line);border-radius:8px;padding:8px 10px;font-size:.9rem;width:100%;background:#fff}
+.input-row .rm{background:none;color:var(--danger);font-size:1.1rem;width:32px;height:32px;border-radius:8px}
+.input-row .rm:hover{background:#fdecea}
+@media(max-width:720px){.input-row{grid-template-columns:48px 1fr 30px;grid-template-areas:"thumb file rm" "price price price" "svc svc svc";gap:8px}.input-row .thumb,.input-row .thumb-empty{grid-area:thumb}.input-row .filewrap{grid-area:file}.input-row .pricewrap{grid-area:price}.input-row .svcwrap{grid-area:svc}.input-row .rm{grid-area:rm}}
+
+/* Stats */
+.stats{display:grid;grid-template-columns:repeat(auto-fit,minmax(150px,1fr));gap:12px;margin:20px 0}
+.stat{background:var(--card);border:1px solid var(--line);border-radius:14px;padding:14px 16px}
+.stat .k{font-size:.72rem;color:var(--muted);text-transform:uppercase;letter-spacing:.04em;font-weight:600}
+.stat .v{font-family:'Bricolage Grotesque',sans-serif;font-size:1.5rem;font-weight:800;letter-spacing:-.02em;margin-top:2px}
+.stat .v.good{color:var(--green-deep)}.stat .v.bad{color:var(--danger)}.stat .v.warn{color:var(--warn)}
+.verdict{border-radius:14px;padding:16px 18px;margin:8px 0 20px;font-size:.95rem;line-height:1.5}
+.verdict.good{background:var(--green-soft);color:var(--green-deep);border:1px solid var(--green-mid)}
+.verdict.warn{background:var(--warn-bg);color:var(--warn);border:1px solid #f0d97a}
+.verdict.bad{background:#fdecea;color:var(--danger);border:1px solid #f3b4af}
+.verdict strong{font-weight:700}
+
+/* Results table */
+.rtable{background:var(--card);border:1px solid var(--line);border-radius:16px;overflow:hidden}
+.rrow{display:grid;grid-template-columns:56px 1.4fr 1fr 1fr 1fr 90px;gap:12px;align-items:center;padding:12px 16px;border-bottom:1px solid var(--line);font-size:.88rem}
+.rrow:last-child{border-bottom:none}
+.rrow.head{background:var(--bg);font-size:.72rem;color:var(--muted);text-transform:uppercase;letter-spacing:.04em;font-weight:600}
+.rrow .thumb{width:48px;height:48px;border-radius:8px;object-fit:cover;border:1px solid var(--line)}
+.rrow .strong{font-weight:600}
+.delta{font-weight:700;white-space:nowrap}
+.delta.in{color:var(--green-deep)}.delta.over{color:var(--danger)}.delta.under{color:var(--warn)}
+.pill{display:inline-block;padding:2px 8px;border-radius:999px;font-size:.7rem;font-weight:700}
+.pill.in{background:var(--green-soft);color:var(--green-deep)}
+.pill.out{background:#fdecea;color:var(--danger)}
+.err{background:#fdecea;color:var(--danger);border-radius:10px;padding:10px 14px;font-size:.85rem;margin-top:8px}
+.spin{display:inline-block;width:16px;height:16px;border:2px solid var(--green-mid);border-top-color:var(--green);border-radius:50%;animation:spin .7s linear infinite;vertical-align:-3px}
+@keyframes spin{to{transform:rotate(360deg)}}
+@media(max-width:720px){.rrow{grid-template-columns:48px 1fr auto;grid-template-areas:"th name delta" "th sub sub";font-size:.82rem}.rrow .th{grid-area:th}.rrow .c-name{grid-area:name}.rrow .c-ai,.rrow .c-actual,.rrow .c-svc{display:none}.rrow .c-delta{grid-area:delta;justify-self:end}.rrow .c-sub{grid-area:sub;color:var(--muted);font-size:.78rem}.rrow.head{display:none}}
+</style>
+</head>
+<body>
+<div class="topbar">
+  <h1>🎯 AI Accuracy Test</h1>
+  <div class="sub">TreeVision — validation harness</div>
+  <div class="grow"></div>
+  <button id="logout-btn" onclick="logout()" style="display:none">Sign out</button>
+</div>
+
+<div class="wrap">
+  <!-- LOGIN -->
+  <div id="view-login">
+    <div class="login-card">
+      <div style="font-size:2.4rem;margin-bottom:8px">🎯</div>
+      <h2>Accuracy test</h2>
+      <p>Run real past jobs through the live AI and see how close its estimate lands. Paste the admin token to start.</p>
+      <div class="field"><label for="token">Admin token</label><input id="token" type="password"></div>
+      <button class="btn" style="width:100%" onclick="login()">Sign in</button>
+      <div id="login-err" class="err" style="display:none;margin-top:12px"></div>
+    </div>
+  </div>
+
+  <!-- APP -->
+  <div id="view-app" style="display:none">
+    <div class="intro">
+      <strong>How to use:</strong> for each past job, add a row — upload the tree photo, enter the <strong>actual final price you charged</strong>, and pick the <strong>service you actually performed</strong>. Then run the test. The AI analyzes each photo with the exact same logic real customers get, and we compare its estimate to your real price.
+      <br><br>Aim for 8–12 jobs across different sizes/services for a meaningful read. Each photo costs ~$0.03 in AI usage.
+    </div>
+
+    <h2 class="sec">Past jobs</h2>
+    <div class="muted">Add one row per job. Photo + the price you actually charged + the service done.</div>
+    <div class="rows" id="rows"></div>
+    <button class="btn-ghost" onclick="addRow()">+ Add a job</button>
+
+    <div style="margin-top:20px;display:flex;gap:10px;align-items:center;flex-wrap:wrap">
+      <button class="btn" id="run-btn" onclick="runTest()">Run accuracy test →</button>
+      <span id="run-status" class="muted"></span>
+    </div>
+
+    <div id="results" style="margin-top:28px"></div>
+  </div>
+</div>
+
+<script>
+const KEY='treevision_admin_token';
+let TOKEN=null;
+let rowSeq=0;
+const SERVICES={trim:'Trimming & Pruning',removal:'Full Tree Removal',stump:'Stump Grinding',treatment:'Health & Treatment'};
+
+document.addEventListener('DOMContentLoaded',()=>{
+  const t=localStorage.getItem(KEY);
+  if(t){TOKEN=t;enter();}
+  document.getElementById('token').addEventListener('keydown',e=>{if(e.key==='Enter')login();});
+});
+
+async function login(){
+  const t=document.getElementById('token').value.trim();
+  if(!t)return;
+  const res=await fetch('/api/admin/leads?limit=1',{headers:{Authorization:'Bearer '+t}});
+  if(res.ok){TOKEN=t;localStorage.setItem(KEY,t);enter();}
+  else{const e=document.getElementById('login-err');e.textContent=res.status===401?'Invalid token.':'Could not reach server.';e.style.display='block';}
+}
+function logout(){TOKEN=null;localStorage.removeItem(KEY);document.getElementById('view-app').style.display='none';document.getElementById('view-login').style.display='block';document.getElementById('logout-btn').style.display='none';}
+function enter(){
+  document.getElementById('view-login').style.display='none';
+  document.getElementById('view-app').style.display='block';
+  document.getElementById('logout-btn').style.display='inline-block';
+  if(!document.querySelectorAll('.input-row').length){addRow();addRow();addRow();}
+}
+
+function addRow(){
+  const id='r'+(rowSeq++);
+  const div=document.createElement('div');
+  div.className='input-row';div.id=id;
+  div.innerHTML=`
+    <div class="thumb-empty" data-thumb>📷</div>
+    <div class="filewrap">
+      <input type="file" accept="image/*" id="${id}-file" onchange="onFile('${id}')">
+      <label class="filelabel" for="${id}-file" data-fname>Choose photo…</label>
+    </div>
+    <div class="pricewrap"><input type="number" min="0" placeholder="Actual $" id="${id}-price"></div>
+    <div class="svcwrap"><select id="${id}-svc">${Object.entries(SERVICES).map(([k,v])=>`<option value="${k}">${v}</option>`).join('')}</select></div>
+    <button class="rm" onclick="rmRow('${id}')" title="Remove">✕</button>`;
+  document.getElementById('rows').appendChild(div);
+}
+function rmRow(id){document.getElementById(id)?.remove();}
+function onFile(id){
+  const f=document.getElementById(id+'-file').files[0];
+  if(!f)return;
+  const row=document.getElementById(id);
+  row._file=f;
+  const r=new FileReader();
+  r.onload=()=>{const t=row.querySelector('[data-thumb]');t.outerHTML=`<img class="thumb" data-thumb src="${r.result}">`;};
+  r.readAsDataURL(f);
+  row.querySelector('[data-fname]').textContent=f.name.length>20?f.name.slice(0,18)+'…':f.name;
+}
+
+async function resize(file,max,q){
+  return new Promise((res,rej)=>{
+    const img=new Image(),fr=new FileReader();
+    fr.onload=()=>img.src=fr.result;fr.onerror=()=>rej(new Error('read'));
+    img.onload=()=>{const r=Math.min(1,max/Math.max(img.width,img.height));const w=Math.round(img.width*r),h=Math.round(img.height*r);const cv=document.createElement('canvas');cv.width=w;cv.height=h;cv.getContext('2d').drawImage(img,0,0,w,h);cv.toBlob(b=>b?res(b):rej(new Error('resize')),'image/jpeg',q);};
+    img.onerror=()=>rej(new Error('decode'));fr.readAsDataURL(file);
+  });
+}
+
+async function runTest(){
+  const rows=[...document.querySelectorAll('.input-row')];
+  const jobs=rows.map(r=>({el:r,file:r._file,price:parseInt(document.getElementById(r.id+'-price').value,10),svc:document.getElementById(r.id+'-svc').value}))
+    .filter(j=>j.file&&Number.isFinite(j.price));
+  if(!jobs.length){alert('Add at least one job with a photo and a price.');return;}
+
+  const btn=document.getElementById('run-btn');btn.disabled=true;
+  const status=document.getElementById('run-status');
+  const results=[];
+  for(let i=0;i<jobs.length;i++){
+    status.innerHTML=`<span class="spin"></span> Analyzing ${i+1} of ${jobs.length}…`;
+    try{
+      const blob=await resize(jobs[i].file,1568,.85);
+      const fd=new FormData();
+      fd.append('photo',blob,'job.jpg');
+      fd.append('actual_price',String(jobs[i].price));
+      fd.append('service',jobs[i].svc);
+      const res=await fetch('/api/admin/accuracy-test',{method:'POST',headers:{Authorization:'Bearer '+TOKEN},body:fd});
+      const data=await res.json();
+      if(!res.ok)throw new Error(data.error||('HTTP '+res.status));
+      results.push({...data,ok:true});
+    }catch(err){results.push({ok:false,error:err.message,actual_price:jobs[i].price,service:jobs[i].svc});}
+  }
+  status.textContent='';btn.disabled=false;
+  render(results);
+}
+
+function render(results){
+  const ok=results.filter(r=>r.ok);
+  const n=ok.length;
+  const wrap=document.getElementById('results');
+  if(!n){wrap.innerHTML='<div class="err">No photos analyzed successfully. '+(results[0]?.error?('First error: '+esc(results[0].error)):'')+'</div>';return;}
+
+  const inRange=ok.filter(r=>r.in_range).length;
+  const absErrs=ok.filter(r=>r.error_pct!=null).map(r=>Math.abs(r.error_pct));
+  const meanAbs=absErrs.length?Math.round(absErrs.reduce((a,b)=>a+b,0)/absErrs.length):null;
+  const within20=ok.filter(r=>r.error_pct!=null&&Math.abs(r.error_pct)<=20).length;
+  const signed=ok.filter(r=>r.error_pct!=null).map(r=>r.error_pct);
+  const bias=signed.length?Math.round(signed.reduce((a,b)=>a+b,0)/signed.length):null; // + = AI under, - = AI over
+
+  // Verdict
+  let vclass='warn',vtext='';
+  if(meanAbs!=null){
+    if(meanAbs<=20){vclass='good';vtext=`<strong>Strong signal.</strong> The AI's price lands within an average of ${meanAbs}% of your real prices. This is good enough to build on — the core value prop holds.`;}
+    else if(meanAbs<=40){vclass='warn';vtext=`<strong>Mixed.</strong> Average error is ${meanAbs}%. Usable as a rough "ballpark" but probably not as a firm quote. Consider framing it as an assessment + fast follow-up rather than an instant price, and tune the pricing multipliers in <code>pricing.ts</code>.`;}
+    else{vclass='bad';vtext=`<strong>Weak.</strong> Average error is ${meanAbs}% — the AI estimate is too far off to use as a price. The single-photo approach may not carry enough info. Options: require multiple photos, lean on the AI for assessment only (not price), or rethink the pricing model.`;}
+  }
+  const biasNote=bias==null?'':(Math.abs(bias)<5?' No systematic bias.':bias>0?` AI tends to <strong>under</strong>-estimate by ~${bias}% on average — nudge prices up.`:` AI tends to <strong>over</strong>-estimate by ~${Math.abs(bias)}% on average — nudge prices down.`);
+
+  let html=`<h2 class="sec">Results — ${n} job${n===1?'':'s'}</h2>
+    <div class="stats">
+      <div class="stat"><div class="k">Avg error</div><div class="v ${meanAbs<=20?'good':meanAbs<=40?'warn':'bad'}">${meanAbs!=null?meanAbs+'%':'—'}</div></div>
+      <div class="stat"><div class="k">Within ±20%</div><div class="v">${within20}/${n}</div></div>
+      <div class="stat"><div class="k">In AI range</div><div class="v">${inRange}/${n}</div></div>
+      <div class="stat"><div class="k">Bias</div><div class="v ${bias==null||Math.abs(bias)<5?'':'warn'}">${bias==null?'—':(bias>0?'+'+bias:bias)+'%'}</div></div>
+    </div>
+    <div class="verdict ${vclass}">${vtext}${biasNote}</div>`;
+
+  // Table
+  html+=`<div class="rtable">
+    <div class="rrow head"><div></div><div>Tree (AI)</div><div>AI estimate</div><div>You charged</div><div>Service</div><div>Δ vs mid</div></div>`;
+  results.forEach(r=>{
+    if(!r.ok){
+      html+=`<div class="rrow"><div class="th thumb-empty" style="width:48px;height:48px;display:flex;align-items:center;justify-content:center;background:var(--bg);border-radius:8px">⚠️</div>
+        <div class="c-name">—<div class="c-sub">${esc(r.error)}</div></div>
+        <div class="c-ai">—</div><div class="c-actual strong">$${num(r.actual_price)}</div><div class="c-svc">${esc(SERVICES[r.service]||r.service)}</div><div class="c-delta">—</div></div>`;
+      return;
+    }
+    const dcls=r.in_range?'in':(r.error_pct>0?'under':'over');
+    const dtxt=r.error_pct==null?'—':(r.error_pct>0?'+'+r.error_pct+'%':r.error_pct+'%');
+    html+=`<div class="rrow">
+      <div class="th thumb-empty" style="width:48px;height:48px;display:flex;align-items:center;justify-content:center;background:var(--green-soft);border-radius:8px;font-size:1.2rem">🌳</div>
+      <div class="c-name strong">${esc(r.species||'Unknown')}<div class="c-sub">${esc(r.est_height_ft||'')} · ${esc(r.risk_rating||'')} risk · <span class="pill ${r.in_range?'in':'out'}">${r.in_range?'in range':'out of range'}</span></div></div>
+      <div class="c-ai">$${num(r.ai_low)}–$${num(r.ai_high)}<br><span class="muted" style="font-size:.78rem">mid $${num(r.ai_expected)}</span></div>
+      <div class="c-actual strong">$${num(r.actual_price)}</div>
+      <div class="c-svc">${esc(SERVICES[r.service]||r.service)}</div>
+      <div class="c-delta delta ${dcls}">${dtxt}</div>
+    </div>`;
+  });
+  html+=`</div>
+    <p class="muted" style="margin-top:12px">Δ = how far your real price was from the AI's expected (midpoint). <span style="color:var(--warn)">+%</span> = AI under-estimated (you charged more); <span style="color:var(--danger)">−%</span> = AI over-estimated. "In range" = your price fell inside the AI's low–high band.</p>`;
+
+  wrap.innerHTML=html;
+  wrap.scrollIntoView({behavior:'smooth',block:'start'});
+}
+
+function num(n){return Number(n||0).toLocaleString('en-US');}
+function esc(s){return String(s??'').replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));}
+</script>
+</body>
+</html>

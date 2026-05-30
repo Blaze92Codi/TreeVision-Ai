@@ -113,6 +113,97 @@ function fmtMoney(n: number | null): string {
   return "$" + n.toLocaleString("en-US");
 }
 
+// HTML-escape any value before interpolating it into email HTML. Customer-supplied
+// fields (name, address, etc.) are length-capped on input but NOT sanitized, so
+// without this an address like `</td><a href="http://evil">…</a>` could inject a
+// phishing link into the operator's email. Plain-text bodies don't need this.
+function esc(s: unknown): string {
+  return String(s ?? "").replace(/[&<>"']/g, c =>
+    ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" }[c]!));
+}
+
+// Operator "new lead" email — fired when a customer SUBMITS an estimate
+// (email-only flow, no Calendly booking yet). Goes to OPERATOR_EMAIL (both owners).
+export function buildOperatorLeadEmail(
+  env: Bindings,
+  estimate: EstimateSummary,
+  contact: ContactSummary,
+  baseUrl: string,
+): EmailMsg {
+  const treesHtml = estimate.trees.map(t => `
+    <tr>
+      <td style="padding:8px 12px;border-bottom:1px solid #d9e6dd;">
+        <img src="${baseUrl}/api/tree-photo/${t.id}" width="64" height="64"
+             style="border-radius:8px;object-fit:cover;display:block;" alt="">
+      </td>
+      <td style="padding:8px 12px;border-bottom:1px solid #d9e6dd;">
+        <strong>${esc(t.species ?? "Unknown tree")}</strong><br>
+        <span style="color:#6b7c70;font-size:12px;">${esc(t.selected_pkg ?? "—")}</span>
+      </td>
+      <td style="padding:8px 12px;border-bottom:1px solid #d9e6dd;color:#1c7a42;font-weight:600;text-align:right;">
+        ${fmtMoney(t.quote_low)} – ${fmtMoney(t.quote_high)}
+      </td>
+    </tr>
+  `).join("");
+
+  const subject = `🌳 New lead: ${(contact.name ?? "Customer").replace(/\s+/g, " ")} — ${estimate.trees.length} ${estimate.trees.length === 1 ? "tree" : "trees"} (${fmtMoney(estimate.total_low)}–${fmtMoney(estimate.total_high)})`;
+  const html = `
+<!doctype html>
+<html><body style="font-family:-apple-system,BlinkMacSystemFont,sans-serif;color:#0f1a12;max-width:640px;margin:0 auto;padding:24px;">
+  <h2 style="color:#1c7a42;margin:0 0 6px;">🌳 New estimate request</h2>
+  <p style="color:#6b7c70;margin:0 0 4px;">${esc(env.COMPANY_NAME)} — estimate #${esc(estimate.id.slice(0, 8))}</p>
+  <p style="background:#fff8e1;color:#7a5c00;padding:8px 12px;border-radius:8px;font-size:13px;margin:0 0 20px;">
+    Customer submitted online and is waiting — reach out to confirm a time.
+  </p>
+
+  <h3 style="margin:8px 0;">Customer</h3>
+  <table style="width:100%;font-size:14px;border-collapse:collapse;">
+    <tr><td style="padding:4px 0;color:#6b7c70;width:120px;">Name</td><td><strong>${esc(contact.name ?? "—")}</strong></td></tr>
+    <tr><td style="padding:4px 0;color:#6b7c70;">Email</td><td><a href="mailto:${esc(contact.email ?? "")}">${esc(contact.email ?? "—")}</a></td></tr>
+    <tr><td style="padding:4px 0;color:#6b7c70;">Phone</td><td><a href="tel:${esc(contact.phone ?? "")}">${esc(contact.phone ?? "—")}</a></td></tr>
+    <tr><td style="padding:4px 0;color:#6b7c70;">Address</td><td>${esc(contact.address ?? "—")}</td></tr>
+  </table>
+
+  <h3 style="margin:24px 0 8px;">Trees on this estimate</h3>
+  <table style="width:100%;border-collapse:collapse;border:1px solid #d9e6dd;border-radius:8px;overflow:hidden;">
+    ${treesHtml}
+    <tr>
+      <td colspan="2" style="padding:12px;background:#eaf7ef;color:#1c7a42;font-weight:600;">Estimate total</td>
+      <td style="padding:12px;background:#eaf7ef;color:#1c7a42;font-weight:700;text-align:right;">
+        ${fmtMoney(estimate.total_low)} – ${fmtMoney(estimate.total_high)}
+      </td>
+    </tr>
+  </table>
+
+  <p style="margin-top:24px;font-size:12px;color:#6b7c70;">Estimate ID: ${estimate.id}</p>
+</body></html>
+  `.trim();
+
+  const text = [
+    `New estimate request — ${env.COMPANY_NAME}`,
+    `Customer submitted online; reach out to confirm.`,
+    ``,
+    `Name:    ${contact.name ?? "—"}`,
+    `Email:   ${contact.email ?? "—"}`,
+    `Phone:   ${contact.phone ?? "—"}`,
+    `Address: ${contact.address ?? "—"}`,
+    ``,
+    `Trees:`,
+    ...estimate.trees.map(t => `  • ${t.species ?? "Unknown"} — ${t.selected_pkg ?? "—"} — ${fmtMoney(t.quote_low)}–${fmtMoney(t.quote_high)}`),
+    ``,
+    `Total: ${fmtMoney(estimate.total_low)}–${fmtMoney(estimate.total_high)}`,
+    `Estimate: ${estimate.id}`,
+  ].join("\n");
+
+  return {
+    to: env.OPERATOR_EMAIL,
+    subject,
+    html,
+    text,
+    replyTo: contact.email ?? undefined,
+  };
+}
+
 export function buildOperatorBookingEmail(
   env: Bindings,
   estimate: EstimateSummary,
@@ -127,8 +218,8 @@ export function buildOperatorBookingEmail(
              style="border-radius:8px;object-fit:cover;display:block;" alt="">
       </td>
       <td style="padding:8px 12px;border-bottom:1px solid #d9e6dd;">
-        <strong>${t.species ?? "Unknown tree"}</strong><br>
-        <span style="color:#6b7c70;font-size:12px;">${t.selected_pkg ?? "—"}</span>
+        <strong>${esc(t.species ?? "Unknown tree")}</strong><br>
+        <span style="color:#6b7c70;font-size:12px;">${esc(t.selected_pkg ?? "—")}</span>
       </td>
       <td style="padding:8px 12px;border-bottom:1px solid #d9e6dd;color:#1c7a42;font-weight:600;text-align:right;">
         ${fmtMoney(t.quote_low)} – ${fmtMoney(t.quote_high)}
@@ -136,20 +227,20 @@ export function buildOperatorBookingEmail(
     </tr>
   `).join("");
 
-  const subject = `🌳 New booking: ${contact.name ?? "Customer"} — ${estimate.trees.length} ${estimate.trees.length === 1 ? "tree" : "trees"}`;
+  const subject = `🌳 New booking: ${(contact.name ?? "Customer").replace(/\s+/g, " ")} — ${estimate.trees.length} ${estimate.trees.length === 1 ? "tree" : "trees"}`;
   const html = `
 <!doctype html>
 <html><body style="font-family:-apple-system,BlinkMacSystemFont,sans-serif;color:#0f1a12;max-width:640px;margin:0 auto;padding:24px;">
   <h2 style="color:#1c7a42;margin:0 0 6px;">🌳 New booking</h2>
-  <p style="color:#6b7c70;margin:0 0 20px;">${env.COMPANY_NAME} — estimate #${estimate.id.slice(0, 8)}</p>
+  <p style="color:#6b7c70;margin:0 0 20px;">${esc(env.COMPANY_NAME)} — estimate #${esc(estimate.id.slice(0, 8))}</p>
 
   <h3 style="margin:8px 0;">Customer</h3>
   <table style="width:100%;font-size:14px;border-collapse:collapse;">
-    <tr><td style="padding:4px 0;color:#6b7c70;width:120px;">Name</td><td><strong>${contact.name ?? "—"}</strong></td></tr>
-    <tr><td style="padding:4px 0;color:#6b7c70;">Email</td><td><a href="mailto:${contact.email}">${contact.email ?? "—"}</a></td></tr>
-    <tr><td style="padding:4px 0;color:#6b7c70;">Phone</td><td><a href="tel:${contact.phone}">${contact.phone ?? "—"}</a></td></tr>
-    <tr><td style="padding:4px 0;color:#6b7c70;">Address</td><td>${contact.address ?? "—"}</td></tr>
-    <tr><td style="padding:4px 0;color:#6b7c70;">Scheduled</td><td><strong>${booking.scheduled_for ?? "—"}</strong></td></tr>
+    <tr><td style="padding:4px 0;color:#6b7c70;width:120px;">Name</td><td><strong>${esc(contact.name ?? "—")}</strong></td></tr>
+    <tr><td style="padding:4px 0;color:#6b7c70;">Email</td><td><a href="mailto:${esc(contact.email ?? "")}">${esc(contact.email ?? "—")}</a></td></tr>
+    <tr><td style="padding:4px 0;color:#6b7c70;">Phone</td><td><a href="tel:${esc(contact.phone ?? "")}">${esc(contact.phone ?? "—")}</a></td></tr>
+    <tr><td style="padding:4px 0;color:#6b7c70;">Address</td><td>${esc(contact.address ?? "—")}</td></tr>
+    <tr><td style="padding:4px 0;color:#6b7c70;">Scheduled</td><td><strong>${esc(booking.scheduled_for ?? "—")}</strong></td></tr>
   </table>
 
   <h3 style="margin:24px 0 8px;">Trees on this estimate</h3>
@@ -163,9 +254,9 @@ export function buildOperatorBookingEmail(
     </tr>
   </table>
 
-  ${booking.notes ? `<h3 style="margin:24px 0 8px;">Customer notes</h3><p style="white-space:pre-wrap;background:#f6f8f6;padding:12px;border-radius:8px;">${booking.notes}</p>` : ""}
+  ${booking.notes ? `<h3 style="margin:24px 0 8px;">Customer notes</h3><p style="white-space:pre-wrap;background:#f6f8f6;padding:12px;border-radius:8px;">${esc(booking.notes)}</p>` : ""}
 
-  <p style="margin-top:24px;font-size:12px;color:#6b7c70;">Estimate ID: ${estimate.id}</p>
+  <p style="margin-top:24px;font-size:12px;color:#6b7c70;">Estimate ID: ${esc(estimate.id)}</p>
 </body></html>
   `.trim();
 
@@ -211,8 +302,8 @@ export function buildCustomerEstimateEmail(
              style="border-radius:8px;object-fit:cover;display:block;" alt="">
       </td>
       <td style="padding:10px 14px;border-bottom:1px solid #d9e6dd;">
-        <strong>${t.species ?? "Tree"}</strong><br>
-        <span style="color:#6b7c70;font-size:13px;">${t.selected_pkg ?? "—"}</span>
+        <strong>${esc(t.species ?? "Tree")}</strong><br>
+        <span style="color:#6b7c70;font-size:13px;">${esc(t.selected_pkg ?? "—")}</span>
       </td>
       <td style="padding:10px 14px;border-bottom:1px solid #d9e6dd;color:#1c7a42;font-weight:600;text-align:right;white-space:nowrap;">
         ${fmtMoney(t.quote_low)}<br>– ${fmtMoney(t.quote_high)}
@@ -226,7 +317,7 @@ export function buildCustomerEstimateEmail(
   <div style="max-width:560px;margin:0 auto;background:#fff;border-radius:16px;padding:28px;border:1px solid #d9e6dd;">
     <div style="font-size:2rem;line-height:1;margin-bottom:8px;">🌳</div>
     <h1 style="font-size:1.5rem;margin:0 0 4px;color:#0f1a12;">Your TreeVision estimate</h1>
-    <p style="color:#6b7c70;margin:0 0 24px;">Hi ${contact.name ? contact.name.split(" ")[0] : "there"}, here's your estimate from ${env.COMPANY_NAME}.</p>
+    <p style="color:#6b7c70;margin:0 0 24px;">Hi ${esc(contact.name ? contact.name.split(" ")[0] : "there")}, here's your estimate from ${esc(env.COMPANY_NAME)}.</p>
 
     <table style="width:100%;border-collapse:collapse;border:1px solid #d9e6dd;border-radius:10px;overflow:hidden;">
       ${treesHtml}
@@ -241,12 +332,12 @@ export function buildCustomerEstimateEmail(
     <p style="font-size:13px;color:#6b7c70;margin:14px 0;">Estimate is based on visual AI analysis. Final pricing confirmed on-site per ANSI A300 standards.</p>
 
     <div style="margin:28px 0;text-align:center;">
-      <a href="${resumeUrl}" style="display:inline-block;background:#2faa5e;color:#fff;text-decoration:none;padding:14px 28px;border-radius:12px;font-weight:700;">
+      <a href="${esc(resumeUrl)}" style="display:inline-block;background:#2faa5e;color:#fff;text-decoration:none;padding:14px 28px;border-radius:12px;font-weight:700;">
         View &amp; book your service →
       </a>
     </div>
 
-    <p style="font-size:13px;color:#6b7c70;margin-top:24px;">Questions? Just reply to this email or call ${env.OPERATOR_PHONE}.</p>
+    <p style="font-size:13px;color:#6b7c70;margin-top:24px;">Questions? Just reply to this email or call ${esc(env.OPERATOR_PHONE)}.</p>
   </div>
 </body></html>
   `.trim();

@@ -8,7 +8,7 @@ import { computePrices, computeEstimateTotal, bundleDiscountPct } from "./pricin
 import { checkAndRecord, hashIp, verifyTurnstile } from "./ratelimit";
 import { extractBookingFields, verifyCalendlySignature } from "./calendly";
 import {
-  buildOperatorBookingEmail, buildCustomerEstimateEmail, buildFollowUpSms,
+  buildOperatorBookingEmail, buildOperatorLeadEmail, buildCustomerEstimateEmail, buildFollowUpSms,
   sendEmail, sendSms,
 } from "./notify";
 
@@ -448,15 +448,38 @@ app.post("/api/estimate/:id/submit", async c => {
       total_high: refreshed!.total_high,
       trees: trees.map(t => ({ id: t.id, species: t.species, selected_pkg: t.selected_pkg, quote_low: t.quote_low, quote_high: t.quote_high })),
     };
-    const resumeUrl = `${publicBase(c)}/?token=${estimate.share_token}`;
-    try {
-      const msg = buildCustomerEstimateEmail(c.env, summary, contact, resumeUrl, publicBase(c));
-      await sendEmail(c.env, msg);
-      await logInteraction(c.env, {
-        contactId: contact.id, estimateId, channel: "email_out", direction: "outbound",
-        body: `Estimate email sent (${msg.subject})`,
-      });
-    } catch (err: any) { console.error("Estimate email failed", err?.message); }
+    // Capture base URL synchronously (publicBase persists it); use the value in
+    // the deferred work so we don't call waitUntil after the response is sent.
+    const base = publicBase(c);
+    const resumeUrl = `${base}/?token=${estimate.share_token}`;
+
+    // Send both emails AFTER responding — don't make the customer wait on two
+    // Resend round-trips. Each has its own try/catch so one failure can't block
+    // the other, and a failure never breaks the submit.
+    const sendEmails = async () => {
+      try {
+        const msg = buildCustomerEstimateEmail(c.env, summary, contact, resumeUrl, base);
+        await sendEmail(c.env, msg);
+        await logInteraction(c.env, {
+          contactId: contact.id, estimateId, channel: "email_out", direction: "outbound",
+          body: `Estimate email sent to customer (${msg.subject})`,
+        });
+      } catch (err: any) { console.error("Customer estimate email failed", err?.message); }
+
+      // Operator lead alert (Palmer & Brian). Without this, email-only
+      // submissions never reach the owners (booking emails only fire on Calendly).
+      try {
+        const opMsg = buildOperatorLeadEmail(c.env, summary, contact, base);
+        await sendEmail(c.env, opMsg);
+        await logInteraction(c.env, {
+          contactId: contact.id, estimateId, channel: "email_out", direction: "outbound",
+          body: `Lead alert sent to operator(s) (${opMsg.subject})`,
+        });
+      } catch (err: any) { console.error("Operator lead email failed", err?.message); }
+    };
+
+    if (c.executionCtx?.waitUntil) c.executionCtx.waitUntil(sendEmails());
+    else await sendEmails();
   }
 
   return c.json({ ok: true, status: "submitted" });
@@ -708,6 +731,58 @@ app.post("/api/admin/run-followups", async c => {
   requireAdmin(c);
   const result = await runFollowUpCron(c.env);
   return c.json(result);
+});
+
+// ────────────────────────────────────────────────────────────
+// ACCURACY TEST — run a known-price photo through the SAME analysis +
+// pricing the live app uses, and compare AI estimate vs the real price.
+// Does NOT persist anything (no estimate, no lead, no R2 upload).
+// Body: multipart { photo, actual_price, service }
+// ────────────────────────────────────────────────────────────
+app.post("/api/admin/accuracy-test", async c => {
+  requireAdmin(c);
+  const form = await c.req.formData().catch(() => null);
+  if (!form) throw new HTTPException(400, { message: "Expected multipart/form-data" });
+
+  const photo = form.get("photo") as unknown as File | null;
+  const actualPrice = parseInt(String(form.get("actual_price") ?? ""), 10);
+  const service = String(form.get("service") ?? "") as PkgKey;
+
+  if (!photo || typeof photo.arrayBuffer !== "function") throw new HTTPException(400, { message: "Missing photo" });
+  if (!Number.isFinite(actualPrice) || actualPrice < 0) throw new HTTPException(400, { message: "actual_price must be a non-negative number" });
+  if (!["trim", "removal", "stump", "treatment"].includes(service)) throw new HTTPException(400, { message: "Invalid service" });
+  if (!ALLOWED_MIME.has(photo.type)) throw new HTTPException(415, { message: `Unsupported image type "${photo.type}"` });
+
+  // base64-encode (chunked)
+  const bytes = new Uint8Array(await photo.arrayBuffer());
+  let bin = "";
+  for (let i = 0; i < bytes.length; i += 0x8000) {
+    bin += String.fromCharCode.apply(null, Array.from(bytes.subarray(i, i + 0x8000)));
+  }
+  const base64 = btoa(bin);
+
+  const analysis = await analyzeTreePhoto(c.env.ANTHROPIC_API_KEY, base64, photo.type);
+  const prices = computePrices(analysis);
+  const p = prices[service];                       // AI price for the SERVICE ACTUALLY PERFORMED
+  const expected = Math.round(((p.low + p.high) / 2) / 25) * 25;
+  const inRange = actualPrice >= p.low && actualPrice <= p.high;
+  const errorPct = expected > 0 ? Math.round(((actualPrice - expected) / expected) * 100) : null;
+
+  return c.json({
+    species: analysis.common_name,
+    est_height_ft: analysis.est_height_ft,
+    est_dbh_in: analysis.est_dbh_in,
+    condition: analysis.condition,
+    risk_rating: analysis.isa_risk_rating,
+    recommended_pkg: analysis.recommended_pkg_key,
+    service,
+    ai_low: p.low,
+    ai_high: p.high,
+    ai_expected: expected,
+    actual_price: actualPrice,
+    in_range: inRange,
+    error_pct: errorPct,                            // + = AI under-estimated, - = AI over-estimated
+  });
 });
 
 // ────────────────────────────────────────────────────────────

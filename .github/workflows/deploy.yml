@@ -1,11 +1,9 @@
 name: Deploy Worker
 
-# Branch-aware deploys for the two-environment model:
-#   push to `main` → SANDBOX  (treevision-sandbox)
-#   push to `beta` → PRODUCTION (treevision, used by beta testers)
+# Single-app deploy: push to `main` → production (treevision).
 on:
   push:
-    branches: [main, beta]
+    branches: [main]
     paths:
       - 'worker/**'
       - 'web/**'
@@ -44,31 +42,17 @@ jobs:
         working-directory: worker
         run: npx tsc --noEmit
 
-      # Resolve target from the branch
-      - name: Resolve environment
-        id: target
-        run: |
-          if [ "${{ github.ref_name }}" = "beta" ]; then
-            echo "db=treevision"            >> "$GITHUB_OUTPUT"
-            echo "deploy_args="             >> "$GITHUB_OUTPUT"
-            echo "label=PRODUCTION (beta)"  >> "$GITHUB_OUTPUT"
-          else
-            echo "db=treevision-sandbox"        >> "$GITHUB_OUTPUT"
-            echo "deploy_args=--env sandbox"    >> "$GITHUB_OUTPUT"
-            echo "label=SANDBOX"                >> "$GITHUB_OUTPUT"
-          fi
-
       - name: Apply pending D1 migrations
         working-directory: worker
-        run: npx wrangler d1 migrations apply ${{ steps.target.outputs.db }} --remote
+        run: npx wrangler d1 migrations apply treevision --remote
 
       - name: Deploy Worker + static assets
         working-directory: worker
-        run: npx wrangler deploy ${{ steps.target.outputs.deploy_args }}
+        run: npx wrangler deploy
 
       - name: Summary
         if: success()
         run: |
-          echo "### ✅ Deployed to ${{ steps.target.outputs.label }}" >> $GITHUB_STEP_SUMMARY
-          echo "Branch: \`${{ github.ref_name }}\`" >> $GITHUB_STEP_SUMMARY
+          echo "### ✅ Deployed" >> $GITHUB_STEP_SUMMARY
           echo "Commit: \`${{ github.sha }}\`" >> $GITHUB_STEP_SUMMARY
+          echo "Triggered by: ${{ github.actor }}" >> $GITHUB_STEP_SUMMARY
