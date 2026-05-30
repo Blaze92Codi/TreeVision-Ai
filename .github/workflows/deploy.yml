@@ -1,8 +1,11 @@
 name: Deploy Worker
 
+# Branch-aware deploys for the two-environment model:
+#   push to `main` → SANDBOX  (treevision-sandbox)
+#   push to `beta` → PRODUCTION (treevision, used by beta testers)
 on:
   push:
-    branches: [main]
+    branches: [main, beta]
     paths:
       - 'worker/**'
       - 'web/**'
@@ -19,6 +22,9 @@ jobs:
     timeout-minutes: 10
     permissions:
       contents: read
+    env:
+      CLOUDFLARE_API_TOKEN: ${{ secrets.CF_API_TOKEN }}
+      CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CF_ACCOUNT_ID }}
     steps:
       - name: Checkout
         uses: actions/checkout@v4
@@ -38,23 +44,31 @@ jobs:
         working-directory: worker
         run: npx tsc --noEmit
 
+      # Resolve target from the branch
+      - name: Resolve environment
+        id: target
+        run: |
+          if [ "${{ github.ref_name }}" = "beta" ]; then
+            echo "db=treevision"            >> "$GITHUB_OUTPUT"
+            echo "deploy_args="             >> "$GITHUB_OUTPUT"
+            echo "label=PRODUCTION (beta)"  >> "$GITHUB_OUTPUT"
+          else
+            echo "db=treevision-sandbox"        >> "$GITHUB_OUTPUT"
+            echo "deploy_args=--env sandbox"    >> "$GITHUB_OUTPUT"
+            echo "label=SANDBOX"                >> "$GITHUB_OUTPUT"
+          fi
+
       - name: Apply pending D1 migrations
         working-directory: worker
-        env:
-          CLOUDFLARE_API_TOKEN: ${{ secrets.CF_API_TOKEN }}
-          CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CF_ACCOUNT_ID }}
-        run: npx wrangler d1 migrations apply treevision --remote
+        run: npx wrangler d1 migrations apply ${{ steps.target.outputs.db }} --remote
 
       - name: Deploy Worker + static assets
         working-directory: worker
-        env:
-          CLOUDFLARE_API_TOKEN: ${{ secrets.CF_API_TOKEN }}
-          CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CF_ACCOUNT_ID }}
-        run: npx wrangler deploy
+        run: npx wrangler deploy ${{ steps.target.outputs.deploy_args }}
 
       - name: Summary
         if: success()
         run: |
-          echo "### ✅ Deployed" >> $GITHUB_STEP_SUMMARY
+          echo "### ✅ Deployed to ${{ steps.target.outputs.label }}" >> $GITHUB_STEP_SUMMARY
+          echo "Branch: \`${{ github.ref_name }}\`" >> $GITHUB_STEP_SUMMARY
           echo "Commit: \`${{ github.sha }}\`" >> $GITHUB_STEP_SUMMARY
-          echo "Triggered by: ${{ github.actor }}" >> $GITHUB_STEP_SUMMARY
