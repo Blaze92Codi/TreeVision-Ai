@@ -15,7 +15,7 @@ export default async function handler(req, res) {
     }
 
     const apiKey = process.env.OPENAI_API_KEY;
-    const model = process.env.OPENAI_VISION_MODEL || "gpt-4.1-mini";
+    const model = process.env.OPENAI_VISION_MODEL || "gpt-4o";
     const publicBaseUrl = process.env.PUBLIC_BASE_URL || "https://tree-vision-ai.vercel.app";
 
     if (!apiKey) {
@@ -98,7 +98,7 @@ Safety Note:
 This is a preliminary photo-based scope only. Final pricing and work approval should be confirmed by Dynamic Tree Service.
 `;
 
-    const openaiResponse = await fetch("https://api.openai.com/v1/responses", {
+    const openaiResponse = await fetch("https://api.openai.com/v1/chat/completions", {
       method: "POST",
       headers: {
         "Authorization": `Bearer ${apiKey}`,
@@ -106,22 +106,22 @@ This is a preliminary photo-based scope only. Final pricing and work approval sh
       },
       body: JSON.stringify({
         model,
-        input: [
+        messages: [
           {
             role: "user",
             content: [
               {
-                type: "input_text",
+                type: "text",
                 text: prompt
               },
               {
-                type: "input_image",
-                image_url
+                type: "image_url",
+                image_url: { url: image_url }
               }
             ]
           }
         ],
-        max_output_tokens: 900
+        max_tokens: 900
       })
     });
 
@@ -136,18 +136,7 @@ This is a preliminary photo-based scope only. Final pricing and work approval sh
     }
 
     const data = JSON.parse(raw);
-
-    let formattedText = "";
-
-    if (data.output_text) {
-      formattedText = data.output_text;
-    } else if (Array.isArray(data.output)) {
-      formattedText = data.output
-        .flatMap(item => item.content || [])
-        .map(content => content.text || "")
-        .join("\n")
-        .trim();
-    }
+    let formattedText = data?.choices?.[0]?.message?.content || "";
 
     if (!formattedText) {
       formattedText = "TreeVision analysis completed, but no text output was returned.";
