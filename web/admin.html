@@ -1,0 +1,840 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>TreeVision — Operator</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Bricolage+Grotesque:opsz,wght@12..96,400;12..96,600;12..96,800&family=Spline+Sans:wght@400;500;600&display=swap" rel="stylesheet">
+<style>
+:root {
+  --green: #2faa5e; --green-deep: #1c7a42; --green-soft: #eaf7ef; --green-mid: #c6ecd6;
+  --ink: #0f1a12; --muted: #6b7c70; --line: #d9e6dd; --bg: #f6f8f6; --card: #fff;
+  --danger: #b3261e; --warn: #7a5c00; --warn-bg: #fff8e1;
+}
+*, *::before, *::after { margin: 0; padding: 0; box-sizing: border-box; }
+body { font-family: 'Spline Sans', sans-serif; background: var(--bg); color: var(--ink); min-height: 100vh; }
+button { cursor: pointer; font-family: inherit; border: none; }
+input, textarea, select { font-family: inherit; }
+a { color: var(--green-deep); }
+code { font-family: ui-monospace, SFMono-Regular, Menlo, monospace; font-size: .85em; background: var(--bg); padding: 1px 6px; border-radius: 4px; }
+
+@media (prefers-reduced-motion: reduce) {
+  *, *::before, *::after { animation-duration: 0.01ms !important; transition-duration: 0.01ms !important; }
+}
+
+/* ── Topbar ────────────────────────────────── */
+.topbar {
+  background: var(--green-deep); color: #fff; padding: 14px 20px;
+  display: flex; align-items: center; gap: 12px;
+}
+.topbar h1 {
+  font-family: 'Bricolage Grotesque', sans-serif;
+  font-size: 1.2rem; font-weight: 800; letter-spacing: -.02em;
+  white-space: nowrap;
+}
+.topbar .grow { flex: 1; }
+.topbar #topbar-user { font-size: .85rem; opacity: .8; white-space: nowrap; }
+.topbar button {
+  background: rgba(255,255,255,.15); color: #fff; padding: 6px 12px;
+  border-radius: 8px; font-size: .85rem; font-weight: 500;
+  white-space: nowrap;
+}
+.topbar button:hover { background: rgba(255,255,255,.25); }
+.topbar .title-short { display: none; }
+@media (max-width: 600px) {
+  .topbar { padding: 12px 14px; gap: 8px; }
+  .topbar .title-full  { display: none; }
+  .topbar .title-short { display: inline; }
+  .topbar #topbar-user { display: none; }
+  .topbar button { padding: 6px 10px; }
+  .topbar button .logout-text { display: none; }
+  .topbar button .logout-icon { display: inline; }
+}
+.topbar button .logout-icon { display: none; }
+
+/* ── Tabs ──────────────────────────────────── */
+.tabs {
+  display: flex; gap: 4px; padding: 14px 20px 0;
+  background: var(--card); border-bottom: 1px solid var(--line);
+  position: sticky; top: 0; z-index: 5;
+}
+.tab {
+  background: transparent; padding: 10px 16px; border-radius: 10px 10px 0 0;
+  font-weight: 600; font-size: .92rem; color: var(--muted);
+  border: none; border-bottom: 2px solid transparent; margin-bottom: -1px;
+}
+.tab.active { color: var(--green-deep); border-bottom-color: var(--green); background: var(--bg); }
+.tab:hover:not(.active) { color: var(--ink); }
+
+.wrap { max-width: 1100px; margin: 0 auto; padding: 24px 20px 60px; }
+.view { display: none; }
+.view.active { display: block; }
+
+/* ── Login ─────────────────────────────────── */
+.login-card {
+  max-width: 420px; margin: 80px auto 0;
+  background: var(--card); border: 1px solid var(--line);
+  border-radius: 20px; padding: 32px;
+  box-shadow: 0 4px 24px rgba(0,0,0,.04);
+}
+.login-card h2 {
+  font-family: 'Bricolage Grotesque', sans-serif;
+  font-size: 1.6rem; font-weight: 800; letter-spacing: -.02em; margin-bottom: 6px;
+}
+.login-card p { color: var(--muted); font-size: .9rem; margin-bottom: 20px; }
+.field { display: flex; flex-direction: column; gap: 6px; margin-bottom: 14px; }
+.field label { font-size: .82rem; font-weight: 600; color: var(--ink); }
+.field input, .field textarea {
+  border: 1px solid var(--line); border-radius: 10px;
+  padding: 10px 12px; font-size: .95rem; background: #fff;
+}
+.field input:focus, .field textarea:focus {
+  outline: none; border-color: var(--green); box-shadow: 0 0 0 3px var(--green-soft);
+}
+.btn { background: var(--green); color: #fff; padding: 12px 18px; border-radius: 10px; font-weight: 700; font-size: .95rem; }
+.btn:hover { background: var(--green-deep); }
+.btn:disabled { opacity: .5; pointer-events: none; }
+.btn-ghost {
+  background: transparent; color: var(--green-deep);
+  border: 1.5px solid var(--green-mid); padding: 10px 16px;
+  border-radius: 10px; font-weight: 600; font-size: .9rem;
+}
+.btn-ghost:hover { background: var(--green-soft); }
+
+/* ── List heading + stats ──────────────────── */
+.list-head { display: flex; align-items: center; gap: 12px; margin-bottom: 16px; flex-wrap: wrap; }
+.list-head h2 {
+  font-family: 'Bricolage Grotesque', sans-serif;
+  font-size: 1.6rem; font-weight: 800; letter-spacing: -.02em;
+}
+.list-head .count { color: var(--muted); font-size: .9rem; }
+.list-head .grow { flex: 1; }
+
+.stats-row {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(140px, 1fr));
+  gap: 12px; margin-bottom: 24px;
+}
+.stats-row > :nth-child(5):last-child { grid-column: 1 / -1; }
+.stat-card {
+  background: var(--card); border: 1px solid var(--line);
+  border-radius: 14px; padding: 14px 16px;
+}
+.stat-card .k { font-size: .75rem; color: var(--muted); text-transform: uppercase; letter-spacing: .04em; font-weight: 600; }
+.stat-card .v { font-family: 'Bricolage Grotesque', sans-serif; font-size: 1.4rem; font-weight: 800; letter-spacing: -.02em; margin-top: 2px; }
+.stat-card .v.green { color: var(--green-deep); }
+
+/* ── Status badge ─────────────────────────── */
+.status-badge {
+  display: inline-block; padding: 3px 9px; border-radius: 999px;
+  font-size: .72rem; font-weight: 600; white-space: nowrap;
+}
+.status-draft, .status-contact_provided { background: #eef2ef; color: #6b7c70; border: 1px solid var(--line); }
+.status-submitted { background: var(--green-soft); color: var(--green-deep); }
+.status-booked    { background: var(--green-mid); color: var(--green-deep); }
+.status-completed { background: var(--green-deep); color: #fff; }
+.status-abandoned { background: #fdecea; color: var(--danger); }
+
+/* ── Rows table ────────────────────────────── */
+.rows-table {
+  background: var(--card); border: 1px solid var(--line);
+  border-radius: 16px; overflow: hidden;
+}
+.row-item {
+  display: grid;
+  gap: 12px; align-items: center;
+  padding: 12px 16px; border-bottom: 1px solid var(--line);
+  cursor: pointer; transition: background .12s;
+  text-align: left; width: 100%;
+  background: var(--card); color: var(--ink);
+  font-family: inherit; font-size: inherit;
+  border-left: none; border-right: none; border-top: none;
+}
+.row-item:last-child { border-bottom: none; }
+.row-item:hover, .row-item:focus-visible {
+  background: var(--green-soft); outline: none;
+}
+.row-item:focus-visible { box-shadow: inset 0 0 0 2px var(--green); }
+.row-item.header {
+  cursor: default; background: var(--bg); padding: 10px 16px;
+  font-size: .75rem; color: var(--muted); text-transform: uppercase; letter-spacing: .04em; font-weight: 600;
+}
+.row-item.header:hover { background: var(--bg); }
+
+/* Leads (estimates) — 6 cols */
+.row-leads {
+  grid-template-columns: 56px 1fr 1fr 110px 110px 120px;
+}
+/* Contacts — 5 cols */
+.row-contacts {
+  grid-template-columns: 1fr 1fr 90px 90px 110px;
+}
+.thumb { width: 48px; height: 48px; border-radius: 10px; object-fit: cover; background: var(--bg); border: 1px solid var(--line); }
+.thumb-fallback { width: 48px; height: 48px; border-radius: 10px; background: var(--bg); display: flex; align-items: center; justify-content: center; font-size: 1.4rem; border: 1px solid var(--line); }
+.cell-primary { font-weight: 600; font-size: .92rem; }
+.cell-secondary { font-size: .8rem; color: var(--muted); }
+.cell-quote { font-weight: 600; font-size: .88rem; color: var(--ink); }
+.cell-final { font-weight: 700; font-size: .88rem; color: var(--green-deep); }
+.cell-meta, .c-meta { display: none; }
+
+/* Mobile: stack rows into cards */
+@media (max-width: 800px) {
+  .row-item.header { display: none; }
+  .row-leads {
+    grid-template-columns: 56px 1fr auto;
+    grid-template-areas: "thumb head status" "thumb meta meta";
+    gap: 4px 12px; padding: 14px;
+  }
+  .row-leads .thumb, .row-leads .thumb-fallback { grid-area: thumb; align-self: center; }
+  .row-leads .cell-head { grid-area: head; }
+  .row-leads .cell-sub, .row-leads .cell-quote, .row-leads .cell-final { display: none; }
+  .row-leads .cell-meta {
+    grid-area: meta; display: flex; gap: 6px; flex-wrap: wrap;
+    font-size: .85rem; align-items: baseline; margin-top: 4px;
+  }
+  .row-leads .cell-meta .sep { color: var(--line); }
+  .row-leads .cell-status { grid-area: status; justify-self: end; align-self: start; }
+
+  .row-contacts {
+    grid-template-columns: 1fr auto;
+    grid-template-areas: "head status" "meta meta";
+    padding: 14px;
+  }
+  .row-contacts .c-head { grid-area: head; }
+  .row-contacts .c-meta { grid-area: meta; display: flex; gap: 10px; font-size: .82rem; color: var(--muted); margin-top: 4px; flex-wrap: wrap; }
+  .row-contacts .c-status { grid-area: status; justify-self: end; }
+  .row-contacts .c-secondary { display: none; }
+}
+
+.empty {
+  padding: 60px 24px; text-align: center; color: var(--muted);
+  background: var(--card); border: 1px solid var(--line); border-radius: 16px;
+}
+.empty .big { font-size: 3rem; margin-bottom: 12px; }
+
+/* ── Detail layout ─────────────────────────── */
+.back-row { display: flex; align-items: center; gap: 10px; margin-bottom: 16px; flex-wrap: wrap; }
+.back-row .crumb { font-size: .82rem; color: var(--muted); font-family: ui-monospace, monospace; }
+
+.detail-grid {
+  display: grid; grid-template-columns: minmax(0, 1fr) 360px;
+  gap: 24px; align-items: start;
+}
+@media (max-width: 800px) {
+  .detail-grid { grid-template-columns: 1fr; }
+}
+.panel {
+  background: var(--card); border: 1px solid var(--line);
+  border-radius: 16px; padding: 20px; margin-bottom: 16px;
+}
+.panel h3 {
+  font-family: 'Bricolage Grotesque', sans-serif;
+  font-size: 1.05rem; font-weight: 700; margin-bottom: 12px;
+}
+.panel .kv {
+  display: grid; grid-template-columns: 130px 1fr; gap: 6px 12px; font-size: .9rem;
+}
+.panel .kv dt { color: var(--muted); font-weight: 500; }
+.panel .kv dd { color: var(--ink); word-break: break-word; }
+
+.tree-card { display: flex; gap: 12px; padding: 12px 0; border-bottom: 1px solid var(--line); }
+.tree-card:last-child { border-bottom: none; }
+.tree-card-thumb { width: 80px; height: 80px; border-radius: 10px; object-fit: cover; background: var(--bg); flex-shrink: 0; }
+.tree-card-thumb-fb { width: 80px; height: 80px; border-radius: 10px; background: var(--bg); display: flex; align-items: center; justify-content: center; font-size: 2rem; flex-shrink: 0; }
+.tree-card-body { flex: 1; min-width: 0; }
+.tree-name { font-weight: 700; font-size: 1rem; }
+.tree-meta { color: var(--muted); font-size: .82rem; line-height: 1.5; }
+.tree-price { font-weight: 700; color: var(--green-deep); font-size: .92rem; margin-top: 4px; }
+
+.quote-block {
+  background: linear-gradient(135deg, var(--green), var(--green-deep));
+  color: #fff; padding: 14px 18px; border-radius: 12px; margin-bottom: 14px;
+}
+.quote-block .q-label { font-size: .72rem; text-transform: uppercase; letter-spacing: .05em; opacity: .85; font-weight: 600; }
+.quote-block .q-range { font-family: 'Bricolage Grotesque', sans-serif; font-size: 1.6rem; font-weight: 800; letter-spacing: -.02em; margin-top: 2px; }
+.quote-block .q-final {
+  margin-top: 8px; padding-top: 8px; border-top: 1px solid rgba(255,255,255,.2);
+  font-size: .85rem; opacity: .95;
+}
+
+.error-text { color: var(--danger); font-size: .85rem; margin-top: 8px; }
+.success-text { color: var(--green-deep); font-size: .85rem; margin-top: 8px; }
+
+.notes-block {
+  background: var(--bg); border: 1px solid var(--line);
+  border-radius: 10px; padding: 10px 12px; font-size: .85rem;
+  white-space: pre-wrap; color: #2a3a2e;
+}
+.notes-block.muted { color: var(--muted); font-style: italic; }
+
+/* Interaction timeline */
+.interaction {
+  display: flex; gap: 10px; padding: 10px 0; border-bottom: 1px dashed var(--line); font-size: .85rem;
+}
+.interaction:last-child { border-bottom: none; }
+.interaction .ch {
+  flex-shrink: 0; width: 28px; height: 28px; border-radius: 50%;
+  background: var(--green-soft); color: var(--green-deep);
+  display: flex; align-items: center; justify-content: center; font-size: .9rem;
+}
+.interaction .ch.sms_out, .interaction .ch.sms_in { background: #e3f0fa; color: #14507a; }
+.interaction .ch.email_out, .interaction .ch.email_in { background: #f0e7f7; color: #5b2a8a; }
+.interaction .ch.system { background: var(--bg); color: var(--muted); }
+.interaction .body { flex: 1; min-width: 0; }
+.interaction .ts { font-size: .72rem; color: var(--muted); margin-top: 2px; }
+
+.estimate-mini {
+  display: flex; align-items: center; gap: 10px;
+  padding: 10px 12px; border: 1px solid var(--line); border-radius: 10px;
+  margin-bottom: 8px; cursor: pointer; transition: background .12s;
+  background: var(--card); width: 100%; text-align: left; color: inherit;
+  font-family: inherit; font-size: inherit;
+}
+.estimate-mini:hover { background: var(--green-soft); }
+.estimate-mini .em-id { font-family: ui-monospace, monospace; font-size: .75rem; color: var(--muted); }
+.estimate-mini .em-summary { flex: 1; font-size: .88rem; }
+.estimate-mini .em-amount { font-weight: 700; color: var(--green-deep); font-size: .88rem; }
+</style>
+</head>
+<body>
+
+<div class="topbar">
+  <h1>
+    <span aria-hidden="true">🌳</span>
+    <span class="title-full">TreeVision — Operator</span>
+    <span class="title-short">TreeVision</span>
+  </h1>
+  <div class="grow"></div>
+  <span id="topbar-user"></span>
+  <button id="logout-btn" onclick="logout()" style="display:none;" aria-label="Sign out">
+    <span class="logout-text">Sign out</span>
+    <span class="logout-icon" aria-hidden="true">⎋</span>
+  </button>
+</div>
+
+<div id="tabs" class="tabs" style="display:none;">
+  <button class="tab" id="tab-leads" onclick="showLeads()">Leads</button>
+  <button class="tab" id="tab-contacts" onclick="showContacts()">Contacts</button>
+</div>
+
+<div class="wrap">
+
+  <!-- ── LOGIN ─────────────────────────────────── -->
+  <div id="view-login" class="view active">
+    <div class="login-card">
+      <div style="font-size:2.6rem;line-height:1;margin-bottom:8px;" aria-hidden="true">🌳</div>
+      <h2>Operator portal</h2>
+      <p>Paste the admin token to view leads and record final prices.</p>
+      <div class="field">
+        <label for="token-input">Admin token</label>
+        <input id="token-input" type="password" autocomplete="current-password">
+      </div>
+      <button class="btn" id="login-btn" onclick="doLogin()" style="width:100%;">Sign in</button>
+      <div class="error-text" id="login-error" style="display:none;"></div>
+      <p style="margin-top:14px;font-size:.78rem;">
+        Set via <code>wrangler secret put ADMIN_TOKEN</code>. Stored locally only.
+      </p>
+    </div>
+  </div>
+
+  <!-- ── LEADS LIST ────────────────────────────── -->
+  <div id="view-leads" class="view"></div>
+
+  <!-- ── CONTACTS LIST ─────────────────────────── -->
+  <div id="view-contacts" class="view"></div>
+
+  <!-- ── DETAIL VIEWS ──────────────────────────── -->
+  <div id="view-estimate" class="view"></div>
+  <div id="view-contact-detail" class="view"></div>
+
+</div>
+
+<script>
+const STATE = { token: null, leads: [], contacts: [], currentTab: 'leads' };
+const STORAGE_KEY = 'treevision_admin_token';
+
+document.addEventListener('DOMContentLoaded', () => {
+  const t = localStorage.getItem(STORAGE_KEY);
+  if (t) { STATE.token = t; enterApp(); }
+  document.getElementById('token-input').addEventListener('keydown', e => {
+    if (e.key === 'Enter') doLogin();
+  });
+});
+
+async function doLogin() {
+  const t = document.getElementById('token-input').value.trim();
+  if (!t) return;
+  const res = await apiFetch('/api/admin/leads?limit=1', {}, t);
+  if (res.ok) {
+    STATE.token = t;
+    localStorage.setItem(STORAGE_KEY, t);
+    document.getElementById('login-error').style.display = 'none';
+    enterApp();
+  } else {
+    const err = document.getElementById('login-error');
+    err.textContent = res.status === 401 ? 'Invalid token.' : 'Could not reach the server.';
+    err.style.display = 'block';
+  }
+}
+
+function logout() {
+  STATE.token = null;
+  localStorage.removeItem(STORAGE_KEY);
+  showView('login');
+  document.getElementById('tabs').style.display = 'none';
+  document.getElementById('logout-btn').style.display = 'none';
+  document.getElementById('topbar-user').textContent = '';
+}
+
+function enterApp() {
+  document.getElementById('tabs').style.display = 'flex';
+  document.getElementById('logout-btn').style.display = 'inline-block';
+  document.getElementById('topbar-user').textContent = 'Signed in';
+  showLeads();
+}
+
+function showView(name) {
+  document.querySelectorAll('.view').forEach(v => v.classList.remove('active'));
+  const el = document.getElementById('view-' + name);
+  if (el) el.classList.add('active');
+}
+
+function activeTab(name) {
+  document.querySelectorAll('.tab').forEach(t => t.classList.remove('active'));
+  document.getElementById('tab-' + name)?.classList.add('active');
+}
+
+async function apiFetch(path, opts = {}, token = STATE.token) {
+  return fetch(path, {
+    ...opts,
+    headers: { ...(opts.headers || {}), Authorization: 'Bearer ' + token },
+  });
+}
+
+/* ════════════════════════════════════════════════════
+   LEADS (estimates)
+════════════════════════════════════════════════════ */
+async function showLeads() {
+  STATE.currentTab = 'leads';
+  activeTab('leads');
+  showView('leads');
+  document.getElementById('view-leads').innerHTML = '<div class="empty">Loading…</div>';
+  try {
+    const res = await apiFetch('/api/admin/leads?limit=200');
+    if (res.status === 401) return logout();
+    const data = await res.json();
+    STATE.leads = data.leads || [];
+    renderLeads();
+  } catch (err) {
+    document.getElementById('view-leads').innerHTML =
+      '<div class="empty"><div class="big">⚠️</div>Could not load leads: ' + escapeHtml(err.message) + '</div>';
+  }
+}
+
+function renderLeads() {
+  const total      = STATE.leads.length;
+  const booked     = STATE.leads.filter(l => l.booking_id).length;
+  const completed  = STATE.leads.filter(l => l.final_price != null).length;
+  const revenue    = STATE.leads.reduce((s, l) => s + (l.final_price || 0), 0);
+  const pendingFp  = STATE.leads.filter(l => l.booking_id && !l.final_price).length;
+
+  let html = `
+    <div class="list-head">
+      <h2>Leads</h2>
+      <span class="count">${total} estimate${total === 1 ? '' : 's'}</span>
+      <div class="grow"></div>
+      <button class="btn-ghost" onclick="showLeads()">Refresh</button>
+    </div>
+    <div class="stats-row">
+      <div class="stat-card"><div class="k">Estimates</div><div class="v">${total}</div></div>
+      <div class="stat-card"><div class="k">Booked</div><div class="v">${booked}</div></div>
+      <div class="stat-card"><div class="k">Completed</div><div class="v green">${completed}</div></div>
+      <div class="stat-card"><div class="k">Final-price todo</div><div class="v">${pendingFp}</div></div>
+      <div class="stat-card"><div class="k">Revenue (final)</div><div class="v green">$${num(revenue)}</div></div>
+    </div>`;
+
+  if (total === 0) {
+    html += '<div class="empty"><div class="big">🌱</div>No estimates yet — they\'ll appear as customers complete the property tour.</div>';
+  } else {
+    const header = `
+      <div class="row-item row-leads header" role="presentation">
+        <div></div>
+        <div class="cell-head">Customer / address</div>
+        <div class="cell-sub">Trees · scheduled</div>
+        <div class="cell-quote">Total</div>
+        <div class="cell-final">Final</div>
+        <div class="cell-status">Status</div>
+      </div>`;
+    const rows = STATE.leads.map(l => {
+      const total = `$${num(l.total_low)}–$${num(l.total_high)}`;
+      const final = l.final_price != null ? `$${num(l.final_price)}` : '—';
+      const customer = l.contact_name || (l.contact_id ? 'No name' : 'No contact yet');
+      const address = l.contact_address || '—';
+      const scheduled = l.scheduled_for ? fmtDate(l.scheduled_for) : '';
+      const treeCount = l.tree_count || 0;
+      const mobileMeta = [
+        `${treeCount} tree${treeCount === 1 ? '' : 's'}`,
+        scheduled || null,
+        `<strong>${total}</strong>`,
+        l.final_price != null ? `<strong style="color:var(--green-deep);">${final} final</strong>` : null,
+      ].filter(Boolean).join(' <span class="sep">·</span> ');
+
+      return `
+        <button type="button" class="row-item row-leads" onclick="openEstimate('${escapeAttr(l.estimate_id)}')" aria-label="Open estimate for ${escapeHtml(customer)}">
+          <div class="thumb-fallback" aria-hidden="true">🌳</div>
+          <div class="cell-head"><span class="cell-primary">${escapeHtml(customer)}</span><br>
+            <span class="cell-secondary">${escapeHtml(address)}</span>
+          </div>
+          <div class="cell-sub">
+            <span class="cell-primary">${treeCount} tree${treeCount === 1 ? '' : 's'}</span><br>
+            <span class="cell-secondary">${escapeHtml(scheduled)}</span>
+          </div>
+          <div class="cell-quote">${total}</div>
+          <div class="cell-final">${final}</div>
+          <div class="cell-status"><span class="status-badge status-${l.status}">${l.status}</span></div>
+          <div class="cell-meta">${mobileMeta}</div>
+        </button>`;
+    }).join('');
+    html += `<div class="rows-table">${header}${rows}</div>`;
+  }
+
+  document.getElementById('view-leads').innerHTML = html;
+}
+
+/* ════════════════════════════════════════════════════
+   CONTACTS
+════════════════════════════════════════════════════ */
+async function showContacts() {
+  STATE.currentTab = 'contacts';
+  activeTab('contacts');
+  showView('contacts');
+  document.getElementById('view-contacts').innerHTML = '<div class="empty">Loading…</div>';
+  try {
+    const res = await apiFetch('/api/admin/contacts?limit=300');
+    if (res.status === 401) return logout();
+    const data = await res.json();
+    STATE.contacts = data.contacts || [];
+    renderContacts();
+  } catch (err) {
+    document.getElementById('view-contacts').innerHTML =
+      '<div class="empty"><div class="big">⚠️</div>Could not load contacts: ' + escapeHtml(err.message) + '</div>';
+  }
+}
+
+function renderContacts() {
+  const total = STATE.contacts.length;
+  const repeat = STATE.contacts.filter(c => (c.estimate_count || 0) > 1).length;
+  const ltvSum = STATE.contacts.reduce((s, c) => s + (c.lifetime_value || 0), 0);
+
+  let html = `
+    <div class="list-head">
+      <h2>Contacts</h2>
+      <span class="count">${total} household${total === 1 ? '' : 's'}</span>
+      <div class="grow"></div>
+      <button class="btn-ghost" onclick="showContacts()">Refresh</button>
+    </div>
+    <div class="stats-row">
+      <div class="stat-card"><div class="k">Households</div><div class="v">${total}</div></div>
+      <div class="stat-card"><div class="k">Repeat customers</div><div class="v">${repeat}</div></div>
+      <div class="stat-card"><div class="k">Lifetime revenue</div><div class="v green">$${num(ltvSum)}</div></div>
+    </div>`;
+
+  if (total === 0) {
+    html += '<div class="empty"><div class="big">👋</div>No contacts yet. They\'ll appear when customers provide details before booking.</div>';
+  } else {
+    const header = `
+      <div class="row-item row-contacts header" role="presentation">
+        <div class="c-head">Name / contact</div>
+        <div class="c-secondary">Address</div>
+        <div>Estimates</div>
+        <div>Booked</div>
+        <div class="c-status">LTV</div>
+      </div>`;
+    const rows = STATE.contacts.map(c => {
+      const meta = [
+        c.email ? escapeHtml(c.email) : null,
+        c.phone ? escapeHtml(c.phone) : null,
+      ].filter(Boolean).join(' · ');
+      return `
+        <button type="button" class="row-item row-contacts" onclick="openContact('${escapeAttr(c.id)}')" aria-label="Open contact ${escapeHtml(c.name || '')}">
+          <div class="c-head"><span class="cell-primary">${escapeHtml(c.name || '—')}</span><br>
+            <span class="cell-secondary">${meta || '—'}</span>
+          </div>
+          <div class="c-secondary cell-secondary">${escapeHtml(c.address || '—')}</div>
+          <div class="cell-primary">${c.estimate_count || 0}</div>
+          <div class="cell-primary">${c.booking_count || 0}</div>
+          <div class="c-status cell-final">${c.lifetime_value ? '$' + num(c.lifetime_value) : '—'}</div>
+          <div class="c-meta">${meta} <span class="sep">·</span> ${c.estimate_count || 0} est. <span class="sep">·</span> LTV ${c.lifetime_value ? '$' + num(c.lifetime_value) : '—'}</div>
+        </button>`;
+    }).join('');
+    html += `<div class="rows-table">${header}${rows}</div>`;
+  }
+
+  document.getElementById('view-contacts').innerHTML = html;
+}
+
+/* ════════════════════════════════════════════════════
+   ESTIMATE DETAIL
+════════════════════════════════════════════════════ */
+async function openEstimate(id) {
+  showView('estimate');
+  const target = document.getElementById('view-estimate');
+  target.innerHTML = '<div class="empty">Loading…</div>';
+  try {
+    const res = await apiFetch('/api/admin/estimate/' + encodeURIComponent(id));
+    if (!res.ok) throw new Error('Could not load estimate');
+    const data = await res.json();
+    renderEstimateDetail(target, data);
+  } catch (err) {
+    target.innerHTML = '<div class="empty"><div class="big">⚠️</div>' + escapeHtml(err.message) + '</div>';
+  }
+}
+
+function renderEstimateDetail(target, data) {
+  const e = data.estimate;
+  const trees = data.trees || [];
+  const contact = data.contact;
+  const booking = data.booking;
+
+  const treesHtml = trees.length ? trees.map(t => `
+    <div class="tree-card">
+      <img class="tree-card-thumb" src="/api/tree-photo/${encodeURIComponent(t.id)}" alt="" onerror="this.outerHTML='<div class=&quot;tree-card-thumb-fb&quot;>🌳</div>'">
+      <div class="tree-card-body">
+        <div class="tree-name">${escapeHtml(t.label || t.species || 'Tree')}</div>
+        <div class="tree-meta">${escapeHtml(t.species || '')}${t.species && t.est_height_ft ? ' · ' : ''}${escapeHtml(t.est_height_ft || '')}<br>
+          ${escapeHtml(serviceName(t.selected_pkg))} · Condition: ${escapeHtml(t.condition || '—')} · Risk: ${escapeHtml(t.risk_rating || '—')}</div>
+        <div class="tree-price">$${num(t.quote_low)} – $${num(t.quote_high)}</div>
+      </div>
+    </div>`).join('') : '<p style="color:var(--muted);font-size:.88rem;">No trees on this estimate.</p>';
+
+  const totalRange = `$${num(e.total_low)} – $${num(e.total_high)}`;
+  const finalDiff = booking && booking.final_price != null ? diffLabel(booking.final_price, e.total_low, e.total_high) : '';
+
+  const finalForm = booking ? `
+    <div class="panel">
+      <h3>Record final price</h3>
+      <div class="field">
+        <label for="final-price-input">Final price ($)</label>
+        <input id="final-price-input" type="number" min="0" step="1" inputmode="numeric"
+               value="${booking.final_price ?? ''}" placeholder="e.g. 850">
+      </div>
+      <div class="field">
+        <label for="final-notes-input">On-site notes</label>
+        <textarea id="final-notes-input" rows="3">${escapeHtml(booking.on_site_notes || '')}</textarea>
+      </div>
+      <button class="btn" onclick="saveFinalPrice('${escapeAttr(booking.id)}', '${escapeAttr(e.id)}')">
+        ${booking.final_price != null ? 'Update' : 'Save final price'}
+      </button>
+      <div id="final-save-msg"></div>
+    </div>` :
+    `<div class="panel" style="background:var(--bg);">
+       <h3>No booking yet</h3>
+       <p style="font-size:.88rem;color:var(--muted);">Final price entry will appear once the customer books a Calendly slot.</p>
+     </div>`;
+
+  target.innerHTML = `
+    <div class="back-row">
+      <button class="btn-ghost" onclick="back()">← Back</button>
+      <span class="crumb">estimate ${e.id.slice(0, 8)}</span>
+    </div>
+    <div class="detail-grid">
+      <div>
+        <div class="panel">
+          <h3>${trees.length} ${trees.length === 1 ? 'tree' : 'trees'} on this estimate</h3>
+          ${treesHtml}
+        </div>
+      </div>
+      <div>
+        <div class="quote-block">
+          <div class="q-label">Estimate</div>
+          <div class="q-range">${totalRange}</div>
+          ${e.bundle_discount_pct ? `<div class="q-final">${e.bundle_discount_pct}% bundle discount applied</div>` : ''}
+          ${booking && booking.final_price != null ? `<div class="q-final">Final: <strong>$${num(booking.final_price)}</strong> ${finalDiff}</div>` : ''}
+        </div>
+        <div class="panel">
+          <h3>Customer</h3>
+          ${contact ? `
+            <dl class="kv">
+              <dt>Name</dt>    <dd><strong>${escapeHtml(contact.name || '—')}</strong></dd>
+              <dt>Email</dt>   <dd>${contact.email ? `<a href="mailto:${escapeAttr(contact.email)}">${escapeHtml(contact.email)}</a>` : '—'}</dd>
+              <dt>Phone</dt>   <dd>${contact.phone ? `<a href="tel:${escapeAttr(contact.phone)}">${escapeHtml(contact.phone)}</a>` : '—'}</dd>
+              <dt>Address</dt> <dd>${escapeHtml(contact.address || '—')}</dd>
+              ${contact.property_notes ? `<dt>Site notes</dt><dd>${escapeHtml(contact.property_notes)}</dd>` : ''}
+            </dl>
+            <button class="btn-ghost" onclick="openContact('${escapeAttr(contact.id)}')" style="margin-top:12px;">View all activity →</button>
+          ` : '<p style="font-size:.88rem;color:var(--muted);">No contact info captured yet.</p>'}
+        </div>
+        ${booking ? `
+        <div class="panel">
+          <h3>Booking</h3>
+          <dl class="kv">
+            <dt>Scheduled</dt> <dd>${escapeHtml(fmtDate(booking.scheduled_for, true) || '—')}</dd>
+            <dt>Status</dt>    <dd><span class="status-badge status-${booking.status}">${booking.status}</span></dd>
+          </dl>
+        </div>` : ''}
+        ${finalForm}
+        <div class="panel" style="background:var(--bg);">
+          <h3 style="font-size:.85rem;">IDs</h3>
+          <dl class="kv">
+            <dt>Estimate</dt> <dd style="font-family:monospace;font-size:.78rem;">${escapeHtml(e.id)}</dd>
+            <dt>Booking</dt>  <dd style="font-family:monospace;font-size:.78rem;">${escapeHtml(booking?.id || '—')}</dd>
+            <dt>Created</dt>  <dd style="font-size:.82rem;">${escapeHtml(fmtDate(e.created_at, true))}</dd>
+            <dt>Updated</dt>  <dd style="font-size:.82rem;">${escapeHtml(fmtDate(e.updated_at, true))}</dd>
+          </dl>
+        </div>
+      </div>
+    </div>
+  `;
+}
+
+function diffLabel(finalPrice, low, high) {
+  const mid = (low + high) / 2;
+  if (!mid) return '';
+  const diff = finalPrice - mid;
+  const pct = Math.round((diff / mid) * 100);
+  if (Math.abs(pct) < 5) return '<span style="opacity:.85;">(on target)</span>';
+  return diff > 0
+    ? `<span style="opacity:.85;">(+${pct}% over mid)</span>`
+    : `<span style="opacity:.85;">(${pct}% under mid)</span>`;
+}
+
+async function saveFinalPrice(bookingId, estimateId) {
+  const input = document.getElementById('final-price-input');
+  const notes = document.getElementById('final-notes-input').value.trim();
+  const msg = document.getElementById('final-save-msg');
+  const v = parseInt(input.value, 10);
+  if (!Number.isFinite(v) || v < 0) {
+    msg.innerHTML = '<div class="error-text">Enter a non-negative number.</div>';
+    return;
+  }
+  msg.innerHTML = '<div class="success-text">Saving…</div>';
+  const res = await apiFetch('/api/admin/booking/' + encodeURIComponent(bookingId) + '/final-price', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ final_price: v, notes: notes || undefined }),
+  });
+  if (res.ok) {
+    msg.innerHTML = '<div class="success-text">Saved.</div>';
+    setTimeout(() => openEstimate(estimateId), 600);
+  } else {
+    const data = await res.json().catch(() => ({}));
+    msg.innerHTML = '<div class="error-text">' + escapeHtml(data.error || 'Save failed.') + '</div>';
+  }
+}
+
+/* ════════════════════════════════════════════════════
+   CONTACT DETAIL
+════════════════════════════════════════════════════ */
+async function openContact(id) {
+  showView('contact-detail');
+  const target = document.getElementById('view-contact-detail');
+  target.innerHTML = '<div class="empty">Loading…</div>';
+  try {
+    const res = await apiFetch('/api/admin/contact/' + encodeURIComponent(id));
+    if (!res.ok) throw new Error('Could not load contact');
+    const data = await res.json();
+    renderContactDetail(target, data);
+  } catch (err) {
+    target.innerHTML = '<div class="empty"><div class="big">⚠️</div>' + escapeHtml(err.message) + '</div>';
+  }
+}
+
+function renderContactDetail(target, data) {
+  const c = data.contact;
+  const estimates = data.estimates || [];
+  const interactions = data.interactions || [];
+
+  const lifetime = estimates.reduce((s, e) => s + (e.final_price || 0), 0);
+
+  const estimatesHtml = estimates.length ? estimates.map(e => {
+    const range = `$${num(e.total_low)}–$${num(e.total_high)}`;
+    const dt = fmtDate(e.created_at);
+    return `
+      <button type="button" class="estimate-mini" onclick="openEstimate('${escapeAttr(e.id)}')">
+        <span class="status-badge status-${e.status}">${e.status}</span>
+        <span class="em-summary">${e.tree_count || 0} tree${e.tree_count === 1 ? '' : 's'} · ${dt}</span>
+        <span class="em-amount">${range}</span>
+      </button>`;
+  }).join('') : '<p style="font-size:.88rem;color:var(--muted);">No estimates yet.</p>';
+
+  const chIcon = { sms_out: '➜', sms_in: '←', email_out: '✉', email_in: '✉', system: '⚙', voice: '☎', chat: '💬' };
+  const chLabel = { sms_out: 'SMS sent', sms_in: 'SMS received', email_out: 'Email sent', email_in: 'Email received', system: 'System', voice: 'Call', chat: 'Chat' };
+
+  const interactionsHtml = interactions.length ? interactions.map(i => `
+    <div class="interaction">
+      <div class="ch ${i.channel}" title="${chLabel[i.channel] || i.channel}">${chIcon[i.channel] || '•'}</div>
+      <div class="body">
+        ${escapeHtml(i.body || chLabel[i.channel] || i.channel)}
+        <div class="ts">${escapeHtml(fmtDate(i.created_at, true))}</div>
+      </div>
+    </div>
+  `).join('') : '<p style="font-size:.88rem;color:var(--muted);">No activity logged yet.</p>';
+
+  target.innerHTML = `
+    <div class="back-row">
+      <button class="btn-ghost" onclick="back()">← Back</button>
+      <span class="crumb">contact ${c.id.slice(0, 8)}</span>
+    </div>
+    <div class="detail-grid">
+      <div>
+        <div class="panel">
+          <h3>Estimates (${estimates.length})</h3>
+          ${estimatesHtml}
+        </div>
+        <div class="panel">
+          <h3>Activity</h3>
+          ${interactionsHtml}
+        </div>
+      </div>
+      <div>
+        <div class="panel">
+          <h3>${escapeHtml(c.name || 'Customer')}</h3>
+          <dl class="kv">
+            <dt>Email</dt>   <dd>${c.email ? `<a href="mailto:${escapeAttr(c.email)}">${escapeHtml(c.email)}</a>` : '—'}</dd>
+            <dt>Phone</dt>   <dd>${c.phone ? `<a href="tel:${escapeAttr(c.phone)}">${escapeHtml(c.phone)}</a>` : '—'}</dd>
+            <dt>Address</dt> <dd>${escapeHtml(c.address || '—')}</dd>
+            ${c.property_notes ? `<dt>Notes</dt><dd>${escapeHtml(c.property_notes)}</dd>` : ''}
+          </dl>
+        </div>
+        <div class="quote-block">
+          <div class="q-label">Lifetime revenue</div>
+          <div class="q-range">$${num(lifetime)}</div>
+          <div class="q-final">${estimates.length} estimate${estimates.length === 1 ? '' : 's'} · ${estimates.filter(e => e.final_price != null).length} completed</div>
+        </div>
+      </div>
+    </div>
+  `;
+}
+
+/* ════════════════════════════════════════════════════
+   Nav helpers
+════════════════════════════════════════════════════ */
+function back() {
+  if (STATE.currentTab === 'contacts') showContacts();
+  else showLeads();
+}
+
+/* ════════════════════════════════════════════════════
+   Utils
+════════════════════════════════════════════════════ */
+function num(n) { return Number(n || 0).toLocaleString('en-US'); }
+function escapeHtml(s) { return String(s ?? '').replace(/[&<>"']/g, c => ({ '&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;' }[c])); }
+function escapeAttr(s) { return escapeHtml(s).replace(/"/g, '&quot;'); }
+function fmtDate(s, includeTime = false) {
+  if (!s) return '';
+  const d = new Date(s.includes('T') ? s : s.replace(' ', 'T') + 'Z');
+  if (Number.isNaN(d.getTime())) return s;
+  const opts = includeTime
+    ? { month: 'short', day: 'numeric', hour: 'numeric', minute: '2-digit' }
+    : { month: 'short', day: 'numeric' };
+  return d.toLocaleString('en-US', opts);
+}
+function serviceName(key) {
+  const map = { trim: 'Trimming & Pruning', removal: 'Full Removal', stump: 'Stump Grinding', treatment: 'Health & Treatment' };
+  return map[key] || '—';
+}
+</script>
+</body>
+</html>

@@ -1,0 +1,103 @@
+name = "treevision"
+main = "src/index.ts"
+compatibility_date = "2024-12-18"
+compatibility_flags = ["nodejs_compat"]
+
+# Static client assets served at the root
+[assets]
+directory = "../web"
+binding = "ASSETS"
+not_found_handling = "single-page-application"
+
+[[d1_databases]]
+binding = "DB"
+database_name = "treevision"
+# Fill in after `npm run db:create`
+database_id = "50fc63d6-157b-42a3-97dc-df3dc1186137"
+migrations_dir = "migrations"
+
+[[r2_buckets]]
+binding = "PHOTOS"
+bucket_name = "treevision-photos"
+
+[vars]
+# Non-secret config. Secrets go in `wrangler secret put`.
+COMPANY_NAME = "Dynamic Tree Service"
+# Operator notification recipient(s). Comma-separate for multiple, e.g.
+# "you@gmail.com, partner@gmail.com". NOTE: with Resend's TEST sender
+# (onboarding@resend.dev) email only reaches the address you signed up to
+# Resend with — verify a domain to send to other addresses / real customers.
+OPERATOR_EMAIL = "firefighter2501@gmail.com"
+OPERATOR_PHONE = "(555) 000-0000"
+# Resend test sender — swap to quotes@yourdomain.com once a domain is verified.
+FROM_EMAIL = "onboarding@resend.dev"
+CALENDLY_URL = "https://calendly.com/YOUR_USERNAME/tree-service"
+ISA_CERT = "ISA Certified Arborist®"
+# Public URL for resume links + emails. Leave blank — the app auto-detects it
+# from the first web request and persists it (app_settings.base_url). Only set
+# this if you want to force a specific URL (e.g. a custom domain before traffic).
+PUBLIC_BASE_URL = ""
+# Twilio sender number for outbound follow-up SMS, e.g. "+15551234567"
+TWILIO_FROM_NUMBER = ""
+# Comma-separated allowed origins for CORS; "*" allows all
+ALLOWED_ORIGINS = "*"
+# Rate limits per IP
+RATE_LIMIT_PER_HOUR = "8"
+RATE_LIMIT_PER_DAY = "30"
+
+# Secrets to set with `wrangler secret put <NAME>`:
+#   ANTHROPIC_API_KEY              — required
+#   ADMIN_TOKEN                    — required
+#   RESEND_API_KEY                 — required for any email (operator + customer)
+#   CALENDLY_WEBHOOK_SIGNING_KEY   — required for /api/webhooks/calendly
+#   TURNSTILE_SECRET               — optional; if unset, bot-check is skipped
+#   TWILIO_ACCOUNT_SID             — required for SMS follow-ups
+#   TWILIO_AUTH_TOKEN              — required for SMS follow-ups
+
+# Cron: hourly follow-up sweep. Fires `scheduled()` in src/index.ts.
+[triggers]
+crons = ["0 * * * *"]
+
+# ════════════════════════════════════════════════════════════
+# SANDBOX environment — a fully separate copy for experimentation.
+#   Deploy:   npm run deploy:sandbox     (→ treevision-sandbox.<sub>.workers.dev)
+#   Migrate:  npm run db:migrate:sandbox
+#   Logs:     npm run tail:sandbox
+# It has its OWN worker, D1 database, and R2 bucket — beta data is never touched.
+# Environments do NOT inherit bindings/vars, so everything is redeclared here.
+# ════════════════════════════════════════════════════════════
+[env.sandbox]
+name = "treevision-sandbox"
+
+[env.sandbox.assets]
+directory = "../web"
+binding = "ASSETS"
+not_found_handling = "single-page-application"
+
+[[env.sandbox.d1_databases]]
+binding = "DB"
+database_name = "treevision-sandbox"
+# Fill in after `npm run db:create:sandbox`
+database_id = "REPLACE_WITH_SANDBOX_D1_ID"
+migrations_dir = "migrations"
+
+[[env.sandbox.r2_buckets]]
+binding = "PHOTOS"
+bucket_name = "treevision-sandbox-photos"
+
+[env.sandbox.vars]
+COMPANY_NAME = "Dynamic Tree Service (SANDBOX)"
+OPERATOR_EMAIL = "firefighter2501@gmail.com"
+OPERATOR_PHONE = "(555) 000-0000"
+FROM_EMAIL = "onboarding@resend.dev"
+CALENDLY_URL = ""
+ISA_CERT = "ISA Certified Arborist®"
+PUBLIC_BASE_URL = ""
+TWILIO_FROM_NUMBER = ""
+ALLOWED_ORIGINS = "*"
+# Looser limits so testing doesn't hit the rate limiter
+RATE_LIMIT_PER_HOUR = "50"
+RATE_LIMIT_PER_DAY = "200"
+
+[env.sandbox.triggers]
+crons = ["0 * * * *"]

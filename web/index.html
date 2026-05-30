@@ -1,0 +1,1467 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0">
+<title>TreeVision AI — Estimate Your Property</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Bricolage+Grotesque:opsz,wght@12..96,400;12..96,600;12..96,800&family=Spline+Sans:wght@400;500;600&display=swap" rel="stylesheet">
+<link href="https://assets.calendly.com/assets/external/widget.css" rel="stylesheet">
+<style>
+:root {
+  --green: #2faa5e; --green-deep: #1c7a42; --green-soft: #eaf7ef; --green-mid: #c6ecd6;
+  --ink: #0f1a12; --muted: #6b7c70; --line: #d9e6dd; --bg: #f6f8f6; --card: #fff;
+  --danger: #b3261e; --warn: #7a5c00; --warn-bg: #fff8e1; --info: #1259a3;
+  --r-sm: 10px; --r-md: 16px; --r-lg: 24px;
+  /* Annotation colors */
+  --anno-deadwood: #b3261e;
+  --anno-hazard: #d97706;
+  --anno-clearance: #1259a3;
+  --anno-measurement: #5b2a8a;
+  --anno-structure: #1c7a42;
+  --anno-note: #6b7c70;
+}
+*, *::before, *::after { margin: 0; padding: 0; box-sizing: border-box; }
+body { font-family: 'Spline Sans', sans-serif; background: var(--bg); color: var(--ink); min-height: 100vh; overscroll-behavior: none; }
+img { display: block; max-width: 100%; }
+button, .btn { cursor: pointer; font-family: inherit; border: none; }
+input, textarea { font-family: inherit; }
+a { color: var(--green-deep); }
+#app { max-width: 480px; margin: 0 auto; min-height: 100vh; display: flex; flex-direction: column; background: var(--card); box-shadow: 0 0 60px rgba(0,0,0,.08); }
+.screen { display: none; flex-direction: column; flex: 1; }
+.screen.active { display: flex; }
+.topbar { background: var(--green-deep); padding: 16px 20px 14px; display: flex; align-items: center; gap: 12px; flex-shrink: 0; }
+.topbar-logo { font-family: 'Bricolage Grotesque', sans-serif; font-weight: 800; font-size: 1.15rem; color: #fff; letter-spacing: -.02em; line-height: 1; }
+.topbar-sub { font-size: .72rem; color: rgba(255,255,255,.7); margin-top: 2px; }
+.topbar-back { background: rgba(255,255,255,.15); border: none; border-radius: 8px; color: #fff; font-size: 1.2rem; width: 40px; height: 40px; display: flex; align-items: center; justify-content: center; flex-shrink: 0; transition: background .15s; }
+.topbar-back:hover { background: rgba(255,255,255,.25); }
+.topbar-back:focus-visible { outline: 2px solid #fff; outline-offset: 2px; }
+.topbar-info { flex: 1; min-width: 0; }
+#analyze-timer { color: rgba(255,255,255,.85); font-size: .85rem; font-variant-numeric: tabular-nums; }
+.scroll-body { flex: 1; overflow-y: auto; padding: 24px 20px 32px; -webkit-overflow-scrolling: touch; }
+h2 { font-family: 'Bricolage Grotesque', sans-serif; font-weight: 800; font-size: clamp(1.6rem, 6vw, 2rem); letter-spacing: -.03em; line-height: 1.1; }
+h3 { font-family: 'Bricolage Grotesque', sans-serif; font-weight: 700; font-size: 1.1rem; }
+p { line-height: 1.6; color: var(--muted); font-size: .95rem; }
+.btn-primary { width: 100%; padding: 16px; background: var(--green); color: #fff; font-family: 'Bricolage Grotesque', sans-serif; font-weight: 700; font-size: 1.05rem; border-radius: var(--r-md); transition: transform .15s, background .15s; text-align: center; }
+.btn-primary:hover { background: var(--green-deep); }
+.btn-primary:active { transform: scale(.98); }
+.btn-primary:disabled { opacity: .5; pointer-events: none; }
+.btn-ghost { width: 100%; padding: 14px; background: transparent; color: var(--green-deep); font-family: 'Bricolage Grotesque', sans-serif; font-weight: 700; font-size: 1rem; border-radius: var(--r-md); border: 2px solid var(--green-mid); transition: background .15s; text-align: center; }
+.btn-ghost:hover { background: var(--green-soft); }
+.btn-link { background: none; color: var(--green-deep); font-weight: 600; font-size: .9rem; padding: 6px 10px; border-radius: 8px; }
+.btn-link:hover { background: var(--green-soft); }
+.btn-link.danger { color: var(--danger); }
+.btn-link.danger:hover { background: #fdecea; }
+.badge { display: inline-flex; align-items: center; gap: 5px; padding: 5px 10px; border-radius: 999px; font-size: .78rem; font-weight: 600; letter-spacing: .02em; }
+.badge-green { background: var(--green-soft); color: var(--green-deep); }
+.badge-warn  { background: var(--warn-bg); color: var(--warn); }
+.badge-muted { background: var(--bg); color: var(--muted); border: 1px solid var(--line); }
+.gap-14 { display: flex; flex-direction: column; gap: 14px; }
+.gap-20 { display: flex; flex-direction: column; gap: 20px; }
+.mt-8 { margin-top: 8px; }
+.mt-16 { margin-top: 16px; }
+.divider { height: 1px; background: var(--line); margin: 16px 0; }
+.std-badge { display: inline-flex; align-items: center; gap: 5px; font-size: .72rem; color: var(--muted); background: var(--bg); border: 1px solid var(--line); border-radius: 6px; padding: 3px 8px; font-weight: 500; }
+.error-box { background: #fdecea; border-radius: var(--r-md); padding: 14px 16px; font-size: .88rem; color: var(--danger); font-weight: 500; }
+.footer-bar { padding: 16px 20px; border-top: 1px solid var(--line); background: var(--card); flex-shrink: 0; display: flex; flex-direction: column; gap: 10px; }
+.fade-in { animation: fadeUp .35s ease both; }
+@keyframes fadeUp { from { opacity: 0; transform: translateY(10px); } to { opacity: 1; transform: none; } }
+@keyframes spin { to { transform: rotate(360deg); } }
+@media (prefers-reduced-motion: reduce) {
+  *, *::before, *::after { animation-duration: 0.01ms !important; transition-duration: 0.01ms !important; }
+}
+
+/* ── LANDING ──────────────────────────────────── */
+.landing-hero { background: linear-gradient(160deg, var(--green-deep) 0%, #0d4a28 100%); padding: 36px 24px 32px; text-align: center; color: #fff; flex-shrink: 0; }
+.hero-icon { font-size: 3.5rem; line-height: 1; margin-bottom: 16px; }
+.hero-title { font-family: 'Bricolage Grotesque', sans-serif; font-weight: 800; font-size: clamp(2rem, 8vw, 2.6rem); letter-spacing: -.03em; line-height: 1; color: #fff; }
+.hero-sub { margin-top: 10px; font-size: 1rem; color: rgba(255,255,255,.85); line-height: 1.5; }
+.landing-body { padding: 24px 20px 36px; }
+.steps-list { display: flex; flex-direction: column; gap: 14px; margin-bottom: 24px; }
+.step-row { display: flex; align-items: flex-start; gap: 14px; }
+.step-dot { width: 32px; height: 32px; border-radius: 50%; background: var(--green-soft); color: var(--green-deep); font-family: 'Bricolage Grotesque', sans-serif; font-weight: 800; font-size: .95rem; display: flex; align-items: center; justify-content: center; flex-shrink: 0; }
+.step-text strong { display: block; font-weight: 600; font-size: .95rem; color: var(--ink); }
+.step-text span { font-size: .85rem; color: var(--muted); }
+.trust-row { display: flex; gap: 8px; justify-content: center; flex-wrap: wrap; margin-bottom: 20px; }
+
+/* ── CART / ESTIMATE DASHBOARD ────────────────── */
+.cart-empty { text-align: center; padding: 40px 20px; }
+.cart-empty .icon { font-size: 3rem; margin-bottom: 12px; }
+.cart-empty h2 { margin-bottom: 8px; }
+.cart-empty p { margin-bottom: 24px; }
+
+.tree-card { background: var(--card); border: 1px solid var(--line); border-radius: var(--r-md); padding: 12px; display: flex; gap: 12px; align-items: flex-start; }
+.tree-card-thumb { width: 64px; height: 64px; border-radius: 10px; object-fit: cover; background: var(--bg); flex-shrink: 0; }
+.tree-card-thumb-fallback { width: 64px; height: 64px; border-radius: 10px; background: var(--bg); display: flex; align-items: center; justify-content: center; font-size: 1.6rem; flex-shrink: 0; border: 1px solid var(--line); }
+.tree-card-body { flex: 1; min-width: 0; }
+.tree-card-label { font-weight: 600; font-size: .95rem; color: var(--ink); }
+.tree-card-meta { font-size: .82rem; color: var(--muted); margin-top: 2px; line-height: 1.4; }
+.tree-card-price { font-weight: 700; color: var(--green-deep); font-size: .92rem; margin-top: 4px; }
+.tree-card-actions { display: flex; gap: 4px; flex-shrink: 0; }
+
+.budget-panel { background: var(--card); border: 1.5px solid var(--green); border-radius: var(--r-lg); padding: 16px 18px; box-shadow: 0 4px 14px rgba(47,170,94,.12); }
+.budget-row { display: flex; justify-content: space-between; font-size: .9rem; padding: 4px 0; color: var(--muted); }
+.budget-row.discount { color: var(--green-deep); font-weight: 600; }
+.budget-divider { height: 1px; background: var(--line); margin: 8px 0; }
+.budget-total { display: flex; justify-content: space-between; align-items: baseline; font-family: 'Bricolage Grotesque', sans-serif; }
+.budget-total .k { font-size: .85rem; color: var(--muted); text-transform: uppercase; letter-spacing: .04em; font-weight: 700; }
+.budget-total .v { font-size: 1.5rem; font-weight: 800; letter-spacing: -.02em; color: var(--green-deep); }
+.bundle-hint { background: var(--green-soft); color: var(--green-deep); border-radius: var(--r-sm); padding: 8px 12px; font-size: .82rem; font-weight: 500; margin-top: 8px; text-align: center; }
+
+/* ── PHOTO UPLOAD ─────────────────────────────── */
+.dropzone { border: 2.5px dashed var(--green); border-radius: var(--r-lg); padding: 40px 20px; text-align: center; cursor: pointer; background: var(--green-soft); transition: background .2s, border-color .2s; position: relative; }
+.dropzone:hover, .dropzone.drag { background: #d4f0e1; border-color: var(--green-deep); }
+.dropzone input { display: none; }
+.dz-icon { font-size: 2.8rem; margin-bottom: 10px; }
+.dz-title { font-family: 'Bricolage Grotesque', sans-serif; font-weight: 800; font-size: 1.3rem; margin-bottom: 6px; }
+.dz-hint { font-size: .88rem; color: var(--muted); }
+.photo-preview { position: relative; border-radius: var(--r-lg); overflow: hidden; background: var(--ink); }
+.photo-preview img { width: 100%; max-height: 260px; object-fit: cover; display: block; }
+.photo-remove { position: absolute; top: 8px; right: 8px; width: 44px; height: 44px; border-radius: 50%; background: rgba(0,0,0,.55); color: #fff; font-size: 1.1rem; display: flex; align-items: center; justify-content: center; border: none; cursor: pointer; }
+.tips-box { background: var(--green-soft); border-radius: var(--r-md); padding: 14px 16px; font-size: .85rem; color: var(--green-deep); }
+.tips-box strong { display: block; font-weight: 600; margin-bottom: 6px; }
+.tips-box ul { list-style: none; display: flex; flex-direction: column; gap: 4px; }
+.tips-box li::before { content: "✓ "; font-weight: 700; }
+
+/* ── ANALYZING ─────────────────────────────────── */
+.scan-container { position: relative; width: 100%; border-radius: var(--r-lg); overflow: hidden; margin-bottom: 32px; }
+.scan-overlay { position: absolute; inset: 0; background: rgba(15,26,18,.25); }
+.scan-line { position: absolute; left: 0; right: 0; height: 2px; background: linear-gradient(90deg, transparent, var(--green) 30%, #6effad, var(--green) 70%, transparent); box-shadow: 0 0 14px 4px rgba(47,170,94,.5); animation: scanline 1.8s ease-in-out infinite; }
+@keyframes scanline { 0%{top:5%} 50%{top:93%} 100%{top:5%} }
+.ai-steps { display: flex; flex-direction: column; gap: 12px; width: 100%; max-width: 320px; }
+.ai-step { display: flex; align-items: center; gap: 12px; font-size: .9rem; color: var(--muted); transition: color .3s; }
+.ai-step.active { color: var(--ink); font-weight: 500; }
+.ai-step.done { color: var(--green-deep); }
+.ai-step-dot { width: 22px; height: 22px; border-radius: 50%; border: 2px solid var(--line); display: flex; align-items: center; justify-content: center; font-size: .7rem; flex-shrink: 0; transition: all .3s; }
+.ai-step.done .ai-step-dot { background: var(--green); border-color: var(--green); color: #fff; }
+.ai-step.active .ai-step-dot { border-color: var(--green); }
+.ai-step.waiting .ai-step-dot { border-color: var(--green-mid); border-top-color: var(--green); animation: spin .8s linear infinite; color: transparent; }
+
+/* ── REPORT HEADER (branded) ───────────────── */
+.report-header {
+  background: var(--ink); color: #fff; border-radius: var(--r-lg);
+  padding: 16px 18px; margin-bottom: 16px; display: flex; align-items: center; gap: 12px;
+}
+.report-header .logo-mark { flex-shrink: 0; }
+.report-header .rh-text { flex: 1; min-width: 0; }
+.report-header .rh-title { font-family: 'Bricolage Grotesque', sans-serif; font-weight: 800; font-size: 1rem; line-height: 1.1; letter-spacing: -.01em; }
+.report-header .rh-sub { font-size: .72rem; color: rgba(255,255,255,.6); margin-top: 3px; }
+.report-header .rh-tag { font-size: .68rem; color: var(--green-mid); font-weight: 600; text-transform: uppercase; letter-spacing: .05em; margin-top: 4px; }
+
+/* ── AUTO ASSESSMENT box (light card) ──────── */
+.auto-assess {
+  background: var(--card); color: var(--ink); border-radius: var(--r-md);
+  padding: 14px 16px; margin-bottom: 16px;
+  border: 1px solid var(--line);
+}
+.auto-assess .aa-head { font-size: .68rem; font-weight: 700; letter-spacing: .08em; color: var(--green-deep); text-transform: uppercase; margin-bottom: 10px; }
+.auto-assess .aa-row { display: flex; justify-content: space-between; align-items: baseline; gap: 16px; padding: 4px 0; font-size: .85rem; border-bottom: 1px solid var(--bg); }
+.auto-assess .aa-row:last-child { border-bottom: none; }
+.auto-assess .aa-row .k { color: var(--muted); white-space: nowrap; flex-shrink: 0; }
+.auto-assess .aa-row .v { font-weight: 600; text-align: right; min-width: 0; }
+/* Risk colors tuned for a light background */
+.aa-risk-low { color: var(--green-deep); } .aa-risk-moderate { color: #9a7400; }
+.aa-risk-high { color: #c2570a; } .aa-risk-extreme { color: var(--danger); }
+
+/* ── ANNOTATED PHOTO + A–E overlay ─────────── */
+.annotated-photo { position: relative; width: 100%; border-radius: var(--r-lg); overflow: hidden; background: var(--ink); margin-bottom: 12px; }
+.annotated-photo img { width: 100%; display: block; }
+.anno-caption { font-size: .72rem; font-weight: 700; letter-spacing: .06em; text-transform: uppercase; color: var(--muted); margin-bottom: 8px; }
+.anno-layer { position: absolute; inset: 0; pointer-events: none; }
+.anno-box {
+  position: absolute; box-sizing: border-box;
+  border: 2.5px dashed; border-radius: 8px;
+}
+.anno-box .anno-fill { position: absolute; inset: 0; opacity: .1; border-radius: 6px; }
+.anno-badge {
+  position: absolute; top: -11px; left: -11px;
+  width: 24px; height: 24px; border-radius: 50%;
+  display: flex; align-items: center; justify-content: center;
+  font: 800 13px 'Bricolage Grotesque', sans-serif; color: #fff;
+  border: 2px solid #fff; box-shadow: 0 1px 4px rgba(0,0,0,.4);
+}
+/* A–E legend */
+.ae-legend { display: flex; flex-direction: column; gap: 8px; margin-bottom: 16px; }
+.ae-row { display: flex; align-items: flex-start; gap: 10px; font-size: .85rem; }
+.ae-letter {
+  flex-shrink: 0; width: 22px; height: 22px; border-radius: 50%;
+  display: flex; align-items: center; justify-content: center;
+  font: 800 12px 'Bricolage Grotesque', sans-serif; color: #fff; margin-top: 1px;
+}
+.ae-row .ae-cat { font-weight: 700; }
+.ae-row .ae-desc { color: var(--muted); }
+
+/* ── REPORT PANELS ─────────────────────────── */
+.report-panel { background: var(--card); border: 1px solid var(--line); border-radius: var(--r-md); padding: 14px 16px; margin-bottom: 12px; }
+.report-panel h4 { font-family: 'Bricolage Grotesque', sans-serif; font-weight: 700; font-size: .82rem; text-transform: uppercase; letter-spacing: .04em; color: var(--green-deep); margin-bottom: 8px; }
+.report-panel p { font-size: .88rem; color: #344838; line-height: 1.55; }
+.scope-list { list-style: none; display: flex; flex-direction: column; gap: 6px; }
+.scope-list li { display: flex; gap: 8px; font-size: .86rem; color: #344838; align-items: flex-start; }
+.scope-list li::before { content: "✓"; color: var(--green); font-weight: 800; flex-shrink: 0; }
+
+/* ── PRICING TIERS ─────────────────────────── */
+.price-tiers { display: grid; grid-template-columns: 1fr 1fr 1fr; gap: 8px; margin-bottom: 10px; }
+.price-tier { text-align: center; border: 1px solid var(--line); border-radius: var(--r-sm); padding: 10px 6px; }
+.price-tier.expected { border-color: var(--green); background: var(--green-soft); }
+.price-tier .pt-label { font-size: .64rem; font-weight: 700; text-transform: uppercase; letter-spacing: .04em; color: var(--muted); }
+.price-tier.expected .pt-label { color: var(--green-deep); }
+.price-tier .pt-amount { font-family: 'Bricolage Grotesque', sans-serif; font-weight: 800; font-size: .92rem; margin-top: 4px; letter-spacing: -.01em; }
+.price-tier.expected .pt-amount { color: var(--green-deep); }
+
+/* ── STANDARDS BADGES ──────────────────────── */
+.standards-row { display: flex; gap: 8px; flex-wrap: wrap; align-items: center; }
+.standard-pill {
+  display: inline-flex; align-items: center; gap: 5px; font-size: .72rem; font-weight: 700;
+  color: var(--green-deep); background: var(--green-soft); border: 1px solid var(--green-mid);
+  border-radius: 6px; padding: 4px 9px;
+}
+.exclusions { font-size: .78rem; color: var(--muted); line-height: 1.5; }
+.exclusions strong { color: #344838; }
+
+/* Report two-column grid — single column on mobile, side-by-side on desktop */
+.report-grid { display: flex; flex-direction: column; }
+
+/* ── DESKTOP / LAPTOP LAYOUT ───────────────────
+   Mobile (≤899px) is untouched — fixed app column, single-column report.
+   Wider screens get a roomier shell + a 2-column report (sticky photo). */
+@media (min-width: 900px) {
+  #app { max-width: 1080px; }
+  /* Utility screens keep a comfortable centered column so they don't stretch */
+  .scroll-body { max-width: 600px; margin-left: auto; margin-right: auto; width: 100%; }
+  .landing-body { max-width: 600px; margin-left: auto; margin-right: auto; }
+  .footer-bar { align-items: center; }
+  .footer-bar > * { width: 100%; max-width: 480px; }
+  /* The review report uses the full width for its two columns */
+  #screen-review .scroll-body { max-width: 1080px; }
+  .report-grid {
+    display: grid;
+    grid-template-columns: minmax(0, 1.05fr) minmax(0, 1fr);
+    gap: 28px; align-items: start;
+  }
+  /* Photo column stays in view as the details scroll */
+  .report-col-left { position: sticky; top: 16px; }
+}
+
+.result-species { font-family: 'Bricolage Grotesque', sans-serif; font-weight: 800; font-size: 1.6rem; letter-spacing: -.02em; }
+.result-latin { font-style: italic; color: var(--muted); font-size: .88rem; margin-bottom: 10px; }
+
+.facts-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; margin: 16px 0; }
+.fact-card { background: var(--bg); border: 1px solid var(--line); border-radius: var(--r-md); padding: 12px; }
+.fact-card .k { font-size: .75rem; color: var(--muted); font-weight: 500; margin-bottom: 3px; }
+.fact-card .v { font-size: 1rem; font-weight: 600; }
+
+.notes-list { list-style: none; display: flex; flex-direction: column; gap: 6px; margin: 8px 0 0; }
+.notes-list li { display: flex; gap: 8px; font-size: .85rem; color: #344838; align-items: flex-start; }
+.notes-list li::before { content: "▸"; color: var(--green); font-weight: 700; flex-shrink: 0; margin-top: 1px; }
+
+/* Service picker (chips, more compact than v1 cards) */
+.svc-picker { display: flex; flex-direction: column; gap: 8px; margin: 16px 0; }
+.svc-chip {
+  display: flex; align-items: center; gap: 12px;
+  padding: 12px 14px; border: 1.5px solid var(--line); border-radius: var(--r-md);
+  background: var(--card); cursor: pointer; transition: border-color .15s, background .15s;
+  text-align: left; width: 100%; font-family: inherit; font-size: inherit; color: inherit;
+}
+.svc-chip:hover { border-color: var(--green); }
+.svc-chip:focus-visible { outline: none; border-color: var(--green); box-shadow: 0 0 0 3px var(--green-soft); }
+.svc-chip.selected { border-color: var(--green); background: var(--green-soft); }
+.svc-chip-icon { font-size: 1.4rem; flex-shrink: 0; }
+.svc-chip-body { flex: 1; min-width: 0; }
+.svc-chip-name { font-weight: 700; font-size: .95rem; }
+.svc-chip-meta { font-size: .78rem; color: var(--muted); }
+.svc-chip-price { font-weight: 700; color: var(--green-deep); font-size: .9rem; white-space: nowrap; }
+.svc-chip.recommended .svc-chip-name::after {
+  content: "AI Recommended"; display: inline-block; margin-left: 8px;
+  background: var(--green); color: #fff; font-size: .65rem; font-weight: 700;
+  padding: 2px 7px; border-radius: 999px; letter-spacing: .03em; vertical-align: 2px;
+}
+
+/* ── CONTACT FORM ─────────────────────────────── */
+.field { display: flex; flex-direction: column; gap: 6px; }
+.field label { font-size: .82rem; font-weight: 600; color: var(--ink); }
+.field input, .field textarea {
+  border: 1.5px solid var(--line); border-radius: 10px;
+  padding: 12px 14px; font-size: 1rem; background: #fff;
+}
+.field input:focus, .field textarea:focus { outline: none; border-color: var(--green); box-shadow: 0 0 0 3px var(--green-soft); }
+.field .hint { font-size: .75rem; color: var(--muted); }
+
+/* ── SCHEDULING ───────────────────────────────── */
+.booking-summary { background: var(--green-soft); border-radius: var(--r-md); padding: 14px 16px; display: flex; gap: 12px; align-items: center; }
+.booking-summary .icon { font-size: 1.6rem; }
+.booking-summary .info { flex: 1; }
+.booking-summary .label { font-size: .78rem; color: var(--green-deep); font-weight: 600; }
+.booking-summary .v { font-size: 1.05rem; font-weight: 700; color: var(--ink); }
+.calendly-wrap { border-radius: var(--r-lg); overflow: hidden; border: 1px solid var(--line); min-height: 600px; }
+
+/* ── CONFIRMATION ─────────────────────────────── */
+.confirm-hero { text-align: center; padding: 32px 24px 8px; }
+.confirm-hero .check { width: 72px; height: 72px; margin: 0 auto 16px; background: var(--green); border-radius: 50%; display: flex; align-items: center; justify-content: center; font-size: 2.4rem; color: #fff; }
+.confirm-hero h2 { margin-bottom: 8px; }
+.confirm-summary { background: var(--green-soft); border-radius: var(--r-md); padding: 16px 18px; }
+.confirm-summary .row { display: flex; justify-content: space-between; gap: 16px; padding: 4px 0; font-size: .92rem; }
+.confirm-summary .row .k { color: var(--green-deep); font-weight: 600; flex-shrink: 0; }
+.confirm-summary .row .v { color: var(--ink); font-weight: 600; text-align: right; }
+.confirm-summary .row.total { border-top: 1px solid var(--green-mid); margin-top: 8px; padding-top: 10px; }
+.confirm-summary .row.total .v { color: var(--green-deep); font-family: 'Bricolage Grotesque', sans-serif; font-size: 1.15rem; font-weight: 800; }
+.confirm-action-list { display: flex; flex-direction: column; gap: 8px; }
+.confirm-action {
+  display: flex; align-items: center; gap: 12px;
+  padding: 14px 16px; background: var(--card);
+  border: 1px solid var(--line); border-radius: var(--r-md);
+  font-size: .92rem; color: var(--ink); text-decoration: none;
+}
+.confirm-action:hover { background: var(--green-soft); border-color: var(--green); }
+.confirm-action .icon { font-size: 1.4rem; flex-shrink: 0; }
+.confirm-action .body { flex: 1; }
+.confirm-action .body .title { font-weight: 600; color: var(--ink); }
+.confirm-action .body .desc { font-size: .8rem; color: var(--muted); }
+.confirm-action .arrow { color: var(--muted); }
+
+</style>
+</head>
+<body>
+
+<div id="app">
+
+  <!-- ── SCREEN 1: LANDING ─────────────────────── -->
+  <div id="screen-landing" class="screen active">
+    <div class="landing-hero">
+      <div class="hero-icon" aria-hidden="true">🌳</div>
+      <div class="hero-title">TreeVision AI</div>
+      <div class="hero-sub">Walk your property, photograph each tree.<br>Get a full estimate in minutes — no on-site visit needed.</div>
+    </div>
+    <div class="landing-body">
+      <div class="steps-list">
+        <div class="step-row"><div class="step-dot">1</div><div class="step-text"><strong>Photograph each tree</strong><span>One photo per tree, walk your whole property</span></div></div>
+        <div class="step-row"><div class="step-dot">2</div><div class="step-text"><strong>AI analyzes each one</strong><span>Species, size, condition, risk — and marks what we'd do</span></div></div>
+        <div class="step-row"><div class="step-dot">3</div><div class="step-text"><strong>Bundle &amp; save</strong><span>Multiple trees? Auto bundle discount applied</span></div></div>
+        <div class="step-row"><div class="step-dot">4</div><div class="step-text"><strong>Book online</strong><span>Pick a date, we'll confirm same-day</span></div></div>
+      </div>
+      <div class="trust-row">
+        <span class="std-badge">📋 ANSI A300 Standards</span>
+        <span class="std-badge">🏅 ISA Certified</span>
+        <span class="std-badge">🛡️ Fully Insured</span>
+      </div>
+      <button class="btn-primary" onclick="startEstimate()">Start your estimate →</button>
+      <p style="text-align:center; font-size:.75rem; margin-top:20px; color:var(--muted);">
+        AI visual estimates; final price confirmed on-site per ANSI A300.
+      </p>
+    </div>
+  </div>
+
+  <!-- ── SCREEN 2: CART / ESTIMATE DASHBOARD ───── -->
+  <div id="screen-cart" class="screen">
+    <div class="topbar">
+      <button class="topbar-back" onclick="goTo('landing')" aria-label="Back">←</button>
+      <div class="topbar-info">
+        <div class="topbar-logo">🌳 Your estimate</div>
+        <div class="topbar-sub" id="cart-subtitle">No trees yet</div>
+      </div>
+    </div>
+    <div class="scroll-body">
+      <div id="cart-body"></div>
+    </div>
+    <div class="footer-bar" id="cart-footer"></div>
+  </div>
+
+  <!-- ── SCREEN 3: PHOTO UPLOAD ────────────────── -->
+  <div id="screen-photo" class="screen">
+    <div class="topbar">
+      <button class="topbar-back" onclick="goTo('cart')" aria-label="Back">←</button>
+      <div class="topbar-info">
+        <div class="topbar-logo">📸 New tree</div>
+        <div class="topbar-sub" id="photo-subtitle">Step 1 — photograph</div>
+      </div>
+    </div>
+    <div class="scroll-body">
+      <div class="gap-20">
+        <div>
+          <h2>Photograph this tree</h2>
+          <p class="mt-8">Stand back so the full tree is visible — trunk to crown.</p>
+        </div>
+        <div id="upload-area">
+          <div class="dropzone" id="dropzone" onclick="document.getElementById('file-input').click()">
+            <input type="file" id="file-input" accept="image/*" capture="environment">
+            <div class="dz-icon">📷</div>
+            <div class="dz-title">Tap to photograph</div>
+            <div class="dz-hint">Or drag and drop a photo<br>JPG, PNG, HEIC accepted</div>
+          </div>
+        </div>
+        <div class="field">
+          <label for="tree-label-input">Label (optional)</label>
+          <input id="tree-label-input" type="text" maxlength="80" placeholder="e.g. Front yard oak, backyard maple">
+          <div class="hint">Helps you tell them apart in your estimate.</div>
+        </div>
+        <div class="tips-box">
+          <strong>📐 Tips for best results</strong>
+          <ul>
+            <li>Stand back — capture the full crown</li>
+            <li>Good lighting, no heavy shade or glare</li>
+            <li>One tree per photo for accurate ID</li>
+          </ul>
+        </div>
+        <div id="upload-error" class="error-box" role="alert" aria-live="assertive" style="display:none;"></div>
+      </div>
+    </div>
+    <div class="footer-bar">
+      <button class="btn-primary" id="analyze-btn" onclick="startAnalysis()" disabled>Analyze this tree →</button>
+    </div>
+  </div>
+
+  <!-- ── SCREEN 4: ANALYZING ────────────────────── -->
+  <div id="screen-analyzing" class="screen" aria-busy="true">
+    <div class="topbar">
+      <div class="topbar-info">
+        <div class="topbar-logo">🔍 Analyzing</div>
+        <div class="topbar-sub">AI arborist assessment in progress</div>
+      </div>
+      <div id="analyze-timer" aria-label="Elapsed">0.0s</div>
+    </div>
+    <div class="scroll-body" aria-live="polite">
+      <div style="display:flex;flex-direction:column;align-items:center;gap:24px;padding-top:10px;">
+        <div class="scan-container" aria-hidden="true">
+          <img id="scan-photo" src="" alt="" style="width:100%;max-height:220px;object-fit:cover;">
+          <div class="scan-overlay"></div>
+          <div class="scan-line"></div>
+        </div>
+        <div>
+          <p style="text-align:center;font-weight:600;color:var(--ink);margin-bottom:16px;">Running arborist analysis…</p>
+          <div class="ai-steps">
+            <div class="ai-step"><div class="ai-step-dot">1</div><span>Reading image &amp; metadata</span></div>
+            <div class="ai-step"><div class="ai-step-dot">2</div><span>Identifying tree species</span></div>
+            <div class="ai-step"><div class="ai-step-dot">3</div><span>Estimating height, DBH &amp; spread</span></div>
+            <div class="ai-step"><div class="ai-step-dot">4</div><span>Risk &amp; condition assessment</span></div>
+            <div class="ai-step"><div class="ai-step-dot">5</div><span>Marking deadwood &amp; hazards on photo</span></div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- ── SCREEN 5: TREE REVIEW ──────────────────── -->
+  <div id="screen-review" class="screen">
+    <div class="topbar">
+      <button class="topbar-back" onclick="cancelTreeReview()" aria-label="Back">←</button>
+      <div class="topbar-info">
+        <div class="topbar-logo">✅ Tree analyzed</div>
+        <div class="topbar-sub" id="review-subtitle">Pick a service to add</div>
+      </div>
+    </div>
+    <div class="scroll-body fade-in" id="review-body"></div>
+    <div class="footer-bar">
+      <button class="btn-primary" onclick="commitTree()">Add to estimate →</button>
+      <button class="btn-ghost" onclick="cancelTreeReview()">Discard &amp; re-take</button>
+    </div>
+  </div>
+
+  <!-- ── SCREEN 6: CONTACT INFO ─────────────────── -->
+  <div id="screen-contact" class="screen">
+    <div class="topbar">
+      <button class="topbar-back" onclick="goTo('cart')" aria-label="Back">←</button>
+      <div class="topbar-info">
+        <div class="topbar-logo">📋 Your details</div>
+        <div class="topbar-sub">So we can confirm &amp; send your estimate</div>
+      </div>
+    </div>
+    <div class="scroll-body">
+      <div class="gap-14">
+        <div>
+          <h2>Where should we send this?</h2>
+          <p class="mt-8">We'll email your estimate and call to confirm before the visit.</p>
+        </div>
+        <div class="field">
+          <label for="ct-name">Your name</label>
+          <input id="ct-name" type="text" autocomplete="name" required>
+        </div>
+        <div class="field">
+          <label for="ct-email">Email</label>
+          <input id="ct-email" type="email" autocomplete="email" required inputmode="email">
+        </div>
+        <div class="field">
+          <label for="ct-phone">Phone</label>
+          <input id="ct-phone" type="tel" autocomplete="tel" required inputmode="tel" placeholder="(555) 123-4567">
+        </div>
+        <div class="field">
+          <label for="ct-address">Property address</label>
+          <input id="ct-address" type="text" autocomplete="street-address" required placeholder="123 Main St, City, State">
+        </div>
+        <div class="field">
+          <label for="ct-notes">Site notes <span style="font-weight:400;color:var(--muted);">(optional)</span></label>
+          <textarea id="ct-notes" rows="3" placeholder="Gate code, dogs, parking, access constraints…"></textarea>
+        </div>
+        <div id="contact-error" class="error-box" role="alert" aria-live="assertive" style="display:none;"></div>
+      </div>
+    </div>
+    <div class="footer-bar">
+      <button class="btn-primary" id="contact-submit" onclick="submitContact()">Submit my estimate →</button>
+    </div>
+  </div>
+
+  <!-- ── SCREEN 7b: ALREADY BOOKED (resume after booking) ── -->
+  <div id="screen-booked" class="screen">
+    <div class="topbar">
+      <div class="topbar-info">
+        <div class="topbar-logo" id="booked-logo">✅ You're booked</div>
+        <div class="topbar-sub" id="booked-subtitle">Confirmation</div>
+      </div>
+    </div>
+    <div class="scroll-body fade-in">
+      <div class="confirm-hero">
+        <div class="check" aria-hidden="true">✓</div>
+        <h2 id="booked-headline">You're all booked!</h2>
+        <p id="booked-tagline">We'll see you at your scheduled time.</p>
+      </div>
+      <div class="confirm-summary" id="booked-summary" style="margin-bottom: 16px;"></div>
+      <div class="confirm-action-list" id="booked-actions"></div>
+      <p style="text-align:center; font-size:.78rem; color:var(--muted); margin-top:20px;">
+        Need to make a change? Reply to the email we sent you.
+      </p>
+    </div>
+  </div>
+
+  <!-- ── SCREEN 7: SCHEDULING ───────────────────── -->
+  <div id="screen-schedule" class="screen">
+    <div class="topbar">
+      <button class="topbar-back" onclick="goTo('contact')" aria-label="Back">←</button>
+      <div class="topbar-info">
+        <div class="topbar-logo">📅 Schedule</div>
+        <div class="topbar-sub">Final step</div>
+      </div>
+    </div>
+    <div class="scroll-body fade-in">
+      <div class="gap-14">
+        <div>
+          <h2>Pick a time</h2>
+          <p class="mt-8">We'll confirm within an hour and email a copy of your estimate.</p>
+        </div>
+        <div class="booking-summary">
+          <div class="icon">🌳</div>
+          <div class="info">
+            <div class="label">Estimated total</div>
+            <div class="v" id="schedule-total">$0 – $0</div>
+          </div>
+          <div style="text-align:right;">
+            <div style="font-size:.78rem;color:var(--green-deep);font-weight:600;">Trees</div>
+            <div style="font-size:1.05rem;font-weight:700;" id="schedule-tree-count">0</div>
+          </div>
+        </div>
+        <div id="calendly-embed-wrap" class="calendly-wrap"></div>
+        <div class="divider"></div>
+        <p style="text-align:center;font-size:.82rem;color:var(--muted);">
+          We'll email your estimate and a confirmation once you pick a time.
+        </p>
+      </div>
+    </div>
+  </div>
+
+</div><!-- /app -->
+
+<script src="https://assets.calendly.com/assets/external/widget.js" async></script>
+
+<script>
+/* ════════════════════════════════════════════════════
+   STATE
+════════════════════════════════════════════════════ */
+const STATE = {
+  config: null,
+  estimate: null,       // { id, share_token, status, total_low, total_high, bundle_discount_pct }
+  trees: [],            // array of tree objects from server
+  contact: null,
+  booking: null,        // { id, scheduled_for, status, final_price } if booked
+  // Pending tree being reviewed (not yet committed)
+  pending: null,        // { photoDataUrl, photoBlob, label }
+  // Most recent analysis result (held during review screen)
+  reviewTree: null,
+  reviewPrices: null,
+  reviewServiceKey: null,
+  reviewExtras: null,   // notes / standard_note from full_analysis
+};
+
+const STORAGE_KEY_TOKEN = 'treevision_estimate_token';
+
+/* ════════════════════════════════════════════════════
+   NAVIGATION
+════════════════════════════════════════════════════ */
+function goTo(name) {
+  document.querySelectorAll('.screen').forEach(s => s.classList.remove('active'));
+  const el = document.getElementById('screen-' + name);
+  if (el) el.classList.add('active');
+  window.scrollTo(0, 0);
+  if (name === 'cart') renderCart();
+  if (name === 'schedule') setupScheduling();
+  if (name === 'booked') renderBooked();
+}
+
+/* ════════════════════════════════════════════════════
+   INIT
+════════════════════════════════════════════════════ */
+document.addEventListener('DOMContentLoaded', async () => {
+  // Load config first
+  try {
+    const res = await fetch('/api/config');
+    STATE.config = await res.json();
+  } catch {
+    STATE.config = { company_name: 'Tree Service', operator_phone: '', calendly_url: '', isa_cert: 'ISA Certified Arborist®', turnstile_required: false };
+  }
+
+
+  // Resume if ?token=... in URL or in localStorage
+  const url = new URL(window.location.href);
+  const urlToken = url.searchParams.get('token');
+  const savedToken = localStorage.getItem(STORAGE_KEY_TOKEN);
+  const token = urlToken || savedToken;
+
+  if (token) {
+    const ok = await tryResumeFromToken(token);
+    if (ok) routeAfterResume();
+  }
+});
+
+async function tryResumeFromToken(token) {
+  try {
+    const res = await fetch('/api/estimate/by-token/' + encodeURIComponent(token));
+    if (!res.ok) {
+      localStorage.removeItem(STORAGE_KEY_TOKEN);
+      return false;
+    }
+    const data = await res.json();
+    STATE.estimate = data.estimate;
+    STATE.trees = data.trees || [];
+    STATE.contact = data.contact || null;
+    STATE.booking = data.booking || null;
+    localStorage.setItem(STORAGE_KEY_TOKEN, data.estimate.share_token);
+    return true;
+  } catch {
+    return false;
+  }
+}
+
+// Route the customer to the right screen based on estimate status when
+// resuming via a saved/email link. Important: a 'booked' estimate must NOT
+// re-render Calendly (would let them book twice and orphan a second event).
+function calendlyConfigured() {
+  const u = STATE.config?.calendly_url || '';
+  return !!u && !u.includes('YOUR_USERNAME');
+}
+
+function routeAfterResume() {
+  const status = STATE.estimate?.status;
+  if (status === 'booked' || status === 'completed') {
+    goTo('booked');
+  } else if (status === 'submitted' && STATE.contact) {
+    // Submitted: if online booking is live, let them still pick a time;
+    // otherwise show the email-only confirmation (no dead-end schedule screen).
+    goTo(calendlyConfigured() ? 'schedule' : 'booked');
+  } else if (STATE.trees.length > 0) {
+    goTo('cart');
+  }
+  // Otherwise (empty draft) stay on landing
+}
+
+/* Keyboard activation for role="button" */
+document.addEventListener('keydown', e => {
+  const t = e.target;
+  if (t && t.getAttribute && t.getAttribute('role') === 'button' && (e.key === 'Enter' || e.key === ' ')) {
+    e.preventDefault();
+    t.click();
+  }
+});
+
+/* ════════════════════════════════════════════════════
+   START AN ESTIMATE
+════════════════════════════════════════════════════ */
+async function startEstimate() {
+  // If we already have an estimate that isn't in a terminal state, resume it.
+  // Otherwise (submitted/booked/completed/abandoned, or no estimate) start fresh.
+  const terminal = ['submitted', 'booked', 'completed', 'abandoned'];
+  if (STATE.estimate && !terminal.includes(STATE.estimate.status)) {
+    goTo('cart');
+    return;
+  }
+  // Clear any stale local state before creating a new estimate
+  STATE.estimate = null;
+  STATE.trees = [];
+  STATE.contact = null;
+  localStorage.removeItem(STORAGE_KEY_TOKEN);
+  try {
+    const res = await fetch('/api/estimate', { method: 'POST' });
+    if (!res.ok) throw new Error('Could not start estimate.');
+    const data = await res.json();
+    STATE.estimate = { id: data.estimate_id, share_token: data.share_token, status: 'draft', total_low: 0, total_high: 0, bundle_discount_pct: 0 };
+    localStorage.setItem(STORAGE_KEY_TOKEN, data.share_token);
+    goTo('cart');
+  } catch (err) {
+    alert(err.message);
+  }
+}
+
+/* ════════════════════════════════════════════════════
+   CART / ESTIMATE DASHBOARD
+════════════════════════════════════════════════════ */
+function renderCart() {
+  const body = document.getElementById('cart-body');
+  const footer = document.getElementById('cart-footer');
+  const subtitle = document.getElementById('cart-subtitle');
+
+  const n = STATE.trees.length;
+  subtitle.textContent = n === 0 ? 'No trees yet' :
+    n === 1 ? '1 tree' : `${n} trees`;
+
+  if (n === 0) {
+    body.innerHTML = `
+      <div class="cart-empty">
+        <div class="icon" aria-hidden="true">🌱</div>
+        <h2>Start with your first tree</h2>
+        <p>Photograph it from a distance so the full tree fits in frame.</p>
+        <button class="btn-primary" onclick="addTree()">Photograph a tree →</button>
+      </div>`;
+    footer.innerHTML = '';
+    return;
+  }
+
+  const treeCards = STATE.trees.map(t => `
+    <div class="tree-card">
+      <img class="tree-card-thumb" src="/api/tree-photo/${encodeURIComponent(t.id)}" alt="" onerror="this.outerHTML='<div class=&quot;tree-card-thumb-fallback&quot; aria-hidden=&quot;true&quot;>🌳</div>'">
+      <div class="tree-card-body">
+        <div class="tree-card-label">${escapeHtml(t.label || t.species || 'Tree')}</div>
+        <div class="tree-card-meta">
+          ${escapeHtml(t.species || '')}${t.species && t.est_height_ft ? ' · ' : ''}${escapeHtml(t.est_height_ft || '')}
+          <br>${escapeHtml(serviceName(t.selected_pkg))}
+        </div>
+        <div class="tree-card-price">$${num(t.quote_low)} – $${num(t.quote_high)}</div>
+      </div>
+      <div class="tree-card-actions">
+        <button class="btn-link danger" onclick="removeTree('${t.id}')" aria-label="Remove tree">✕</button>
+      </div>
+    </div>
+  `).join('');
+
+  body.innerHTML = `
+    <div class="gap-14">
+      ${treeCards}
+      <button class="btn-ghost" onclick="addTree()">+ Add another tree</button>
+      <div class="budget-panel">
+        ${renderBudget()}
+      </div>
+    </div>`;
+
+  footer.innerHTML = `
+    <button class="btn-primary" onclick="goToContact()">Continue →</button>
+    <button class="btn-link" onclick="copyResumeLink()" style="font-size:.82rem;">📧 Save &amp; finish later (copy link)</button>`;
+}
+
+function renderBudget() {
+  const trees = STATE.trees;
+  const subLow  = trees.reduce((s, t) => s + (t.quote_low  || 0), 0);
+  const subHigh = trees.reduce((s, t) => s + (t.quote_high || 0), 0);
+  const pct = STATE.estimate?.bundle_discount_pct || 0;
+  const totalLow  = STATE.estimate?.total_low  ?? subLow;
+  const totalHigh = STATE.estimate?.total_high ?? subHigh;
+
+  const nextTier = pct === 0 ? 2 : pct === 5 ? 3 : null;
+  const hint = nextTier
+    ? `<div class="bundle-hint">Add ${nextTier - trees.length} more tree${nextTier - trees.length === 1 ? '' : 's'} to unlock ${nextTier === 2 ? '5%' : '10%'} bundle discount</div>`
+    : pct > 0
+    ? `<div class="bundle-hint">🎉 ${pct}% bundle discount applied</div>`
+    : '';
+
+  return `
+    <div class="budget-row"><span>Subtotal (${trees.length} ${trees.length === 1 ? 'tree' : 'trees'})</span><span>$${num(subLow)} – $${num(subHigh)}</span></div>
+    ${pct > 0 ? `<div class="budget-row discount"><span>Bundle discount (${pct}%)</span><span>− $${num(subLow - totalLow)} – $${num(subHigh - totalHigh)}</span></div>` : ''}
+    <div class="budget-divider"></div>
+    <div class="budget-total">
+      <span class="k">Estimate</span>
+      <span class="v">$${num(totalLow)} – $${num(totalHigh)}</span>
+    </div>
+    ${hint}
+  `;
+}
+
+function serviceName(key) {
+  const map = { trim: 'Trimming & Pruning', removal: 'Full Removal', stump: 'Stump Grinding', treatment: 'Health & Treatment' };
+  return map[key] || '—';
+}
+
+async function removeTree(id) {
+  if (!confirm('Remove this tree from your estimate?')) return;
+  try {
+    const res = await fetch(`/api/estimate/${STATE.estimate.id}/tree/${id}`, { method: 'DELETE' });
+    const data = await res.json();
+    if (!res.ok) throw new Error(data.error || 'Could not remove');
+    STATE.trees = STATE.trees.filter(t => t.id !== id);
+    if (data.totals) {
+      STATE.estimate.total_low = data.totals.total_low;
+      STATE.estimate.total_high = data.totals.total_high;
+      STATE.estimate.bundle_discount_pct = data.totals.discount_pct;
+    }
+    renderCart();
+  } catch (err) {
+    alert(err.message);
+  }
+}
+
+function copyResumeLink() {
+  const url = `${window.location.origin}/?token=${STATE.estimate.share_token}`;
+  navigator.clipboard?.writeText(url).then(
+    () => alert('Link copied! Paste it anywhere to come back to this estimate.'),
+    () => prompt('Copy this link to come back later:', url)
+  );
+}
+
+function goToContact() {
+  if (STATE.trees.length === 0) {
+    alert('Add at least one tree first.');
+    return;
+  }
+  // Prefill from existing contact if resumed
+  if (STATE.contact) {
+    document.getElementById('ct-name').value = STATE.contact.name || '';
+    document.getElementById('ct-email').value = STATE.contact.email || '';
+    document.getElementById('ct-phone').value = STATE.contact.phone || '';
+    document.getElementById('ct-address').value = STATE.contact.address || '';
+    document.getElementById('ct-notes').value = STATE.contact.property_notes || '';
+  }
+  goTo('contact');
+}
+
+/* ════════════════════════════════════════════════════
+   ADD TREE — photo upload subflow
+════════════════════════════════════════════════════ */
+function addTree() {
+  STATE.pending = null;
+  document.getElementById('upload-area').innerHTML = `
+    <div class="dropzone" id="dropzone" onclick="document.getElementById('file-input').click()">
+      <input type="file" id="file-input" accept="image/*" capture="environment">
+      <div class="dz-icon">📷</div>
+      <div class="dz-title">Tap to photograph</div>
+      <div class="dz-hint">Or drag and drop a photo<br>JPG, PNG, HEIC accepted</div>
+    </div>`;
+  bindFileInput(); bindDropzone();
+  document.getElementById('tree-label-input').value = '';
+  document.getElementById('analyze-btn').disabled = true;
+  document.getElementById('photo-subtitle').textContent = `Tree ${STATE.trees.length + 1}`;
+  hideUploadError();
+  goTo('photo');
+}
+
+function bindFileInput() {
+  const fi = document.getElementById('file-input');
+  if (fi) fi.addEventListener('change', e => { if (e.target.files[0]) handleFile(e.target.files[0]); });
+}
+function bindDropzone() {
+  const dz = document.getElementById('dropzone');
+  if (!dz) return;
+  dz.addEventListener('dragover', e => { e.preventDefault(); dz.classList.add('drag'); });
+  dz.addEventListener('dragleave', () => dz.classList.remove('drag'));
+  dz.addEventListener('drop', e => {
+    e.preventDefault();
+    dz.classList.remove('drag');
+    if (e.dataTransfer.files[0]) handleFile(e.dataTransfer.files[0]);
+  });
+}
+
+async function handleFile(file) {
+  hideUploadError();
+  try {
+    let working = file;
+    if (/heic|heif/i.test(file.type) || /\.heic$|\.heif$/i.test(file.name)) {
+      working = await convertHeic(file);
+    }
+    if (!working.type.startsWith('image/')) throw new Error('Please select an image file.');
+    const processed = await resizeImage(working, 1568, 0.85);
+    STATE.pending = { photoBlob: processed.blob, photoDataUrl: processed.dataUrl };
+    renderPhotoPreview();
+  } catch (err) {
+    showUploadError(err.message || 'Could not process this photo.');
+  }
+}
+
+let heicLib = null;
+async function convertHeic(file) {
+  if (!heicLib) {
+    await loadScript('https://cdn.jsdelivr.net/npm/heic2any@0.0.4/dist/heic2any.min.js');
+    heicLib = window.heic2any;
+  }
+  const blob = await heicLib({ blob: file, toType: 'image/jpeg', quality: 0.9 });
+  const out = Array.isArray(blob) ? blob[0] : blob;
+  return new File([out], file.name.replace(/\.(heic|heif)$/i, '.jpg'), { type: 'image/jpeg' });
+}
+
+function loadScript(src) {
+  return new Promise((resolve, reject) => {
+    const s = document.createElement('script');
+    s.src = src; s.onload = resolve; s.onerror = () => reject(new Error('Script load failed: ' + src));
+    document.head.appendChild(s);
+  });
+}
+
+function resizeImage(file, maxLongSide, quality) {
+  return new Promise((resolve, reject) => {
+    const img = new Image();
+    const reader = new FileReader();
+    reader.onload = () => { img.src = reader.result; };
+    reader.onerror = () => reject(new Error('Could not read file.'));
+    img.onload = () => {
+      const { width, height } = img;
+      const ratio = Math.min(1, maxLongSide / Math.max(width, height));
+      const w = Math.round(width * ratio);
+      const h = Math.round(height * ratio);
+      const canvas = document.createElement('canvas');
+      canvas.width = w; canvas.height = h;
+      canvas.getContext('2d').drawImage(img, 0, 0, w, h);
+      canvas.toBlob(blob => {
+        if (!blob) return reject(new Error('Resize failed.'));
+        const r = new FileReader();
+        r.onload = () => resolve({ blob, dataUrl: r.result });
+        r.readAsDataURL(blob);
+      }, 'image/jpeg', quality);
+    };
+    img.onerror = () => reject(new Error('Could not decode image.'));
+    reader.readAsDataURL(file);
+  });
+}
+
+function renderPhotoPreview() {
+  document.getElementById('upload-area').innerHTML = `
+    <div class="photo-preview">
+      <img src="${STATE.pending.photoDataUrl}" alt="">
+      <button class="photo-remove" onclick="clearPhoto()" aria-label="Remove photo">✕</button>
+    </div>`;
+  document.getElementById('analyze-btn').disabled = false;
+}
+
+function clearPhoto() {
+  STATE.pending = null;
+  document.getElementById('analyze-btn').disabled = true;
+  document.getElementById('upload-area').innerHTML = `
+    <div class="dropzone" id="dropzone" onclick="document.getElementById('file-input').click()">
+      <input type="file" id="file-input" accept="image/*" capture="environment">
+      <div class="dz-icon">📷</div>
+      <div class="dz-title">Tap to photograph</div>
+      <div class="dz-hint">Or drag and drop a photo<br>JPG, PNG, HEIC accepted</div>
+    </div>`;
+  bindFileInput(); bindDropzone();
+}
+
+function showUploadError(msg) { const el = document.getElementById('upload-error'); el.textContent = msg; el.style.display = 'block'; }
+function hideUploadError() { document.getElementById('upload-error').style.display = 'none'; }
+
+/* ════════════════════════════════════════════════════
+   ANALYZE — POST /api/estimate/:id/tree
+════════════════════════════════════════════════════ */
+async function startAnalysis() {
+  if (!STATE.pending) return;
+  const label = document.getElementById('tree-label-input').value.trim();
+  STATE.pending.label = label;
+
+  goTo('analyzing');
+  document.getElementById('scan-photo').src = STATE.pending.photoDataUrl;
+
+  const t0 = Date.now();
+  const timerEl = document.getElementById('analyze-timer');
+  const timerInt = setInterval(() => { timerEl.textContent = ((Date.now() - t0) / 1000).toFixed(1) + 's'; }, 100);
+
+  const stepEls = [...document.querySelectorAll('.ai-step')];
+  stepEls.forEach(e => e.classList.remove('active', 'done', 'waiting'));
+  stepEls[0].classList.add('active');
+  const EXPECTED_MS = 11_000;
+  const stepInt = setInterval(() => {
+    const targetActive = Math.min(4, Math.floor(((Date.now() - t0) / EXPECTED_MS) * 4));
+    stepEls.forEach((el, i) => {
+      if (i < targetActive) { el.classList.remove('active', 'waiting'); el.classList.add('done'); }
+      else if (i === targetActive) {
+        el.classList.add('active');
+        if (i === 4) el.classList.add('waiting');
+      }
+    });
+  }, 200);
+
+  try {
+    const form = new FormData();
+    form.append('photo', STATE.pending.photoBlob, 'tree.jpg');
+    if (label) form.append('label', label);
+
+    const res = await fetch(`/api/estimate/${STATE.estimate.id}/tree`, { method: 'POST', body: form });
+    const data = await res.json();
+    if (!res.ok) throw new Error(data.error || `Request failed (${res.status})`);
+
+    clearInterval(timerInt); clearInterval(stepInt);
+    stepEls.forEach(e => { e.classList.remove('active', 'waiting'); e.classList.add('done'); });
+    await new Promise(r => setTimeout(r, 300));
+
+    STATE.reviewTree = data.tree;
+    STATE.reviewPrices = data.prices;
+    STATE.reviewServiceKey = data.tree.selected_pkg;
+    STATE.reviewExtras = data.full_analysis || {};
+    if (data.totals) {
+      STATE.estimate.total_low = data.totals.total_low;
+      STATE.estimate.total_high = data.totals.total_high;
+      STATE.estimate.bundle_discount_pct = data.totals.discount_pct;
+    }
+    renderReview();
+    goTo('review');
+  } catch (err) {
+    clearInterval(timerInt); clearInterval(stepInt);
+    goTo('photo');
+    showUploadError(err.message + ' Please try a different photo.');
+  }
+}
+
+/* ════════════════════════════════════════════════════
+   REVIEW — annotated photo + service picker
+════════════════════════════════════════════════════ */
+// ── A–E scope-of-work taxonomy ──────────────────────────────
+const CATS = {
+  trim:      { letter: 'A', name: 'Trim / Shape Area',       color: '#e0a800' },
+  clearance: { letter: 'B', name: 'Clearance Area',          color: '#2faa5e' },
+  deadwood:  { letter: 'C', name: 'Deadwood / Hazard Limb',  color: '#b3261e' },
+  cleanup:   { letter: 'D', name: 'Cleanup / Haul-Away Zone',color: '#d97706' },
+  review:    { letter: 'E', name: 'Review Concern',          color: '#1259a3' },
+};
+const CAT_ORDER = ['trim', 'clearance', 'deadwood', 'cleanup', 'review'];
+function cat(type) { return CATS[type] || { letter: '•', name: type || 'Note', color: '#6b7c70' }; }
+
+// Brand mark — clean SVG recreation of the Dynamic Tree Service logo:
+// layered fir inside a speech-bubble ring, side signal arcs, chat dots.
+// (To use the exact PNG later, save it as web/logo.png and we'll swap to it.)
+function logoMark(size) {
+  const s = size || 46;
+  return `<svg width="${s}" height="${s}" viewBox="0 0 60 60" fill="none" xmlns="http://www.w3.org/2000/svg" class="logo-mark" aria-hidden="true">
+    <circle cx="29" cy="28" r="23" stroke="#2faa5e" stroke-width="3"/>
+    <path d="M40 45 L51 47 L43 54 Z" fill="#2faa5e"/>
+    <path d="M14 32 Q8 24 13 16" stroke="#6effad" stroke-width="2.3" stroke-linecap="round" fill="none" opacity=".8"/>
+    <path d="M44 32 Q50 24 45 16" stroke="#6effad" stroke-width="2.3" stroke-linecap="round" fill="none" opacity=".8"/>
+    <path d="M29 9 L23 21 L35 21 Z" fill="#2faa5e"/>
+    <path d="M29 16 L20 30 L38 30 Z" fill="#2faa5e"/>
+    <path d="M29 23 L17 39 L41 39 Z" fill="#2faa5e"/>
+    <rect x="26.5" y="38" width="5" height="8" rx="1" fill="#2faa5e"/>
+    <circle cx="35" cy="43" r="1.5" fill="#2faa5e"/>
+    <circle cx="40" cy="43" r="1.5" fill="#2faa5e"/>
+    <circle cx="45" cy="43" r="1.5" fill="#2faa5e"/>
+  </svg>`;
+}
+
+function riskClass(risk) {
+  return 'aa-risk-' + String(risk || '').toLowerCase().replace(/[^a-z]/g, '');
+}
+
+function priceTiersHtml(key) {
+  const p = STATE.reviewPrices[key];
+  const expected = Math.round(((p.low + p.high) / 2) / 25) * 25;
+  return `
+    <div class="price-tier"><div class="pt-label">Low</div><div class="pt-amount">$${num(p.low)}</div></div>
+    <div class="price-tier expected"><div class="pt-label">Expected</div><div class="pt-amount">$${num(expected)}</div></div>
+    <div class="price-tier"><div class="pt-label">High</div><div class="pt-amount">$${num(p.high)}+</div></div>`;
+}
+
+function renderReview() {
+  const t = STATE.reviewTree;
+  const x = STATE.reviewExtras || {};
+  const prices = STATE.reviewPrices;
+  document.getElementById('review-subtitle').textContent = `Tree ${STATE.trees.length + 1}: ${t.species || 'Tree'}`;
+
+  const annotations = Array.isArray(t.annotations) ? t.annotations : [];
+  const photoSrc = `/api/tree-photo/${encodeURIComponent(t.id)}`;
+
+  // Legend: only categories present, each with the specific labels Claude gave
+  const present = CAT_ORDER.filter(type => annotations.some(a => a.type === type));
+  const legend = present.map(type => {
+    const c = cat(type);
+    const labels = annotations.filter(a => a.type === type).map(a => escapeHtml(a.label || '')).filter(Boolean).join('; ');
+    return `
+      <div class="ae-row">
+        <div class="ae-letter" style="background:${c.color};">${c.letter}</div>
+        <div><span class="ae-cat">${escapeHtml(c.name)}</span><br><span class="ae-desc">${labels || '—'}</span></div>
+      </div>`;
+  }).join('');
+
+  const svcChips = Object.entries(prices).map(([key, p]) => {
+    const selected = key === STATE.reviewServiceKey;
+    const recommended = key === t.recommended_pkg;
+    return `
+      <button type="button" class="svc-chip ${selected ? 'selected' : ''} ${recommended ? 'recommended' : ''}" data-svc="${key}" onclick="pickService('${key}')">
+        <div class="svc-chip-icon" aria-hidden="true">${escapeHtml(p.icon)}</div>
+        <div class="svc-chip-body">
+          <div class="svc-chip-name">${escapeHtml(p.name)}</div>
+          <div class="svc-chip-meta">${recommended ? '✓ AI suggests this for your tree' : ''}</div>
+        </div>
+        <div class="svc-chip-price">$${num(p.low)}–$${num(p.high)}</div>
+      </button>`;
+  }).join('');
+
+  const company = STATE.config?.company_name || 'Dynamic Tree Service';
+
+  document.getElementById('review-body').innerHTML = `
+    <div class="report-header">
+      ${logoMark(40)}
+      <div class="rh-text">
+        <div class="rh-title">${escapeHtml(company)}</div>
+        <div class="rh-sub">Scope of Work · Powered by Palmer Venture LLC</div>
+      </div>
+    </div>
+
+    <div class="report-grid">
+     <div class="report-col-left">
+      <!-- Lead with the customer's marked-up photo — the proof of value -->
+      <div class="anno-caption">Annotated photo — A–E scope markers</div>
+      <div class="annotated-photo" id="anno-photo-wrap">
+        <img id="anno-photo" src="${photoSrc}" alt="${escapeHtml(t.species || 'Tree')}" onload="renderAnnotations()">
+        <div class="anno-layer" id="anno-layer"></div>
+      </div>
+      ${legend ? `<div class="ae-legend">${legend}</div>` : ''}
+     </div>
+
+     <div class="report-col-right">
+      <div style="margin-bottom:12px;">
+        <div class="result-species">${escapeHtml(t.species || 'Unknown')}</div>
+        <div class="result-latin">${escapeHtml(t.latin_name || '')}</div>
+      </div>
+
+      <div class="auto-assess">
+      <div class="aa-head">Auto Assessment</div>
+      <div class="aa-row"><span class="k">Photo quality</span><span class="v">${escapeHtml(x.photo_quality || 'Usable')}</span></div>
+      <div class="aa-row"><span class="k">Likely tree type</span><span class="v">${escapeHtml(t.species || 'Unknown')}</span></div>
+      <div class="aa-row"><span class="k">Size class</span><span class="v">${escapeHtml(x.size_class || '—')}</span></div>
+      <div class="aa-row"><span class="k">Confidence</span><span class="v">${escapeHtml(x.confidence || 'Medium')}</span></div>
+      <div class="aa-row"><span class="k">Risk level</span><span class="v ${riskClass(t.risk_rating)}">${escapeHtml((t.risk_rating || '—').toUpperCase())}</span></div>
+    </div>
+
+    <div class="facts-grid">
+      <div class="fact-card"><div class="k">Est. height</div><div class="v">${escapeHtml(t.est_height_ft || '—')}</div></div>
+      <div class="fact-card"><div class="k">DBH (trunk)</div><div class="v">${escapeHtml(t.est_dbh_in || '—')}</div></div>
+      <div class="fact-card"><div class="k">Crown spread</div><div class="v">${escapeHtml(t.crown_spread_ft || '—')}</div></div>
+      <div class="fact-card"><div class="k">Condition</div><div class="v">${escapeHtml(t.condition || '—')}</div></div>
+    </div>
+
+    ${x.site_assessment ? `<div class="report-panel"><h4>Tree &amp; Site Assessment</h4><p>${escapeHtml(x.site_assessment)}</p></div>` : ''}
+    ${x.hazard_review ? `<div class="report-panel"><h4>Health / Hazard Review</h4><p>${escapeHtml(x.hazard_review)}</p></div>` : ''}
+
+    ${x.scope_summary && x.scope_summary.length ? `
+      <div class="report-panel">
+        <h4>Scope Summary</h4>
+        <ul class="scope-list">${x.scope_summary.map(s => `<li>${escapeHtml(s)}</li>`).join('')}</ul>
+      </div>` : ''}
+
+    <h3 style="margin:4px 0 0;">Pick a service</h3>
+    <div class="svc-picker">${svcChips}</div>
+
+    <div class="report-panel">
+      <h4>Preliminary Pricing — Photo-Based Range</h4>
+      <div class="price-tiers" id="price-tiers">${priceTiersHtml(STATE.reviewServiceKey)}</div>
+      <div class="exclusions"><strong>Excludes:</strong> permit handling, utility coordination, traffic control, hidden structural issues, and certified arborist inspection. Final price confirmed on-site.</div>
+    </div>
+
+    <div class="report-panel">
+      <h4>Industry Standards</h4>
+      <div class="standards-row">
+        <span class="standard-pill">🏅 ISA</span>
+        <span class="standard-pill">🛡️ TCIA</span>
+        <span class="standard-pill">📋 ANSI A300</span>
+      </div>
+      <p style="font-size:.76rem;color:var(--muted);margin-top:8px;">${escapeHtml(x.standard_note || 'Work follows ANSI A300 Best Management Practices as guidance, not a completed certified inspection.')}</p>
+    </div>
+
+      <p style="font-size:.72rem;color:var(--muted);line-height:1.5;">⚠️ Not a certified arborist report. Preliminary visual estimate from your photo only — final scope and price require on-site review by ${escapeHtml(STATE.config?.isa_cert || 'an ISA Certified Arborist')}.</p>
+     </div>
+    </div>
+  `;
+}
+
+function pickService(key) {
+  STATE.reviewServiceKey = key;
+  document.querySelectorAll('.svc-chip').forEach(c => c.classList.toggle('selected', c.dataset.svc === key));
+  const tiers = document.getElementById('price-tiers');
+  if (tiers) tiers.innerHTML = priceTiersHtml(key);
+}
+
+// Validate a single annotation's bbox; returns clamped [x,y,w,h] fractions or null.
+function normalizeBbox(bbox) {
+  if (!Array.isArray(bbox) || bbox.length !== 4) return null;
+  const nums = bbox.map(Number);
+  if (nums.some(n => !Number.isFinite(n))) return null;
+  let [x, y, w, h] = nums;
+  if (x > 1 || y > 1 || w > 1 || h > 1) { x /= 100; y /= 100; w /= 100; h /= 100; }
+  const clamp = v => Math.max(0, Math.min(1, v));
+  x = clamp(x); y = clamp(y); w = clamp(w); h = clamp(h);
+  if (w <= 0 || h <= 0) return null;
+  if (x + w > 1) w = 1 - x;
+  if (y + h > 1) h = 1 - y;
+  return [x, y, w, h];
+}
+
+function renderAnnotations() {
+  const layer = document.getElementById('anno-layer');
+  if (!layer) return;
+  const t = STATE.reviewTree;
+  const annos = Array.isArray(t && t.annotations) ? t.annotations : [];
+
+  const boxes = annos.map(a => {
+    const bb = normalizeBbox(a && a.bbox);
+    if (!bb) return '';                       // skip malformed — never throw
+    const [x, y, w, h] = bb;
+    const c = cat(a.type);
+    return `
+      <div class="anno-box" style="left:${(x*100).toFixed(2)}%;top:${(y*100).toFixed(2)}%;width:${(w*100).toFixed(2)}%;height:${(h*100).toFixed(2)}%;border-color:${c.color};">
+        <div class="anno-fill" style="background:${c.color};"></div>
+        <div class="anno-badge" style="background:${c.color};">${c.letter}</div>
+      </div>`;
+  }).join('');
+
+  layer.innerHTML = boxes;
+}
+
+async function commitTree() {
+  const t = STATE.reviewTree;
+  if (!t) return;
+  try {
+    // If user changed the service, PATCH it
+    if (STATE.reviewServiceKey && STATE.reviewServiceKey !== t.selected_pkg) {
+      const res = await fetch(`/api/estimate/${STATE.estimate.id}/tree/${t.id}`, {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ selected_pkg: STATE.reviewServiceKey }),
+      });
+      const data = await res.json();
+      if (!res.ok) throw new Error(data.error || 'Could not save');
+      t.selected_pkg = STATE.reviewServiceKey;
+      t.quote_low = STATE.reviewPrices[STATE.reviewServiceKey].low;
+      t.quote_high = STATE.reviewPrices[STATE.reviewServiceKey].high;
+      if (data.totals) {
+        STATE.estimate.total_low = data.totals.total_low;
+        STATE.estimate.total_high = data.totals.total_high;
+        STATE.estimate.bundle_discount_pct = data.totals.discount_pct;
+      }
+    }
+    STATE.trees.push(t);
+    STATE.reviewTree = null;
+    STATE.pending = null;
+    goTo('cart');
+  } catch (err) {
+    alert(err.message);
+  }
+}
+
+async function cancelTreeReview() {
+  if (!STATE.reviewTree) { goTo('cart'); return; }
+  // Delete the just-created tree (since user didn't commit it).
+  // Capture the returned totals so the cart doesn't show stale bundle math.
+  try {
+    const res = await fetch(`/api/estimate/${STATE.estimate.id}/tree/${STATE.reviewTree.id}`, { method: 'DELETE' });
+    const data = await res.json().catch(() => ({}));
+    if (data.totals) {
+      STATE.estimate.total_low = data.totals.total_low;
+      STATE.estimate.total_high = data.totals.total_high;
+      STATE.estimate.bundle_discount_pct = data.totals.discount_pct;
+    }
+  } catch {}
+  STATE.reviewTree = null;
+  STATE.pending = null;
+  goTo('cart');
+}
+
+/* ════════════════════════════════════════════════════
+   CONTACT SUBMIT
+════════════════════════════════════════════════════ */
+async function submitContact() {
+  const payload = {
+    name:    document.getElementById('ct-name').value.trim(),
+    email:   document.getElementById('ct-email').value.trim(),
+    phone:   document.getElementById('ct-phone').value.trim(),
+    address: document.getElementById('ct-address').value.trim(),
+    property_notes: document.getElementById('ct-notes').value.trim(),
+  };
+  const errEl = document.getElementById('contact-error');
+  errEl.style.display = 'none';
+
+  if (!payload.name || !payload.email || !payload.phone || !payload.address) {
+    errEl.textContent = 'Name, email, phone, and address are required.';
+    errEl.style.display = 'block'; return;
+  }
+  if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(payload.email)) {
+    errEl.textContent = 'Please enter a valid email.';
+    errEl.style.display = 'block'; return;
+  }
+
+  const btn = document.getElementById('contact-submit');
+  btn.disabled = true; btn.textContent = 'Saving…';
+  try {
+    const res = await fetch(`/api/estimate/${STATE.estimate.id}/contact`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(payload),
+    });
+    const data = await res.json();
+    if (!res.ok) throw new Error(data.error || 'Could not save');
+    STATE.contact = payload;
+    // Lock the estimate + send confirmation email
+    await fetch(`/api/estimate/${STATE.estimate.id}/submit`, { method: 'POST' });
+    STATE.estimate.status = 'submitted';
+    // Reset the link: once submitted, this device shouldn't auto-reopen the
+    // finished estimate. The current session continues in memory (so scheduling
+    // still works); the customer's email holds the resume link if they need it.
+    localStorage.removeItem(STORAGE_KEY_TOKEN);
+    if (new URL(window.location.href).searchParams.has('token')) {
+      history.replaceState(null, '', window.location.pathname);
+    }
+    // If online booking is live, let them pick a time; otherwise end on a
+    // clean email-only confirmation instead of a "pick a time" dead end.
+    goTo(calendlyConfigured() ? 'schedule' : 'booked');
+  } catch (err) {
+    errEl.textContent = err.message;
+    errEl.style.display = 'block';
+  } finally {
+    btn.disabled = false; btn.textContent = 'Submit my estimate →';
+  }
+}
+
+/* ════════════════════════════════════════════════════
+   SCHEDULING
+════════════════════════════════════════════════════ */
+function setupScheduling() {
+  document.getElementById('schedule-total').textContent =
+    `$${num(STATE.estimate.total_low)} – $${num(STATE.estimate.total_high)}`;
+  document.getElementById('schedule-tree-count').textContent = STATE.trees.length;
+
+  const wrap = document.getElementById('calendly-embed-wrap');
+  const calUrl = STATE.config?.calendly_url || '';
+
+  if (!calUrl || calUrl.includes('YOUR_USERNAME')) {
+    wrap.innerHTML = `
+      <div style="background:var(--bg);border-radius:var(--r-lg);border:2px dashed var(--line);padding:40px 24px;text-align:center;">
+        <div style="font-size:3rem;margin-bottom:16px;">📬</div>
+        <h3 style="margin-bottom:8px;">Estimate received</h3>
+        <p style="font-size:.88rem;">We've emailed your estimate and will be in touch to confirm a time. Thanks!</p>
+      </div>`;
+    return;
+  }
+
+  const utm = {
+    utmSource: 'treevision-app',
+    utmMedium: 'web',
+    utmCampaign: 'multi-tree-estimate',
+    utmContent: STATE.estimate.id,
+  };
+  const treeSummary = STATE.trees.map(t => `${t.species || 'Tree'} (${serviceName(t.selected_pkg)})`).join('; ');
+  const prefill = {
+    name: STATE.contact?.name || '',
+    email: STATE.contact?.email || '',
+    customAnswers: {
+      a1: `Estimate ${STATE.estimate.id.slice(0, 8)} — ${STATE.trees.length} tree(s): ${treeSummary}`,
+      a2: STATE.contact?.address || '',
+    },
+  };
+
+  if (window.Calendly) {
+    wrap.innerHTML = '';
+    window.Calendly.initInlineWidget({ url: calUrl, parentElement: wrap, prefill, utm });
+  } else {
+    const params = new URLSearchParams({
+      hide_landing_page_details: '1', hide_gdpr_banner: '1',
+      name: prefill.name, email: prefill.email,
+      utm_source: utm.utmSource, utm_medium: utm.utmMedium,
+      utm_campaign: utm.utmCampaign, utm_content: utm.utmContent,
+    });
+    wrap.innerHTML = `<iframe src="${calUrl}?${params}" width="100%" height="630" frameborder="0" style="border:none;border-radius:16px;"></iframe>`;
+  }
+}
+
+/* ════════════════════════════════════════════════════
+   BOOKED CONFIRMATION (resume after booking)
+════════════════════════════════════════════════════ */
+function renderBooked() {
+  const e = STATE.estimate;
+  const b = STATE.booking;
+  const c = STATE.contact;
+  const isCompleted = e?.status === 'completed';
+  // "submitted" with no booking = email-only path (no Calendly time picked yet)
+  const isSubmittedOnly = !isCompleted && !b;
+
+  const logoEl = document.getElementById('booked-logo');
+  if (isCompleted) {
+    logoEl.textContent = '✅ Service complete';
+    document.getElementById('booked-subtitle').textContent = 'Service complete';
+    document.getElementById('booked-headline').textContent = 'Thanks — service complete!';
+    document.getElementById('booked-tagline').textContent = 'Your tree work is done. We hope you\'re happy with the result.';
+  } else if (isSubmittedOnly) {
+    logoEl.textContent = '✅ Estimate sent';
+    document.getElementById('booked-subtitle').textContent = 'Confirmation';
+    document.getElementById('booked-headline').textContent = 'Your estimate is on its way!';
+    document.getElementById('booked-tagline').textContent = 'We\'ve emailed your estimate and will reach out shortly to confirm a time.';
+  } else {
+    logoEl.textContent = '✅ You\'re booked';
+    document.getElementById('booked-subtitle').textContent = 'Confirmation';
+    document.getElementById('booked-headline').textContent = 'You\'re all booked!';
+    document.getElementById('booked-tagline').textContent = 'We\'ll see you at your scheduled time.';
+  }
+
+  // Summary block
+  const treeCount = STATE.trees.length;
+  const treeSummary = STATE.trees
+    .map(t => `${t.label || t.species || 'Tree'} — ${serviceName(t.selected_pkg)}`)
+    .join('<br>');
+  const totalRange = `$${num(e.total_low)} – $${num(e.total_high)}`;
+  const finalRow = b && b.final_price != null
+    ? `<div class="row total"><span class="k">Final price</span><span class="v">$${num(b.final_price)}</span></div>`
+    : '';
+
+  document.getElementById('booked-summary').innerHTML = `
+    ${b?.scheduled_for ? `<div class="row"><span class="k">Scheduled</span><span class="v">${escapeHtml(fmtDateTime(b.scheduled_for))}</span></div>` : ''}
+    <div class="row"><span class="k">${treeCount} ${treeCount === 1 ? 'tree' : 'trees'}</span><span class="v" style="text-align:right;">${treeSummary}</span></div>
+    ${c?.address ? `<div class="row"><span class="k">Address</span><span class="v">${escapeHtml(c.address)}</span></div>` : ''}
+    <div class="row total"><span class="k">Estimate</span><span class="v">${totalRange}</span></div>
+    ${finalRow}
+  `;
+
+  // Actions
+  document.getElementById('booked-actions').innerHTML = `
+    <div class="confirm-action" style="cursor:default;">
+      <div class="icon" aria-hidden="true">📧</div>
+      <div class="body">
+        <div class="title">Check your email</div>
+        <div class="desc">We've sent your estimate and will confirm by email.</div>
+      </div>
+    </div>
+    ${!isCompleted ? `
+      <button type="button" class="confirm-action" onclick="startFreshEstimate()" style="text-align:left;width:100%;cursor:pointer;background:var(--card);">
+        <div class="icon" aria-hidden="true">🌱</div>
+        <div class="body">
+          <div class="title">Start a new estimate</div>
+          <div class="desc">Got another tree or property? Begin fresh.</div>
+        </div>
+        <div class="arrow">→</div>
+      </button>` : ''}
+  `;
+}
+
+// Used by the booked-confirmation "Start a new estimate" action and as a public
+// fallback if a customer ever wants to bypass the resumed-estimate behavior.
+async function startFreshEstimate() {
+  STATE.estimate = null; STATE.trees = []; STATE.contact = null; STATE.booking = null;
+  localStorage.removeItem(STORAGE_KEY_TOKEN);
+  // Drop ?token= from URL so we don't re-resume on reload
+  if (new URL(window.location.href).searchParams.has('token')) {
+    history.replaceState(null, '', window.location.pathname);
+  }
+  await startEstimate();
+}
+
+function fmtDateTime(s) {
+  if (!s) return '';
+  const d = new Date(s);
+  if (Number.isNaN(d.getTime())) return s;
+  return d.toLocaleString('en-US', { weekday: 'short', month: 'short', day: 'numeric', hour: 'numeric', minute: '2-digit' });
+}
+
+/* ════════════════════════════════════════════════════
+   UTILS
+════════════════════════════════════════════════════ */
+function num(n) { return Number(n || 0).toLocaleString('en-US'); }
+function escapeHtml(s) { return String(s ?? '').replace(/[&<>"']/g, c => ({ '&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;' }[c])); }
+
+// Re-render annotations on window resize (image dimensions may change)
+window.addEventListener('resize', () => { if (STATE.reviewTree) renderAnnotations(); });
+</script>
+</body>
+</html>
