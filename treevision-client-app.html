@@ -435,9 +435,10 @@ p { line-height: 1.65; color: var(--muted); font-size: .92rem; }
 ═══════════════════════════════════════════ -->
 <script>
 const CONFIG = {
-  PROXY_URL:    "https://hydlxwjtdkzcnxxukakt.supabase.co/functions/v1/analyze",
-  SAVE_URL:     "https://hydlxwjtdkzcnxxukakt.supabase.co/functions/v1/save-estimate",
-  SUPABASE_KEY: "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Imh5ZGx4d2p0ZGt6Y254eHVrYWt0Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3Nzk2ODcyNjQsImV4cCI6MjA5NTI2MzI2NH0.vXLOWjXh_6z8sSoBVqKA6wwwEKKMozjhRoIIUffwnzI",
+  PROXY_URL:      "https://hydlxwjtdkzcnxxukakt.supabase.co/functions/v1/analyze",
+  SAVE_URL:       "https://hydlxwjtdkzcnxxukakt.supabase.co/functions/v1/save-estimate",
+  SUPABASE_URL:   "https://hydlxwjtdkzcnxxukakt.supabase.co",
+  SUPABASE_KEY:   "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Imh5ZGx4d2p0ZGt6Y254eHVrYWt0Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3Nzk2ODcyNjQsImV4cCI6MjA5NTI2MzI2NH0.vXLOWjXh_6z8sSoBVqKA6wwwEKKMozjhRoIIUffwnzI",
 
   // ← Only needed if NOT using the Worker proxy (direct browser call — local testing only)
   ANTHROPIC_API_KEY: "",
@@ -1134,6 +1135,8 @@ async function startAnalysis() {
     STATE.analysis = result;
     clearInterval(timerInt); clearInterval(stepInt);
     stepEls.forEach(e => { e.classList.remove('active'); e.classList.add('done'); });
+    // Upload photo to Supabase Storage in background
+    uploadPhotoToStorage().then(url => { STATE.photoStorageUrl = url || null; });
     await new Promise(r => setTimeout(r, 400));
     renderResults(result);
     updatePackagePrices(result);
@@ -1437,6 +1440,30 @@ function setupScheduling() {
   }
 }
 
+/* ═══════════════════════════════════════════ PHOTO STORAGE ═ */
+async function uploadPhotoToStorage() {
+  if (!STATE.photoDataUrl || !CONFIG.SUPABASE_URL) return null;
+  try {
+    // Convert data URL to blob
+    const res = await fetch(STATE.photoDataUrl);
+    const blob = await res.blob();
+    const filename = `estimate_${Date.now()}.jpg`;
+    const uploadUrl = `${CONFIG.SUPABASE_URL}/storage/v1/object/tree-photos/${filename}`;
+    const resp = await fetch(uploadUrl, {
+      method: 'POST',
+      headers: {
+        'Authorization': `Bearer ${CONFIG.SUPABASE_KEY}`,
+        'Content-Type': 'image/jpeg',
+        'x-upsert': 'false',
+      },
+      body: blob,
+    });
+    if (!resp.ok) return null;
+    // Return public URL
+    return `${CONFIG.SUPABASE_URL}/storage/v1/object/public/tree-photos/${filename}`;
+  } catch { return null; }
+}
+
 /* ═══════════════════════════════════════════ SAVE ═════ */
 async function saveEstimate() {
   const btn = document.getElementById('save-btn');
@@ -1455,6 +1482,7 @@ async function saveEstimate() {
       body: JSON.stringify({
         analysis: STATE.analysis,
         service: pkg.name,
+        photo_url: STATE.photoStorageUrl || null,
         contact: {
           name:    document.getElementById('ct-name').value.trim(),
           phone:   document.getElementById('ct-phone').value.trim(),

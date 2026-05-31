@@ -101,6 +101,9 @@ body { font-family: 'Spline Sans', sans-serif; background: var(--bg); color: var
   border-bottom: 1px solid var(--line);
   background: var(--surface);
 }
+.est-photo { width: 80px; height: 80px; border-radius: 10px; object-fit: cover; flex-shrink: 0; cursor: pointer; border: 2px solid var(--line); transition: border-color .15s; }
+.est-photo:hover { border-color: var(--em); }
+.est-photo-placeholder { width: 80px; height: 80px; border-radius: 10px; background: var(--surface); border: 2px dashed var(--line); flex-shrink: 0; display: flex; align-items: center; justify-content: center; color: var(--subtle); font-size: 1.5rem; }
 .est-id { font-size: .7rem; color: var(--muted); font-family: monospace; margin-bottom: 6px; }
 .est-species { font-family: 'Bricolage Grotesque', sans-serif; font-weight: 800; font-size: 1.25rem; letter-spacing: -.02em; }
 .est-latin  { font-style: italic; color: var(--muted); font-size: .82rem; }
@@ -378,6 +381,10 @@ function renderCard(e) {
   return `
   <div class="est-card ${e.status}" id="card-${e.id}">
     <div class="est-header">
+      ${e.photo_url
+        ? `<img class="est-photo" src="${esc(e.photo_url)}" alt="Tree photo" onclick="openPhoto('${esc(e.photo_url)}')" title="Click to view full photo">`
+        : `<div class="est-photo-placeholder"><i class="ti ti-photo-off" aria-hidden="true"></i></div>`
+      }
       <div class="est-meta">
         <div class="est-id">#${e.id.substring(0,8).toUpperCase()}</div>
         <div class="est-species">${esc(e.species || 'Unknown tree')}</div>
@@ -460,6 +467,13 @@ async function resetToPending(id) {
 }
 
 /* ── Helpers ── */
+function openPhoto(url) {
+  const lb = document.getElementById('photo-lightbox');
+  document.getElementById('lightbox-img').src = url;
+  lb.style.display = 'flex';
+}
+document.addEventListener('keydown', e => { if (e.key === 'Escape') document.getElementById('photo-lightbox').style.display = 'none'; });
+
 function esc(s) {
   if (!s) return '';
   return String(s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');
@@ -476,5 +490,10 @@ function timeAgo(iso) {
 loadEstimates();
 setInterval(loadEstimates, 60000);
 </script>
+<!-- Photo lightbox -->
+<div id="photo-lightbox" style="display:none;position:fixed;inset:0;background:rgba(0,0,0,.88);z-index:9999;align-items:center;justify-content:center;cursor:pointer;" onclick="this.style.display='none'">
+  <img id="lightbox-img" src="" alt="Tree photo" style="max-width:92vw;max-height:88vh;border-radius:12px;object-fit:contain;box-shadow:0 24px 80px rgba(0,0,0,.5);">
+  <button style="position:absolute;top:20px;right:24px;background:rgba(255,255,255,.15);border:none;color:#fff;font-size:1.4rem;width:40px;height:40px;border-radius:50%;cursor:pointer;" onclick="document.getElementById('photo-lightbox').style.display='none'">✕</button>
+</div>
 </body>
 </html>
