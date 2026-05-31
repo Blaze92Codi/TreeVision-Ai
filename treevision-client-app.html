@@ -1,0 +1,1880 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0">
+<title>TreeVision — Instant Tree Estimate</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Bricolage+Grotesque:opsz,wght@12..96,400;12..96,600;12..96,800&family=Spline+Sans:wght@400;500;600&display=swap" rel="stylesheet">
+<link href="https://assets.calendly.com/assets/external/widget.css" rel="stylesheet">
+<link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/@tabler/icons-webfont@3.31.0/dist/tabler-icons.min.css">
+
+<style>
+/* ═══════════════════════════════════════════
+   TREEVISION v3 — Modern SaaS Design System
+   Emerald brand · Slate neutrals · Dark hero
+═══════════════════════════════════════════ */
+:root {
+  /* Emerald brand */
+  --em:        #16a34a;
+  --em-bright: #22c55e;
+  --em-glow:   #4ade80;
+  --em-hero:   #020d06;
+  --em-dark:   #052e16;
+  --em-rich:   #15803d;
+  --em-soft:   #f0fdf4;
+  --em-light:  #dcfce7;
+  --em-mid:    #86efac;
+
+  /* Slate neutrals */
+  --ink:    #0f172a;
+  --ink2:   #1e293b;
+  --muted:  #64748b;
+  --subtle: #94a3b8;
+  --line:   #e2e8f0;
+  --line2:  #f1f5f9;
+  --bg:     #f8fafc;
+  --card:   #ffffff;
+  --surface:#f1f5f9;
+
+  /* Amber badges */
+  --amber:        #d97706;
+  --amber-light:  #fef3c7;
+  --amber-border: #fcd34d;
+  --amber-text:   #92400e;
+
+  /* Semantic */
+  --danger:    #dc2626;
+  --danger-bg: #fef2f2;
+  --warn:      #b45309;
+  --warn-bg:   #fffbeb;
+
+  /* Radii */
+  --r-xs:  6px;
+  --r-sm:  10px;
+  --r-md:  14px;
+  --r-lg:  20px;
+  --r-xl:  28px;
+  --r-full:999px;
+}
+
+/* ─── Reset ─── */
+*, *::before, *::after { margin: 0; padding: 0; box-sizing: border-box; }
+body { font-family: 'Spline Sans', sans-serif; background: var(--bg); color: var(--ink); min-height: 100vh; overscroll-behavior: none; }
+img { display: block; max-width: 100%; }
+button { cursor: pointer; font-family: inherit; border: none; }
+
+/* ─── App Shell ─── */
+#app { max-width: 480px; margin: 0 auto; min-height: 100vh; display: flex; flex-direction: column; background: var(--card); box-shadow: 0 0 0 1px rgba(0,0,0,.06), 0 24px 80px rgba(0,0,0,.12); }
+
+/* ─── Screen System ─── */
+.screen { display: none; flex-direction: column; flex: 1; }
+.screen.active { display: flex; }
+
+/* ─── Top Bar ─── */
+.topbar { background: var(--em-dark); padding: 14px 18px; display: flex; align-items: center; gap: 12px; flex-shrink: 0; }
+.topbar-logo { font-family: 'Bricolage Grotesque', sans-serif; font-weight: 800; font-size: 1rem; color: #fff; letter-spacing: -.02em; }
+.topbar-sub { font-size: .7rem; color: rgba(255,255,255,.5); margin-top: 1px; }
+.topbar-back { background: rgba(255,255,255,.1); border: 1px solid rgba(255,255,255,.12); color: #fff; font-size: .95rem; width: 32px; height: 32px; border-radius: var(--r-sm); display: flex; align-items: center; justify-content: center; flex-shrink: 0; transition: background .15s; }
+.topbar-back:hover { background: rgba(255,255,255,.2); }
+.topbar-info { flex: 1; }
+
+/* ─── Progress Bar ─── */
+.progress-bar { height: 2px; background: var(--line2); flex-shrink: 0; position: relative; overflow: hidden; }
+.progress-fill { height: 100%; background: linear-gradient(90deg, var(--em), var(--em-bright)); transition: width .5s cubic-bezier(.4,0,.2,1); }
+
+/* ─── Scroll Body ─── */
+.scroll-body { flex: 1; overflow-y: auto; padding: 24px 20px 48px; -webkit-overflow-scrolling: touch; }
+
+/* ─── Typography ─── */
+h2 { font-family: 'Bricolage Grotesque', sans-serif; font-weight: 800; font-size: clamp(1.6rem, 6vw, 2rem); letter-spacing: -.035em; line-height: 1.08; color: var(--ink); }
+h3 { font-family: 'Bricolage Grotesque', sans-serif; font-weight: 700; font-size: 1.05rem; color: var(--ink); }
+p { line-height: 1.65; color: var(--muted); font-size: .92rem; }
+
+/* ─── Buttons ─── */
+.btn-primary {
+  width: 100%; padding: 16px;
+  background: var(--em); color: #fff;
+  font-family: 'Bricolage Grotesque', sans-serif; font-weight: 800; font-size: 1rem;
+  border-radius: var(--r-md); transition: all .2s; text-align: center; letter-spacing: -.01em;
+  box-shadow: 0 1px 3px rgba(22,163,74,.25), 0 4px 12px rgba(22,163,74,.2);
+}
+.btn-primary:hover  { background: var(--em-rich); box-shadow: 0 2px 6px rgba(22,163,74,.3), 0 8px 20px rgba(22,163,74,.25); transform: translateY(-1px); }
+.btn-primary:active { transform: scale(.98) translateY(0); }
+.btn-primary:disabled { opacity: .35; pointer-events: none; box-shadow: none; transform: none; }
+
+.btn-ghost {
+  width: 100%; padding: 14px;
+  background: transparent; color: var(--muted);
+  font-family: 'Bricolage Grotesque', sans-serif; font-weight: 600; font-size: .92rem;
+  border-radius: var(--r-md); border: 1.5px solid var(--line); transition: all .15s; text-align: center;
+}
+.btn-ghost:hover { background: var(--line2); color: var(--ink); border-color: var(--subtle); }
+
+/* ─── Cards ─── */
+.card { background: var(--card); border-radius: var(--r-lg); padding: 20px; box-shadow: 0 1px 3px rgba(0,0,0,.06), 0 4px 12px rgba(0,0,0,.04); }
+.card-flat { background: var(--surface); border-radius: var(--r-lg); padding: 16px 18px; }
+
+/* ─── Badges ─── */
+.badge { display: inline-flex; align-items: center; gap: 5px; padding: 4px 10px; border-radius: var(--r-full); font-size: .75rem; font-weight: 600; letter-spacing: .01em; }
+.badge-green  { background: var(--em-soft);   color: var(--em-rich); }
+.badge-amber  { background: var(--amber-light); color: var(--amber-text); }
+.badge-warn   { background: var(--warn-bg);    color: var(--warn); }
+.badge-muted  { background: var(--surface);    color: var(--muted); }
+
+/* ─── Standard badge ─── */
+.std-badge { display: inline-flex; align-items: center; gap: 4px; font-size: .68rem; color: var(--amber-text); background: var(--amber-light); border: 1px solid var(--amber-border); border-radius: var(--r-xs); padding: 2px 7px; font-weight: 700; letter-spacing: .03em; }
+
+/* ─── Divider ─── */
+.divider { height: 1px; background: var(--line); margin: 16px 0; }
+
+/* ─── Stack helpers ─── */
+.gap-8  { display: flex; flex-direction: column; gap: 8px; }
+.gap-12 { display: flex; flex-direction: column; gap: 12px; }
+.gap-16 { display: flex; flex-direction: column; gap: 16px; }
+.gap-20 { display: flex; flex-direction: column; gap: 20px; }
+.mt-8 { margin-top: 8px; } .mt-16 { margin-top: 16px; } .mt-24 { margin-top: 24px; }
+
+/* ─── Callout / Disclaimer ─── */
+.standard-info { background: var(--amber-light); border-left: 3px solid var(--amber-border); border-radius: 0 var(--r-sm) var(--r-sm) 0; padding: 11px 14px; margin: 14px 0; font-size: .8rem; color: var(--ink); line-height: 1.5; }
+.standard-info strong { color: var(--amber); }
+.disclaimer { font-size: .73rem; color: var(--subtle); line-height: 1.55; margin-top: 8px; }
+
+/* ═══════════════════════════════════════════
+   SCREEN 1 — LANDING (dark SaaS hero)
+═══════════════════════════════════════════ */
+.landing-hero {
+  background: var(--em-hero);
+  flex-shrink: 0; position: relative; overflow: hidden;
+}
+/* Radial glow */
+.landing-hero::before {
+  content: ''; position: absolute; top: -60px; left: -60px;
+  width: 320px; height: 320px; border-radius: 50%;
+  background: radial-gradient(circle, rgba(34,197,94,.18) 0%, transparent 70%);
+  pointer-events: none;
+}
+.hero-inner { padding: 44px 24px 36px; position: relative; z-index: 2; }
+.hero-decor { position: absolute; top: -40px; right: -40px; width: 220px; height: 220px; opacity: .04; pointer-events: none; }
+
+.hero-eyebrow {
+  display: inline-flex; align-items: center; gap: 7px;
+  background: rgba(34,197,94,.1); border: 1px solid rgba(34,197,94,.25);
+  border-radius: var(--r-full); padding: 5px 12px;
+  font-size: .72rem; font-weight: 600; color: var(--em-glow);
+  letter-spacing: .06em; text-transform: uppercase; margin-bottom: 18px;
+}
+.hero-title {
+  font-family: 'Bricolage Grotesque', sans-serif; font-weight: 800;
+  font-size: clamp(2.6rem, 10vw, 3.4rem); letter-spacing: -.045em; line-height: .95;
+  color: #fff; margin-bottom: 14px;
+}
+.hero-title em { color: var(--em-bright); font-style: normal; }
+.hero-subtitle { font-size: .95rem; color: rgba(255,255,255,.55); line-height: 1.6; margin-bottom: 24px; max-width: 300px; }
+
+.trust-strip { display: flex; gap: 6px; flex-wrap: wrap; margin-bottom: 32px; }
+.trust-pill {
+  display: inline-flex; align-items: center; gap: 5px;
+  background: rgba(255,255,255,.06); border: 1px solid rgba(255,255,255,.1);
+  border-radius: var(--r-full); padding: 5px 11px;
+  font-size: .7rem; font-weight: 600; color: rgba(255,255,255,.6); letter-spacing: .03em;
+}
+
+.steps-list { display: flex; flex-direction: column; gap: 0; margin-bottom: 32px; }
+.step-row { display: flex; align-items: flex-start; gap: 14px; padding: 11px 0; border-bottom: 1px solid rgba(255,255,255,.05); }
+.step-row:last-child { border-bottom: none; }
+.step-num {
+  width: 26px; height: 26px; border-radius: 50%; flex-shrink: 0;
+  background: rgba(34,197,94,.15); border: 1px solid rgba(34,197,94,.3); color: var(--em-bright);
+  font-family: 'Bricolage Grotesque', sans-serif; font-weight: 800; font-size: .8rem;
+  display: flex; align-items: center; justify-content: center;
+}
+.step-text strong { display: block; font-weight: 600; font-size: .9rem; color: rgba(255,255,255,.9); }
+.step-text span   { font-size: .78rem; color: rgba(255,255,255,.4); margin-top: 1px; }
+
+/* Landing body */
+.landing-body { padding: 24px 20px 36px; }
+.landing-cta-group { display: flex; flex-direction: column; gap: 10px; }
+
+.btn-primary-hero {
+  width: 100%; padding: 17px; background: var(--em-bright); color: #052e16;
+  font-family: 'Bricolage Grotesque', sans-serif; font-weight: 800; font-size: 1.08rem;
+  border-radius: var(--r-md); transition: all .2s; text-align: center; letter-spacing: -.01em;
+  box-shadow: 0 0 0 1px rgba(34,197,94,.3), 0 4px 20px rgba(34,197,94,.25);
+}
+.btn-primary-hero:hover  { background: var(--em-glow); box-shadow: 0 0 0 1px rgba(34,197,94,.5), 0 8px 32px rgba(34,197,94,.35); transform: translateY(-1px); }
+.btn-primary-hero:active { transform: scale(.98); }
+
+.btn-ghost-dark {
+  width: 100%; padding: 13px; background: transparent; color: var(--subtle);
+  font-family: 'Bricolage Grotesque', sans-serif; font-weight: 600; font-size: .9rem;
+  border-radius: var(--r-md); border: 1.5px solid var(--line);
+  transition: all .15s; text-align: center; text-decoration: none; display: block;
+}
+.btn-ghost-dark:hover { background: var(--line2); color: var(--ink); }
+
+.proof-strip {
+  display: flex; margin-top: 20px; border-radius: var(--r-md); overflow: hidden;
+  border: 1px solid var(--line); background: var(--card);
+  box-shadow: 0 1px 3px rgba(0,0,0,.04);
+}
+.proof-item { flex: 1; padding: 13px 8px; text-align: center; border-right: 1px solid var(--line); }
+.proof-item:last-child { border-right: none; }
+.proof-num { font-family: 'Bricolage Grotesque', sans-serif; font-weight: 800; font-size: 1.3rem; color: var(--em-rich); letter-spacing: -.025em; }
+.proof-lbl { font-size: .65rem; color: var(--subtle); margin-top: 2px; text-transform: uppercase; letter-spacing: .04em; font-weight: 500; }
+
+/* ═══════════════════════════════════════════
+   SCREEN 2 — PHOTO UPLOAD
+═══════════════════════════════════════════ */
+.dropzone {
+  border: 2px dashed var(--em-mid); border-radius: var(--r-xl); padding: 48px 20px;
+  text-align: center; cursor: pointer; background: var(--em-soft);
+  transition: all .2s; position: relative;
+}
+.dropzone:hover, .dropzone.drag { background: #d1fae5; border-color: var(--em-bright); box-shadow: 0 0 0 4px rgba(34,197,94,.08); }
+.dropzone input { display: none; }
+.dz-icon { font-size: 3rem; margin-bottom: 12px; line-height: 1; }
+.dz-title { font-family: 'Bricolage Grotesque', sans-serif; font-weight: 800; font-size: 1.2rem; color: var(--ink); margin-bottom: 6px; letter-spacing: -.02em; }
+.dz-hint { font-size: .82rem; color: var(--muted); }
+
+.photo-preview { position: relative; border-radius: var(--r-lg); overflow: hidden; box-shadow: 0 4px 20px rgba(0,0,0,.15); background: #060f08; }
+.photo-preview img { width: 100%; max-height: 360px; min-height: 200px; object-fit: contain; display: block; }
+.photo-remove { position: absolute; top: 10px; right: 10px; width: 30px; height: 30px; border-radius: 50%; background: rgba(0,0,0,.65); color: #fff; font-size: .9rem; display: flex; align-items: center; justify-content: center; border: none; cursor: pointer; }
+
+.tips-box { background: var(--em-soft); border-radius: var(--r-md); padding: 14px 16px; font-size: .83rem; color: var(--em-rich); border: 1px solid var(--em-light); }
+.tips-box strong { display: block; font-weight: 700; margin-bottom: 7px; font-size: .85rem; }
+.tips-box ul { list-style: none; display: flex; flex-direction: column; gap: 5px; }
+.tips-box li::before { content: "✓ "; font-weight: 700; color: var(--em-bright); }
+
+/* ═══════════════════════════════════════════
+   SCREEN 3 — ANALYZING
+═══════════════════════════════════════════ */
+.timer-el { font-variant-numeric: tabular-nums; color: rgba(255,255,255,.5); font-weight: 500; font-size: .85rem; }
+.scan-container { position: relative; width: 100%; border-radius: var(--r-lg); overflow: hidden; margin-bottom: 28px; box-shadow: 0 8px 32px rgba(0,0,0,.2); background: #060f08; }
+.scan-overlay { position: absolute; inset: 0; background: rgba(5,46,22,.3); }
+.scan-line {
+  position: absolute; left: 0; right: 0; height: 2px;
+  background: linear-gradient(90deg, transparent 0%, var(--em) 25%, var(--em-glow) 50%, var(--em) 75%, transparent 100%);
+  box-shadow: 0 0 20px 6px rgba(34,197,94,.6), 0 0 40px 12px rgba(34,197,94,.2);
+  animation: scanline 1.8s ease-in-out infinite;
+}
+@keyframes scanline { 0%{top:4%} 50%{top:94%} 100%{top:4%} }
+
+.ai-steps { display: flex; flex-direction: column; gap: 12px; width: 100%; max-width: 320px; }
+.ai-step { display: flex; align-items: center; gap: 12px; font-size: .86rem; color: var(--subtle); transition: color .3s; }
+.ai-step.active { color: var(--ink); font-weight: 500; }
+.ai-step.done   { color: var(--em-rich); }
+.ai-step-dot { width: 22px; height: 22px; border-radius: 50%; border: 2px solid var(--line); display: flex; align-items: center; justify-content: center; font-size: .68rem; flex-shrink: 0; transition: all .3s; }
+.ai-step.done .ai-step-dot { background: var(--em); border-color: var(--em); color: #fff; }
+.ai-step.active .ai-step-dot { border-color: var(--em); box-shadow: 0 0 0 3px rgba(22,163,74,.15); }
+@keyframes spin { to { transform: rotate(360deg); } }
+
+/* ═══════════════════════════════════════════
+   SCREEN 4 — RESULTS
+═══════════════════════════════════════════ */
+.result-photo { width: 100%; max-height: 320px; object-fit: contain; border-radius: var(--r-lg); margin-bottom: 16px; box-shadow: 0 8px 32px rgba(0,0,0,.15); background: #060f08; display: block; }
+.result-species { font-family: 'Bricolage Grotesque', sans-serif; font-weight: 800; font-size: 1.8rem; letter-spacing: -.035em; margin-bottom: 2px; }
+.result-latin { font-style: italic; color: var(--subtle); font-size: .85rem; margin-bottom: 10px; }
+
+.quote-hero {
+  background: var(--em-dark); border-radius: var(--r-lg); padding: 22px 20px; color: #fff; margin: 16px 0;
+  position: relative; overflow: hidden;
+  box-shadow: 0 4px 20px rgba(5,46,22,.3);
+}
+.quote-hero::before { content: ''; position: absolute; top: -40px; right: -40px; width: 160px; height: 160px; border-radius: 50%; background: rgba(34,197,94,.08); pointer-events: none; }
+.quote-label { font-size: .68rem; text-transform: uppercase; letter-spacing: .1em; opacity: .6; font-weight: 700; }
+.quote-amount { font-family: 'Bricolage Grotesque', sans-serif; font-weight: 800; font-size: 2.6rem; letter-spacing: -.045em; margin: 4px 0; color: var(--em-bright); }
+.quote-amount .range { font-size: 1.15rem; opacity: .8; font-weight: 600; color: var(--em-glow); }
+.quote-service { font-size: .85rem; opacity: .7; color: rgba(255,255,255,.8); }
+.quote-sub { margin-top: 12px; padding-top: 12px; border-top: 1px solid rgba(255,255,255,.08); font-size: .75rem; opacity: .5; font-style: italic; }
+
+.facts-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; margin: 14px 0; }
+.fact-card { background: var(--surface); border-radius: var(--r-md); padding: 12px 14px; }
+.fact-card .k { font-size: .68rem; color: var(--subtle); font-weight: 700; margin-bottom: 3px; text-transform: uppercase; letter-spacing: .05em; }
+.fact-card .v { font-size: .98rem; font-weight: 700; color: var(--ink); }
+
+.notes-list { list-style: none; display: flex; flex-direction: column; gap: 8px; margin: 10px 0; }
+.notes-list li { display: flex; gap: 8px; font-size: .84rem; color: var(--ink2); align-items: flex-start; line-height: 1.5; }
+.notes-list li::before { content: "▸"; color: var(--em); font-weight: 700; flex-shrink: 0; margin-top: 1px; }
+
+/* ═══════════════════════════════════════════
+   SCREEN 5 — SERVICE PACKAGES
+═══════════════════════════════════════════ */
+.pkg-card {
+  background: var(--card); border: 1.5px solid var(--line); border-radius: var(--r-lg);
+  padding: 18px 16px; cursor: pointer; transition: all .2s; position: relative;
+  box-shadow: 0 1px 3px rgba(0,0,0,.04);
+}
+.pkg-card:hover { border-color: var(--em-mid); box-shadow: 0 0 0 3px rgba(22,163,74,.08), 0 4px 16px rgba(0,0,0,.06); transform: translateY(-1px); }
+.pkg-card.selected { border-color: var(--em); background: var(--em-soft); box-shadow: 0 0 0 3px rgba(22,163,74,.12), 0 4px 20px rgba(22,163,74,.08); transform: none; }
+.pkg-card.selected .pkg-radio { background: var(--em); border-color: var(--em); }
+.pkg-card.selected .pkg-radio::after { opacity: 1; }
+
+.pkg-header { display: flex; align-items: flex-start; gap: 12px; }
+.pkg-radio { width: 20px; height: 20px; border-radius: 50%; border: 2px solid var(--line); flex-shrink: 0; margin-top: 2px; position: relative; transition: all .2s; }
+.pkg-radio::after { content: ""; position: absolute; top: 50%; left: 50%; transform: translate(-50%,-50%); width: 8px; height: 8px; border-radius: 50%; background: #fff; opacity: 0; transition: opacity .2s; }
+.pkg-icon { font-size: 1.5rem; flex-shrink: 0; }
+.pkg-meta { flex: 1; }
+.pkg-name { font-family: 'Bricolage Grotesque', sans-serif; font-weight: 700; font-size: 1.02rem; color: var(--ink); }
+.pkg-price-row { display: flex; align-items: center; gap: 8px; margin-top: 4px; flex-wrap: wrap; }
+.pkg-price { font-weight: 700; font-size: .92rem; color: var(--em-rich); }
+.pkg-desc { font-size: .8rem; color: var(--muted); margin-top: 6px; line-height: 1.55; }
+.pkg-includes { margin-top: 12px; padding-top: 12px; border-top: 1px solid var(--em-light); display: none; flex-direction: column; gap: 6px; }
+.pkg-card.selected .pkg-includes { display: flex; }
+.pkg-include-item { display: flex; gap: 7px; font-size: .8rem; color: var(--em-rich); align-items: flex-start; line-height: 1.45; }
+.pkg-include-item::before { content: "✓"; font-weight: 700; flex-shrink: 0; }
+.recommended-tag {
+  position: absolute; top: -10px; right: 14px;
+  background: var(--em); color: #fff;
+  font-size: .65rem; font-weight: 800; padding: 3px 10px; border-radius: var(--r-full);
+  letter-spacing: .05em; text-transform: uppercase; display: none;
+  box-shadow: 0 2px 8px rgba(22,163,74,.4);
+}
+
+/* ═══════════════════════════════════════════
+   SCREEN 6 — SCHEDULING
+═══════════════════════════════════════════ */
+.booking-summary { background: var(--em-soft); border: 1px solid var(--em-light); border-radius: var(--r-md); padding: 14px 16px; display: flex; gap: 12px; align-items: center; margin-bottom: 20px; }
+.booking-summary .icon { font-size: 1.5rem; }
+.booking-summary .info { flex: 1; }
+.booking-summary .service-name { font-weight: 700; font-size: .92rem; color: var(--ink); }
+.booking-summary .price { color: var(--em-rich); font-weight: 700; font-size: .85rem; }
+.calendly-wrap { border-radius: var(--r-lg); overflow: hidden; border: 1px solid var(--line); min-height: 600px; }
+.calendly-placeholder { background: var(--surface); border-radius: var(--r-lg); border: 2px dashed var(--line); padding: 40px 24px; text-align: center; }
+.calendly-placeholder .big-icon { font-size: 3rem; margin-bottom: 16px; }
+.config-note { background: var(--warn-bg); border-radius: var(--r-md); padding: 12px 16px; font-size: .8rem; color: var(--warn); font-weight: 500; margin-bottom: 16px; }
+
+/* ─── Error / Utility ─── */
+.error-box { background: var(--danger-bg); border-radius: var(--r-md); padding: 13px 16px; font-size: .85rem; color: var(--danger); font-weight: 500; border: 1px solid rgba(220,38,38,.15); }
+.fade-in { animation: fadeUp .3s ease both; }
+@keyframes fadeUp { from { opacity: 0; transform: translateY(8px); } to { opacity: 1; transform: none; } }
+
+/* ─── Footer Bar ─── */
+.footer-bar { padding: 14px 20px; border-top: 1px solid var(--line); background: var(--card); flex-shrink: 0; display: flex; flex-direction: column; gap: 8px; }
+
+/* ─── Assessment section headings ─── */
+.assess-section { margin-bottom: 4px; }
+.section-heading { font-size: .66rem; font-weight: 700; text-transform: uppercase; letter-spacing: .1em; color: var(--subtle); display: flex; align-items: center; gap: 6px; margin-bottom: 10px; }
+.section-heading i { font-size: 13px; }
+.section-divider { height: 1px; background: var(--line2); margin: 16px 0 14px; }
+
+/* ─── Inline result service cards ─── */
+.res-pkg { background: var(--card); border: 1.5px solid var(--line); border-radius: var(--r-md); padding: 12px 14px; cursor: pointer; transition: all .18s; position: relative; display: flex; align-items: flex-start; gap: 10px; }
+.res-pkg:hover { border-color: var(--em-mid); box-shadow: 0 0 0 3px rgba(22,163,74,.06); }
+.res-pkg.selected { border-color: var(--em); background: var(--em-soft); box-shadow: 0 0 0 3px rgba(22,163,74,.1); }
+.res-pkg.selected .res-pkg-radio { background: var(--em); border-color: var(--em); }
+.res-pkg.selected .res-pkg-radio::after { opacity: 1; }
+.res-pkg-radio { width: 18px; height: 18px; border-radius: 50%; border: 2px solid var(--line); flex-shrink: 0; margin-top: 2px; position: relative; transition: all .15s; }
+.res-pkg-radio::after { content:''; position:absolute; top:50%; left:50%; transform:translate(-50%,-50%); width:7px; height:7px; border-radius:50%; background:#fff; opacity:0; transition:opacity .15s; }
+.res-pkg-body { flex: 1; }
+.res-pkg-name { font-family: var(--font-display); font-weight: 700; font-size: .92rem; color: var(--ink); }
+.res-pkg-price { font-size: .82rem; font-weight: 700; color: var(--em-rich); margin-top: 2px; }
+.res-rec-tag { position:absolute; top:-9px; right:10px; background:var(--em); color:#fff; font-size:.62rem; font-weight:800; padding:2px 8px; border-radius:var(--r-full); letter-spacing:.04em; text-transform:uppercase; display:none; }
+
+/* ─── After rendering canvas ─── */
+.after-canvas { width:100%; max-height:320px; object-fit:contain; border-radius:var(--r-lg); display:block; background:#060f08; box-shadow:0 8px 32px rgba(0,0,0,.15); }
+
+/* ─── Photo tabs (before/after toggle) ─── */
+.photo-tabs { display: flex; gap: 6px; margin-bottom: 10px; align-items: center; }
+.photo-tab { padding: 6px 14px; border-radius: var(--r-sm); border: 1.5px solid var(--line); background: transparent; font-size: .78rem; font-weight: 600; color: var(--muted); cursor: pointer; transition: all .15s; font-family: inherit; }
+.photo-tab.active { background: var(--em); color: #fff; border-color: var(--em); box-shadow: 0 1px 4px rgba(22,163,74,.25); }
+.photo-tab:not(.active):hover { border-color: var(--em-mid); color: var(--em-rich); }
+.photo-tab-dl { margin-left: auto; padding: 6px 12px; border-radius: var(--r-sm); border: 1.5px solid var(--em-light); background: var(--em-soft); font-size: .75rem; font-weight: 600; color: var(--em-rich); cursor: pointer; font-family: inherit; display: flex; align-items: center; gap: 5px; transition: background .15s; }
+.photo-tab-dl:hover { background: var(--em-light); }
+.photo-tab-dl i { font-size: 14px; }
+
+/* ─── Annotation canvas ─── */
+.annotated-canvas { width: 100%; max-height: 320px; object-fit: contain; border-radius: var(--r-lg); display: block; background: #060f08; box-shadow: 0 8px 32px rgba(0,0,0,.15); }
+
+/* ─── After description ─── */
+.after-desc { background: var(--em-soft); border: 1px solid var(--em-light); border-radius: var(--r-md); padding: 12px 14px; font-size: .85rem; color: var(--em-dark); line-height: 1.6; }
+.after-desc strong { font-size: .72rem; text-transform: uppercase; letter-spacing: .06em; color: var(--em-rich); display: block; margin-bottom: 4px; }
+
+/* ─── Crown retained badge ─── */
+.crown-badge { display: inline-flex; align-items: center; gap: 5px; background: var(--em-soft); border: 1px solid var(--em-mid); border-radius: var(--r-full); padding: 4px 10px; font-size: .72rem; font-weight: 700; color: var(--em-rich); }
+
+/* ─── Service package icon wrapper ─── */
+.pkg-icon-wrap { width: 42px; height: 42px; border-radius: var(--r-sm); display: flex; align-items: center; justify-content: center; flex-shrink: 0; font-size: 1.25rem; }
+.pkg-icon-wrap i { font-size: 20px; }
+.pkg-icon-trim     { background: #f0fdf4; color: #15803d; }
+.pkg-icon-removal  { background: #f8fafc; color: #334155; border: 1px solid var(--line); }
+.pkg-icon-stump    { background: #fffbeb; color: #92400e; }
+
+/* ─── Topbar icon ─── */
+.topbar-icon { font-size: 16px; color: rgba(255,255,255,.6); margin-right: 4px; vertical-align: -2px; }
+
+/* ─── Drop zone icon ─── */
+.dz-icon-wrap { width: 64px; height: 64px; border-radius: var(--r-lg); background: #fff; border: 1px solid var(--em-mid); display: flex; align-items: center; justify-content: center; margin: 0 auto 14px; }
+.dz-icon-wrap i { font-size: 28px; color: var(--em); }
+
+/* ─── Quote hero polished ─── */
+.quote-divider { height: 1px; background: rgba(255,255,255,.1); margin: 12px 0; }
+.quote-meta-row { display: flex; gap: 16px; }
+.quote-meta-item .k { font-size: .65rem; opacity: .5; text-transform: uppercase; letter-spacing: .06em; font-weight: 700; }
+.quote-meta-item .v { font-size: .88rem; font-weight: 600; margin-top: 1px; }
+
+/* ─── Trust strip icons ─── */
+.trust-pill i { font-size: 13px; vertical-align: -1px; }
+
+/* ─── Tips box icon ─── */
+.tips-title { display: flex; align-items: center; gap: 7px; font-weight: 700; margin-bottom: 7px; font-size: .85rem; }
+.tips-title i { font-size: 15px; }
+
+/* ─── Proof strip star ─── */
+.proof-star { color: #eab308; font-size: .7rem; letter-spacing: 1px; }
+
+/* ─── Step icon ─── */
+.step-icon { font-size: 14px; color: rgba(255,255,255,.5); flex-shrink: 0; margin-top: 1px; }
+</style>
+</head>
+<body>
+
+<!-- ══════════════════════════════════════════
+     CONFIG
+═══════════════════════════════════════════ -->
+<script>
+const CONFIG = {
+  PROXY_URL:    "https://hydlxwjtdkzcnxxukakt.supabase.co/functions/v1/analyze",
+  SAVE_URL:     "https://hydlxwjtdkzcnxxukakt.supabase.co/functions/v1/save-estimate",
+  SUPABASE_KEY: "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Imh5ZGx4d2p0ZGt6Y254eHVrYWt0Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3Nzk2ODcyNjQsImV4cCI6MjA5NTI2MzI2NH0.vXLOWjXh_6z8sSoBVqKA6wwwEKKMozjhRoIIUffwnzI",
+
+  // ← Only needed if NOT using the Worker proxy (direct browser call — local testing only)
+  ANTHROPIC_API_KEY: "",
+
+  CALENDLY_URL: "https://calendly.com/YOUR_USERNAME/tree-service",
+  COMPANY_NAME: "Dynamic Tree Service",
+  PHONE: "(555) 000-0000",
+  ISA_CERT: "",
+  FOUNDED: "2010",
+};
+</script>
+
+<div id="app">
+
+  <!-- ═══ SCREEN 1: LANDING ═══════════════════════════ -->
+  <div id="screen-1" class="screen active">
+
+    <!-- Hero — deep forest green -->
+    <div class="landing-hero">
+      <!-- Decorative tree rings -->
+      <svg class="hero-decor" viewBox="0 0 200 200" fill="none" xmlns="http://www.w3.org/2000/svg" aria-hidden="true">
+        <circle cx="100" cy="100" r="95" stroke="white" stroke-width="1.5"/>
+        <circle cx="100" cy="100" r="78" stroke="white" stroke-width="1.5"/>
+        <circle cx="100" cy="100" r="60" stroke="white" stroke-width="1.5"/>
+        <circle cx="100" cy="100" r="42" stroke="white" stroke-width="1.5"/>
+        <circle cx="100" cy="100" r="25" stroke="white" stroke-width="1.5"/>
+        <circle cx="100" cy="100" r="10" stroke="white" stroke-width="1.5"/>
+      </svg>
+
+      <div class="hero-inner">
+        <div class="hero-eyebrow">
+          <i class="ti ti-map-pin" aria-hidden="true" style="font-size:13px;"></i>
+          Dynamic Tree Service &nbsp;·&nbsp; SE Michigan
+        </div>
+
+        <div style="font-family:'Bricolage Grotesque',sans-serif;font-weight:800;font-size:clamp(2.4rem,9vw,3.2rem);letter-spacing:-.04em;line-height:.96;color:#fff;margin-bottom:14px;">
+          Expert<br>tree care.<br><span style="color:#4ade80;">Estimated</span><br>in seconds.
+        </div>
+
+        <p style="font-size:.9rem;color:rgba(255,255,255,.5);line-height:1.65;margin-bottom:24px;max-width:280px;">
+          Upload one photo. Get a professional estimate. Book your service — all from your phone.
+        </p>
+
+        <div class="trust-strip">
+          <span class="trust-pill"><i class="ti ti-clipboard-check" aria-hidden="true"></i> ANSI A300</span>
+          <span class="trust-pill"><i class="ti ti-shield-check" aria-hidden="true"></i> Fully Insured</span>
+          <span class="trust-pill"><i class="ti ti-star" aria-hidden="true"></i> 4.9 Google</span>
+        </div>
+
+        <div class="steps-list">
+          <div class="step-row">
+            <div class="step-num">1</div>
+            <div class="step-text">
+              <strong>Photograph your tree</strong>
+              <span>One photo — trunk to canopy</span>
+            </div>
+            <i class="ti ti-camera step-icon" aria-hidden="true"></i>
+          </div>
+          <div class="step-row">
+            <div class="step-num">2</div>
+            <div class="step-text">
+              <strong>Photo assessment in 20 seconds</strong>
+              <span>Species, size, condition &amp; quote</span>
+            </div>
+            <i class="ti ti-scan step-icon" aria-hidden="true"></i>
+          </div>
+          <div class="step-row">
+            <div class="step-num">3</div>
+            <div class="step-text">
+              <strong>Select your service</strong>
+              <span>3 options priced to your tree</span>
+            </div>
+            <i class="ti ti-list-check step-icon" aria-hidden="true"></i>
+          </div>
+          <div class="step-row">
+            <div class="step-num">4</div>
+            <div class="step-text">
+              <strong>Book online instantly</strong>
+              <span>We confirm within 1 hour</span>
+            </div>
+            <i class="ti ti-calendar-check step-icon" aria-hidden="true"></i>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- Body — warm ivory -->
+    <div class="landing-body">
+      <div class="landing-cta-group">
+        <button class="btn-primary-hero" onclick="goTo(2)">Get my free quote →</button>
+        <a href="tel:PHONE" class="btn-ghost-dark" id="call-btn">Or call us directly</a>
+      </div>
+
+      <!-- Social proof -->
+      <div class="proof-strip">
+        <div class="proof-item">
+          <div class="proof-num">500+</div>
+          <div class="proof-lbl">Trees serviced</div>
+        </div>
+        <div class="proof-item">
+          <div class="proof-num" style="display:flex;align-items:center;gap:3px;justify-content:center;">4.9<i class="ti ti-star" aria-hidden="true" style="font-size:.9rem;color:#eab308;"></i></div>
+          <div class="proof-lbl">Google rating</div>
+        </div>
+        <div class="proof-item">
+          <div class="proof-num" id="founded-years">15yr</div>
+          <div class="proof-lbl">In business</div>
+        </div>
+      </div>
+
+      <p style="text-align:center;font-size:.73rem;margin-top:18px;color:var(--muted);line-height:1.5;">
+        Preliminary estimate only. Final price confirmed on-site per ANSI A300 standards.
+      </p>
+    </div>
+  </div>
+
+  <!-- ═══ SCREEN 2: PHOTO UPLOAD ═══════════════════════ -->
+  <div id="screen-2" class="screen">
+    <div class="topbar">
+      <button class="topbar-back" onclick="goTo(1)">←</button>
+      <div class="topbar-info">
+        <div class="topbar-logo"><i class="ti ti-camera topbar-icon" aria-hidden="true"></i>Your tree photo</div>
+        <div class="topbar-sub">Step 1 of 4</div>
+      </div>
+    </div>
+    <div class="progress-bar"><div class="progress-fill" style="width:25%"></div></div>
+    <div class="scroll-body">
+      <div class="gap-20">
+        <div>
+          <h2>Snap your tree</h2>
+          <p class="mt-8">One clear photo is all we need for a professional assessment.</p>
+        </div>
+
+        <div id="upload-area">
+          <div class="dropzone" id="dropzone" onclick="document.getElementById('file-input').click()">
+            <input type="file" id="file-input" accept="image/*" capture="environment">
+            <div class="dz-icon-wrap"><i class="ti ti-camera" aria-hidden="true"></i></div>
+            <div class="dz-title">Tap to photograph your tree</div>
+            <div class="dz-hint">Or drag &amp; drop &nbsp;·&nbsp; JPG, PNG, HEIC</div>
+          </div>
+        </div>
+
+        <div class="tips-box">
+          <div class="tips-title"><i class="ti ti-info-circle" aria-hidden="true"></i> Tips for the best quote</div>
+          <ul>
+            <li>Stand back — show full tree crown to roots</li>
+            <li>Include trunk and surrounding area for scale</li>
+            <li>Good light — avoid heavy shade or glare</li>
+            <li>One tree per photo for accurate species ID</li>
+          </ul>
+        </div>
+
+        <div id="upload-error" class="error-box" style="display:none;"></div>
+      </div>
+    </div>
+    <div class="footer-bar">
+      <button class="btn-primary" id="analyze-btn" onclick="startAnalysis()" disabled>Analyze my tree →</button>
+    </div>
+  </div>
+
+  <!-- ═══ SCREEN 3: ANALYZING ═══════════════════════════ -->
+  <div id="screen-3" class="screen">
+    <div class="topbar">
+      <div class="topbar-info">
+        <div class="topbar-logo"><i class="ti ti-scan topbar-icon" aria-hidden="true"></i>Analyzing your tree</div>
+        <div class="topbar-sub">Assessment in progress</div>
+      </div>
+      <div class="timer-el" id="analyze-timer">0.0s</div>
+    </div>
+    <div class="scroll-body">
+      <div style="display:flex;flex-direction:column;align-items:center;gap:24px;padding-top:8px;">
+        <div class="scan-container" id="scan-img-wrap">
+          <img id="scan-photo" src="" alt="Tree being analyzed" style="width:100%;max-height:300px;min-height:180px;object-fit:contain;display:block;">
+          <div class="scan-overlay"></div>
+          <div class="scan-line"></div>
+        </div>
+        <div>
+          <p style="text-align:center;font-weight:600;color:var(--ink);margin-bottom:16px;font-size:.92rem;display:flex;align-items:center;justify-content:center;gap:8px;"><i class="ti ti-scan" style="color:var(--em);font-size:16px;" aria-hidden="true"></i>Running tree assessment…</p>
+          <div class="ai-steps" id="ai-steps">
+            <div class="ai-step" data-i="0"><div class="ai-step-dot">1</div><span>Reading image &amp; metadata</span></div>
+            <div class="ai-step" data-i="1"><div class="ai-step-dot">2</div><span>Identifying tree species</span></div>
+            <div class="ai-step" data-i="2"><div class="ai-step-dot">3</div><span>Estimating height, DBH &amp; crown spread</span></div>
+            <div class="ai-step" data-i="3"><div class="ai-step-dot">4</div><span>ISA risk rating &amp; condition assessment</span></div>
+            <div class="ai-step" data-i="4"><div class="ai-step-dot">5</div><span>Calculating ANSI-standard service quote</span></div>
+            <div class="ai-step" data-i="5"><div class="ai-step-dot">6</div><span>Generating annotation zones</span></div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- ═══ SCREEN 4: PROPERTY ASSESSMENT RESULTS ══════════ -->
+  <div id="screen-4" class="screen">
+    <div class="topbar">
+      <button class="topbar-back" onclick="goTo(2)">←</button>
+      <div class="topbar-info">
+        <div class="topbar-logo"><i class="ti ti-clipboard-text topbar-icon" aria-hidden="true"></i>Property Assessment</div>
+        <div class="topbar-sub">Results ready</div>
+      </div>
+    </div>
+    <div class="progress-bar"><div class="progress-fill" style="width:50%"></div></div>
+    <div class="scroll-body fade-in">
+      <div class="gap-16">
+
+        <!-- Title + species ──────────────────────────── -->
+        <div>
+          <div style="font-size:.7rem;font-weight:700;text-transform:uppercase;letter-spacing:.1em;color:var(--em-rich);margin-bottom:6px;">
+            <i class="ti ti-report" aria-hidden="true" style="font-size:13px;vertical-align:-1px;margin-right:4px;"></i>Your Property Assessment Results
+          </div>
+          <div id="demo-banner" style="display:none;background:var(--amber-light);border:1px solid var(--amber-border);border-radius:var(--r-sm);padding:7px 11px;font-size:.75rem;color:var(--amber-text);font-weight:600;margin-bottom:8px;">
+            ✦ Demo preview — add your API key to analyze real trees
+          </div>
+          <div id="result-badge" class="badge badge-green" style="margin-bottom:7px;"></div>
+          <div id="result-species" class="result-species"></div>
+          <div id="result-latin" class="result-latin"></div>
+          <div id="result-id-confidence" style="display:none;margin-top:5px;font-size:.76rem;color:var(--muted);line-height:1.5;"></div>
+        </div>
+
+        <!-- Photo gallery ────────────────────────────── -->
+        <div>
+          <div class="section-heading"><i class="ti ti-photo" aria-hidden="true"></i>Photo documentation</div>
+          <div class="photo-tabs" id="photo-tabs">
+            <button class="photo-tab" onclick="showPhotoView('original')">Original</button>
+            <button class="photo-tab active" onclick="showPhotoView('annotated')">
+              <i class="ti ti-layers-subtract" aria-hidden="true"></i> Annotated
+            </button>
+            <button class="photo-tab" id="after-tab" onclick="showPhotoView('after')" style="display:none;">After</button>
+            <button class="photo-tab-dl" onclick="downloadAnnotated()">
+              <i class="ti ti-download" aria-hidden="true"></i>
+            </button>
+          </div>
+          <div id="photo-original-wrap" style="display:none;">
+            <img id="result-photo" class="result-photo" src="" alt="Your tree">
+          </div>
+          <div id="photo-annotated-wrap">
+            <canvas id="annotated-canvas" class="annotated-canvas"></canvas>
+          </div>
+          <div id="photo-after-wrap" style="display:none;">
+            <canvas id="after-canvas" class="after-canvas"></canvas>
+          </div>
+        </div>
+
+        <!-- Estimate ─────────────────────────────────── -->
+        <div class="quote-hero">
+          <div style="display:flex;justify-content:space-between;align-items:flex-start;">
+            <div>
+              <div class="quote-label">Preliminary estimate</div>
+              <div class="quote-amount" id="result-quote-range"></div>
+              <div class="quote-service" id="result-service"></div>
+            </div>
+            <div style="text-align:right;flex-shrink:0;">
+              <div style="font-size:.6rem;text-transform:uppercase;letter-spacing:.08em;opacity:.5;font-weight:700;margin-bottom:3px;">Est. range</div>
+              <div style="font-size:.7rem;color:rgba(255,255,255,.7);font-weight:500;">Based on photo</div>
+            </div>
+          </div>
+          <div class="quote-divider"></div>
+          <div class="quote-meta-row">
+            <div class="quote-meta-item"><div class="k">Condition</div><div class="v" id="q-condition">—</div></div>
+            <div class="quote-meta-item"><div class="k">Risk</div><div class="v" id="q-risk">—</div></div>
+            <div class="quote-meta-item"><div class="k">Service</div><div class="v" id="q-service-short">—</div></div>
+          </div>
+          <div class="quote-divider"></div>
+          <div style="font-size:.7rem;opacity:.4;font-style:italic;">Final price confirmed on-site</div>
+        </div>
+
+        <!-- Assessment details ────────────────────────── -->
+        <div>
+          <div class="section-heading"><i class="ti ti-ruler-measure" aria-hidden="true"></i>Assessment details</div>
+          <div class="facts-grid" id="result-facts"></div>
+        </div>
+
+        <!-- What we observed ──────────────────────────── -->
+        <div id="result-notes-wrap" style="display:none;">
+          <div class="section-heading"><i class="ti ti-eye" aria-hidden="true"></i>What we observed</div>
+          <ul class="notes-list" id="result-notes"></ul>
+        </div>
+
+        <!-- Recommended services ──────────────────────── -->
+        <div>
+          <div class="section-heading"><i class="ti ti-list-check" aria-hidden="true"></i>Recommended services</div>
+          <div style="display:flex;flex-direction:column;gap:8px;">
+
+            <div class="res-pkg" id="res-trim" onclick="selectResPkg('trim')">
+              <div class="res-rec-tag" id="res-rec-trim">★ Recommended</div>
+              <div class="res-pkg-radio"></div>
+              <div class="pkg-icon-wrap pkg-icon-trim" style="width:36px;height:36px;"><i class="ti ti-scissors" aria-hidden="true" style="font-size:17px;"></i></div>
+              <div class="res-pkg-body">
+                <div class="res-pkg-name">Trimming &amp; Pruning</div>
+                <div class="res-pkg-price" id="res-price-trim">$225 – $525</div>
+              </div>
+            </div>
+
+            <div class="res-pkg" id="res-removal" onclick="selectResPkg('removal')">
+              <div class="res-rec-tag" id="res-rec-removal">★ Recommended</div>
+              <div class="res-pkg-radio"></div>
+              <div class="pkg-icon-wrap pkg-icon-removal" style="width:36px;height:36px;"><i class="ti ti-trees" aria-hidden="true" style="font-size:17px;"></i></div>
+              <div class="res-pkg-body">
+                <div class="res-pkg-name">Full Tree Removal</div>
+                <div class="res-pkg-price" id="res-price-removal">$525 – $1,350</div>
+              </div>
+            </div>
+
+            <div class="res-pkg" id="res-stump" onclick="selectResPkg('stump')">
+              <div class="res-rec-tag" id="res-rec-stump">★ Recommended</div>
+              <div class="res-pkg-radio"></div>
+              <div class="pkg-icon-wrap pkg-icon-stump" style="width:36px;height:36px;"><i class="ti ti-circle-dot" aria-hidden="true" style="font-size:17px;"></i></div>
+              <div class="res-pkg-body">
+                <div class="res-pkg-name">Stump Grinding</div>
+                <div class="res-pkg-price" id="res-price-stump">$125 – $325</div>
+              </div>
+            </div>
+
+          </div>
+        </div>
+
+        <!-- After service ─────────────────────────────── -->
+        <div id="after-desc-wrap" style="display:none;">
+          <div class="section-heading"><i class="ti ti-sparkles" aria-hidden="true"></i>After service — what to expect</div>
+          <div class="after-desc">
+            <span id="after-desc-text"></span>
+            <span id="crown-retained-badge" style="display:none;margin-top:8px;"></span>
+          </div>
+        </div>
+
+        <div id="result-standard-box" class="standard-info" style="display:none;"></div>
+        <p class="disclaimer">Visual assessment per <strong>ANSI A300</strong> standards. Zone positions are estimated from photo analysis, not a measured survey. Final scope and safety confirmed on-site.</p>
+      </div>
+    </div>
+    <div class="footer-bar">
+      <button class="btn-primary" id="res-schedule-btn" onclick="proceedToSchedule()" disabled>Select a service to schedule</button>
+      <button class="btn-ghost" onclick="goTo(2)">Re-take photo</button>
+    </div>
+  </div>
+
+  <!-- ═══ SCREEN 5: SERVICE PACKAGES ═══════════════════ -->
+  <div id="screen-5" class="screen">
+    <div class="topbar">
+      <button class="topbar-back" onclick="goTo(4)">←</button>
+      <div class="topbar-info">
+        <div class="topbar-logo"><i class="ti ti-list topbar-icon" aria-hidden="true"></i>Choose your service</div>
+        <div class="topbar-sub">Step 3 of 4</div>
+      </div>
+    </div>
+    <div class="progress-bar"><div class="progress-fill" style="width:75%"></div></div>
+    <div class="scroll-body fade-in">
+      <div class="gap-16">
+        <div>
+          <h2>Your service options</h2>
+          <p class="mt-8">Pricing calibrated to your tree's estimated size and condition.</p>
+        </div>
+
+        <div id="pkg-recommended-tree" class="badge badge-green" style="display:none;"></div>
+
+        <!-- Trimming -->
+        <div class="pkg-card" data-pkg="trim" onclick="selectPkg('trim')" id="pkg-trim">
+          <div class="pkg-header">
+            <div class="pkg-radio"></div>
+            <div class="pkg-icon-wrap pkg-icon-trim"><i class="ti ti-scissors" aria-hidden="true"></i></div>
+            <div class="pkg-meta">
+              <div class="pkg-name">Trimming &amp; Pruning</div>
+              <div class="pkg-price-row">
+                <span class="pkg-price" id="price-trim">$150 – $400</span>
+                <span class="std-badge">ANSI A300 Part 1</span>
+              </div>
+              <div class="pkg-desc">Crown thinning, deadwood removal, clearance pruning, and shape maintenance.</div>
+            </div>
+          </div>
+          <div class="pkg-includes">
+            <div class="pkg-include-item">Crown cleaning: dead, dying, diseased &amp; crossing branches removed (ANSI A300 Part 1)</div>
+            <div class="pkg-include-item">Directional pruning for structure — live crown removal not to exceed 25% per ISA guidelines</div>
+            <div class="pkg-include-item">Clearance cuts for structures, utilities, or sight lines as specified at estimate</div>
+            <div class="pkg-include-item">All brush chipped on-site; debris hauled from property and site blown clean</div>
+          </div>
+        </div>
+
+        <!-- Removal -->
+        <div class="pkg-card" data-pkg="removal" onclick="selectPkg('removal')" id="pkg-removal">
+          <div class="recommended-tag" id="removal-rec-tag" style="display:none;">AI Recommended</div>
+          <div class="pkg-header">
+            <div class="pkg-radio"></div>
+            <div class="pkg-icon-wrap pkg-icon-removal"><i class="ti ti-trees" aria-hidden="true"></i></div>
+            <div class="pkg-meta">
+              <div class="pkg-name">Full Tree Removal</div>
+              <div class="pkg-price-row">
+                <span class="pkg-price" id="price-removal">$400 – $1,200</span>
+                <span class="std-badge">ISA Z133 Safety</span>
+              </div>
+              <div class="pkg-desc">Complete sectional takedown, debris removal, and full site cleanup.</div>
+            </div>
+          </div>
+          <div class="pkg-includes">
+            <div class="pkg-include-item">Complete sectional dismantling using approved rigging — no uncontrolled felling (ISA Z133)</div>
+            <div class="pkg-include-item">Logs cut to 16–18 in. rounds; stacked on-site or hauled per homeowner preference</div>
+            <div class="pkg-include-item">Stump cut to ground level; brush chipped and removed</div>
+            <div class="pkg-include-item">Full site cleanup: rake, blow, and final debris inspection — stump grinding available as add-on</div>
+          </div>
+        </div>
+
+        <!-- Stump -->
+        <div class="pkg-card" data-pkg="stump" onclick="selectPkg('stump')" id="pkg-stump">
+          <div class="pkg-header">
+            <div class="pkg-radio"></div>
+            <div class="pkg-icon-wrap pkg-icon-stump"><i class="ti ti-circle-dot" aria-hidden="true"></i></div>
+            <div class="pkg-meta">
+              <div class="pkg-name">Stump Grinding</div>
+              <div class="pkg-price-row">
+                <span class="pkg-price" id="price-stump">$100 – $300</span>
+              </div>
+              <div class="pkg-desc">Mechanical grinding to below grade, surface roots, and void backfill.</div>
+            </div>
+          </div>
+          <div class="pkg-includes">
+            <div class="pkg-include-item">Grinding to 6–8 in. below existing grade (standard practice)</div>
+            <div class="pkg-include-item">Visible surface roots ground within 2 ft. of stump base</div>
+            <div class="pkg-include-item">Grindings backfilled into void; excess material hauled away</div>
+            <div class="pkg-include-item">Area graded and ready for topsoil — topsoil and seed not included</div>
+          </div>
+        </div>
+
+        <p class="disclaimer">All services performed by licensed and insured crew. Pricing calibrated to estimated tree size and condition. Final quote confirmed on-site.</p>
+      </div>
+    </div>
+    <div class="footer-bar">
+      <button class="btn-primary" id="book-btn" onclick="goTo(55)" disabled>Continue →</button>
+    </div>
+  </div>
+
+  <!-- ═══ SCREEN 5.5: CONTACT + SAVE ══════════════════════ -->
+  <div id="screen-55" class="screen">
+    <div class="topbar">
+      <button class="topbar-back" onclick="goTo(5)">←</button>
+      <div class="topbar-info">
+        <div class="topbar-logo"><i class="ti ti-user topbar-icon" aria-hidden="true"></i>Contact details</div>
+        <div class="topbar-sub">Step 3.5 of 4</div>
+      </div>
+    </div>
+    <div class="progress-bar"><div class="progress-fill" style="width:82%"></div></div>
+    <div class="scroll-body fade-in">
+      <div class="gap-16">
+        <div>
+          <h2>Customer details</h2>
+          <p class="mt-8">Save this estimate to your review queue so you can approve and send it to the customer.</p>
+        </div>
+
+        <div id="save-success" style="display:none;background:var(--em-soft);border:1px solid var(--em-light);border-radius:var(--r-md);padding:14px 16px;">
+          <div style="font-weight:700;color:var(--em-rich);margin-bottom:4px;">✓ Saved to review queue</div>
+          <div style="font-size:.82rem;color:var(--muted);">Estimate ID: <span id="saved-id" style="font-family:monospace;font-size:.78rem;"></span></div>
+        </div>
+
+        <!-- Customer info -->
+        <div style="display:flex;flex-direction:column;gap:12px;">
+          <div>
+            <label style="font-size:.82rem;font-weight:600;color:var(--ink);display:block;margin-bottom:5px;">Customer name</label>
+            <input id="ct-name" type="text" placeholder="First and last name" style="width:100%;border:1.5px solid var(--line);border-radius:var(--r-sm);padding:11px 14px;font-family:inherit;font-size:.95rem;color:var(--ink);background:var(--card);outline:none;transition:border-color .15s;" onfocus="this.style.borderColor='var(--em)'" onblur="this.style.borderColor='var(--line)'">
+          </div>
+          <div>
+            <label style="font-size:.82rem;font-weight:600;color:var(--ink);display:block;margin-bottom:5px;">Phone number</label>
+            <input id="ct-phone" type="tel" placeholder="(555) 000-0000" style="width:100%;border:1.5px solid var(--line);border-radius:var(--r-sm);padding:11px 14px;font-family:inherit;font-size:.95rem;color:var(--ink);background:var(--card);outline:none;transition:border-color .15s;" onfocus="this.style.borderColor='var(--em)'" onblur="this.style.borderColor='var(--line)'">
+          </div>
+          <div>
+            <label style="font-size:.82rem;font-weight:600;color:var(--ink);display:block;margin-bottom:5px;">Email <span style="color:var(--muted);font-weight:400;">(optional)</span></label>
+            <input id="ct-email" type="email" placeholder="customer@email.com" style="width:100%;border:1.5px solid var(--line);border-radius:var(--r-sm);padding:11px 14px;font-family:inherit;font-size:.95rem;color:var(--ink);background:var(--card);outline:none;transition:border-color .15s;" onfocus="this.style.borderColor='var(--em)'" onblur="this.style.borderColor='var(--line)'">
+          </div>
+          <div>
+            <label style="font-size:.82rem;font-weight:600;color:var(--ink);display:block;margin-bottom:5px;">Job address</label>
+            <input id="ct-address" type="text" placeholder="123 Main St, City, MI" style="width:100%;border:1.5px solid var(--line);border-radius:var(--r-sm);padding:11px 14px;font-family:inherit;font-size:.95rem;color:var(--ink);background:var(--card);outline:none;transition:border-color .15s;" onfocus="this.style.borderColor='var(--em)'" onblur="this.style.borderColor='var(--line)'">
+          </div>
+        </div>
+
+        <!-- Internal notes -->
+        <div>
+          <label style="font-size:.82rem;font-weight:600;color:var(--ink);display:block;margin-bottom:5px;">Internal notes <span style="color:var(--muted);font-weight:400;">(estimator only — not shown to customer)</span></label>
+          <textarea id="ct-notes" placeholder="Access notes, risk flags, crew considerations, site conditions…" rows="4" style="width:100%;border:1.5px solid var(--line);border-radius:var(--r-sm);padding:11px 14px;font-family:inherit;font-size:.9rem;color:var(--ink);background:var(--card);outline:none;resize:vertical;transition:border-color .15s;" onfocus="this.style.borderColor='var(--em)'" onblur="this.style.borderColor='var(--line)'"></textarea>
+        </div>
+
+        <div id="save-error" class="error-box" style="display:none;"></div>
+      </div>
+    </div>
+    <div class="footer-bar">
+      <button class="btn-primary" id="save-btn" onclick="saveEstimate()">Save to review queue →</button>
+      <button class="btn-ghost" onclick="goTo(6)">Skip — go straight to scheduling</button>
+    </div>
+  </div>
+
+  <!-- ═══ SCREEN 6: SCHEDULING ══════════════════════════ -->
+  <div id="screen-6" class="screen">
+    <div class="topbar">
+      <button class="topbar-back" onclick="goTo(5)">←</button>
+      <div class="topbar-info">
+        <div class="topbar-logo"><i class="ti ti-calendar topbar-icon" aria-hidden="true"></i>Schedule service</div>
+        <div class="topbar-sub">Step 4 of 4 — Final step</div>
+      </div>
+    </div>
+    <div class="progress-bar"><div class="progress-fill" style="width:100%"></div></div>
+    <div class="scroll-body fade-in">
+      <div class="gap-16">
+        <div>
+          <h2>Pick a date</h2>
+          <p class="mt-8">Choose a time that works. We confirm within 1 hour.</p>
+        </div>
+        <div class="booking-summary">
+          <div class="icon" id="booking-icon">🌿</div>
+          <div class="info">
+            <div class="service-name" id="booking-service-name">Service</div>
+            <div class="price" id="booking-price">$0 – $0</div>
+          </div>
+          <div style="text-align:right;">
+            <div style="font-size:.75rem;color:var(--muted);">Tree</div>
+            <div style="font-size:.85rem;font-weight:700;" id="booking-tree">–</div>
+          </div>
+        </div>
+        <div id="calendly-note" class="config-note" style="display:none;">⚙️ Add your Calendly URL in CONFIG to enable live scheduling.</div>
+        <div id="calendly-embed-wrap" class="calendly-wrap"></div>
+        <div class="divider"></div>
+        <p style="text-align:center;font-size:.82rem;color:var(--muted);">
+          Prefer to call? <a href="tel:" id="booking-phone-link" style="color:var(--em-rich);font-weight:700;">Tap to call us directly</a>
+        </p>
+      </div>
+    </div>
+  </div>
+
+</div><!-- /app -->
+
+<script src="https://assets.calendly.com/assets/external/widget.js" async></script>
+<script>
+/* ═══════════════════════════════════════════ STATE ═══ */
+const STATE = { photoDataUrl: null, photoBase64: null, photoMediaType: null, analysis: null, selectedPkg: null };
+
+// SE Michigan market pricing — 20-25% margin built in
+const PKG_INFO = {
+  trim:    { name: "Trimming & Pruning", icon: "✂", baseLow: 225, baseHigh: 525 },
+  removal: { name: "Full Tree Removal",  icon: "↓",  baseLow: 525, baseHigh: 1350 },
+  stump:   { name: "Stump Grinding",     icon: "◎",  baseLow: 125, baseHigh: 325 },
+};
+
+/* ═══════════════════════════════════════════ NAV ═════ */
+function goTo(n) {
+  document.querySelectorAll('.screen').forEach(s => s.classList.remove('active'));
+  const screenId = n === 55 ? 'screen-55' : 'screen-' + n;
+  document.getElementById(screenId).classList.add('active');
+  window.scrollTo(0,0);
+  if (n === 6) setupScheduling();
+}
+
+/* ═══════════════════════════════════════════ INIT ════ */
+document.addEventListener('DOMContentLoaded', () => {
+  document.getElementById('call-btn').href = 'tel:' + CONFIG.PHONE;
+  document.getElementById('booking-phone-link').href = 'tel:' + CONFIG.PHONE;
+
+  const yr = new Date().getFullYear() - parseInt(CONFIG.FOUNDED);
+  document.getElementById('founded-years').textContent = yr + 'yr';
+
+  const fi = document.getElementById('file-input');
+  if (fi) fi.addEventListener('change', e => { if (e.target.files[0]) handleFile(e.target.files[0]); });
+
+  bindDropzone();
+});
+
+/* ═══════════════════════════════════════════ FILES ═══ */
+function bindDropzone() {
+  const dz = document.getElementById('dropzone');
+  if (!dz) return;
+  dz.addEventListener('dragover', e => { e.preventDefault(); dz.classList.add('drag'); });
+  dz.addEventListener('dragleave', () => dz.classList.remove('drag'));
+  dz.addEventListener('drop', e => {
+    e.preventDefault(); dz.classList.remove('drag');
+    if (e.dataTransfer.files[0]) handleFile(e.dataTransfer.files[0]);
+  });
+  const fi = dz.querySelector('input[type=file]');
+  if (fi) fi.addEventListener('change', e => { if (e.target.files[0]) handleFile(e.target.files[0]); });
+}
+
+function handleFile(file) {
+  if (!file.type.startsWith('image/')) { showUploadError("Please select an image file."); return; }
+  hideUploadError();
+  const reader = new FileReader();
+  reader.onload = (e) => {
+    const img = new Image();
+    img.onload = () => {
+      // Resize to max 2048px on longest side — preserves full tree detail for AI, stays under 10MB
+      const MAX = 2048;
+      let w = img.width, h = img.height;
+      if (w > MAX || h > MAX) {
+        if (w >= h) { h = Math.round(h * MAX / w); w = MAX; }
+        else        { w = Math.round(w * MAX / h); h = MAX; }
+      }
+      const canvas = document.createElement('canvas');
+      canvas.width = w; canvas.height = h;
+      canvas.getContext('2d').drawImage(img, 0, 0, w, h);
+      const dataUrl = canvas.toDataURL('image/jpeg', 0.85);
+      STATE.photoDataUrl   = dataUrl;
+      STATE.photoBase64    = dataUrl.split(',')[1];
+      STATE.photoMediaType = 'image/jpeg';
+      renderPreview();
+    };
+    img.src = e.target.result;
+  };
+  reader.readAsDataURL(file);
+}
+
+function renderPreview() {
+  const area = document.getElementById('upload-area');
+  area.innerHTML = `<div class="photo-preview"><img src="${STATE.photoDataUrl}" alt="Your tree"><button class="photo-remove" onclick="clearPhoto()" aria-label="Remove photo">✕</button></div>`;
+  document.getElementById('analyze-btn').disabled = false;
+}
+
+function clearPhoto() {
+  STATE.photoDataUrl = STATE.photoBase64 = STATE.photoMediaType = null;
+  document.getElementById('analyze-btn').disabled = true;
+  document.getElementById('upload-area').innerHTML = `
+    <div class="dropzone" id="dropzone" onclick="document.getElementById('file-input').click()">
+      <input type="file" id="file-input" accept="image/*" capture="environment">
+      <div class="dz-icon">📷</div>
+      <div class="dz-title">Tap to photograph tree</div>
+      <div class="dz-hint">Or drag and drop · JPG, PNG, HEIC</div>
+    </div>`;
+  bindDropzone();
+}
+
+function showUploadError(msg) { const el = document.getElementById('upload-error'); el.textContent = msg; el.style.display = 'block'; }
+function hideUploadError()    { document.getElementById('upload-error').style.display = 'none'; }
+
+/* ═══════════════════════════════════════════ DEMO DATA ═ */
+const DEMO_RESULT = {
+  is_tree: true,
+  common_name: "Norway Maple",
+  latin_name: "Acer platanoides",
+  est_height_ft: "38–48 ft",
+  est_dbh_in: "14–18 in",
+  crown_spread_ft: "32–40 ft",
+  condition: "Fair",
+  isa_risk_rating: "Moderate",
+  recommended_service: "Trimming & Pruning",
+  recommended_pkg_key: "trim",
+  quote_low: 285,
+  quote_high: 480,
+  ansi_standard: "ANSI A300 Part 1 — Pruning",
+  notes: [
+    "Significant deadwood visible throughout the upper crown — crown cleaning recommended",
+    "Several overextended lateral limbs creating end-weight load over driveway",
+    "Minor co-dominant stem low on trunk; included bark visible — monitor annually",
+    "Dense canopy limiting light penetration; crown thinning will improve air circulation",
+  ],
+  standard_note: "Crown cleaning and selective reduction per ANSI A300 Part 1. Live crown removal to remain within 20% given tree's mature age and fair condition rating."
+};
+
+function isDemoMode() {
+  const hasProxy = CONFIG.PROXY_URL && CONFIG.PROXY_URL.startsWith('http');
+  const hasKey   = CONFIG.ANTHROPIC_API_KEY && !CONFIG.ANTHROPIC_API_KEY.includes('YOUR_');
+  return !hasProxy && !hasKey;
+}
+
+function apiEndpoint() {
+  if (CONFIG.PROXY_URL && CONFIG.PROXY_URL.startsWith('http')) return CONFIG.PROXY_URL;
+  return 'https://api.anthropic.com/v1/messages';
+}
+
+function apiHeaders() {
+  const h = { 'Content-Type': 'application/json' };
+  if (CONFIG.PROXY_URL && CONFIG.PROXY_URL.startsWith('http')) {
+    // Supabase requires anon key for Edge Function routing
+    if (CONFIG.SUPABASE_KEY) h['Authorization'] = 'Bearer ' + CONFIG.SUPABASE_KEY;
+  } else {
+    h['x-api-key'] = CONFIG.ANTHROPIC_API_KEY;
+    h['anthropic-version'] = '2023-06-01';
+  }
+  return h;
+}
+
+/* ═══════════════════════════════════════════ ANALYSIS ═ */
+async function startAnalysis() {
+  if (!STATE.photoDataUrl) return;
+  goTo(3);
+  const sp = document.getElementById('scan-photo');
+  sp.src = STATE.photoDataUrl;
+
+  const t0 = Date.now();
+  const timerEl = document.getElementById('analyze-timer');
+  const timerInt = setInterval(() => { timerEl.textContent = ((Date.now()-t0)/1000).toFixed(1) + 's'; }, 100);
+
+  const stepEls = [...document.querySelectorAll('.ai-step')];
+  let cur = 0;
+  stepEls[0].classList.add('active');
+  const stepInt = setInterval(() => {
+    if (cur < stepEls.length) {
+      stepEls[cur].classList.remove('active'); stepEls[cur].classList.add('done'); cur++;
+      if (cur < stepEls.length) stepEls[cur].classList.add('active');
+    }
+  }, 1600);
+
+  try {
+    const result = isDemoMode()
+      ? await runDemo()
+      : await callClaude(STATE.photoBase64, STATE.photoMediaType);
+    STATE.analysis = result;
+    clearInterval(timerInt); clearInterval(stepInt);
+    stepEls.forEach(e => { e.classList.remove('active'); e.classList.add('done'); });
+    await new Promise(r => setTimeout(r, 400));
+    renderResults(result);
+    updatePackagePrices(result);
+    goTo(4);
+  } catch (err) {
+    clearInterval(timerInt); clearInterval(stepInt);
+    goTo(2);
+    showUploadError("Analysis failed: " + err.message + ". Please try a different photo.");
+  }
+}
+
+async function runDemo() {
+  await new Promise(r => setTimeout(r, 6500));
+  return DEMO_RESULT;
+}
+
+async function callClaude(base64, mediaType) {
+  const PROMPT = `You are a professional tree service estimator performing a visual assessment per ANSI A300 standards and ISA Best Management Practices.
+
+Return ONLY a valid JSON object (no markdown, no backticks, no preamble):
+{
+  "is_tree": true,
+  "common_name": "string — use the most specific correct common name",
+  "latin_name": "string — binomial nomenclature",
+  "id_confidence": "High | Medium | Low",
+  "id_notes": "brief explanation of visible identification clues used (bark texture, flower form, branching pattern, leaf shape if visible)",
+  "est_height_ft": "string e.g. 45-55 ft",
+  "est_dbh_in": "string e.g. 18-22 in",
+  "crown_spread_ft": "string e.g. 30-40 ft",
+  "condition": "Excellent | Good | Fair | Poor | Dead/Hazardous",
+  "isa_risk_rating": "Low | Moderate | High | Extreme",
+  "recommended_service": "Trimming & Pruning | Full Removal | Stump Grinding",
+  "recommended_pkg_key": "trim | removal | stump",
+  "quote_low": integer USD,
+  "quote_high": integer USD,
+  "ansi_standard": "relevant ANSI A300 part",
+  "notes": ["3-5 short professional observations"],
+  "standard_note": "1-2 sentences on applicable standard",
+  "live_crown_retained_pct": integer 0-100,
+  "after_description": "2-3 sentences: what the tree looks like after work is complete",
+  "annotations": [
+    {
+      "id": "a1",
+      "type": "remove | clearance | final-crown | protect | drop-zone",
+      "client_label": "plain-English label for homeowner e.g. Remove deadwood — upper right crown",
+      "technical_standard": "ANSI citation e.g. ANSI A300 Part 1 — Crown Cleaning",
+      "color": "#ef4444 for remove | #f59e0b for clearance | #22c55e for final-crown | #3b82f6 for protect | #f97316 for drop-zone",
+      "region": { "x": 0.0, "y": 0.0, "w": 0.5, "h": 0.5 },
+      "shape": "ellipse | rect",
+      "opacity": 0.42,
+      "hatch": true
+    }
+  ],
+  "cut_points": [
+    {
+      "description": "Three-cut removal — branch collar preserved",
+      "technique": "three-cut | lateral-reduction | collar-cut | crown-raise",
+      "short_technique": "3-Cut | Lat.Red. | Collar | C.Raise",
+      "x": 0.65,
+      "y": 0.22
+    }
+  ]
+}
+
+SPECIES IDENTIFICATION RULES — be meticulous:
+Use ONLY visible morphological evidence: overall form, bark texture/color, branching pattern, flower/fruit/seed if visible, leaf shape if visible, trunk structure.
+Common SE Michigan trees and their key identifiers:
+- Lilac (Syringa spp.): multi-stem shrub/small tree, flower panicles at branch TIPS (not on trunk), oval leaves, 8-20 ft
+- Redbud (Cercis canadensis): flowers emerge DIRECTLY from branches and trunk (cauliflory), heart-shaped leaves, 20-30 ft
+- Norway/Silver/Red/Sugar Maple: opposite branching, winged samaras if visible, lobed leaves
+- Green/White/Black Ash: opposite compound leaves, diamond-furrowed bark
+- White/Red/Pin Oak: alternate lobed leaves — White has rounded lobes, Red/Pin have pointed lobes
+- Bradford Pear: symmetrical crown, white spring flowers, small dark fruit
+- Crabapple: small (<20 ft), spring flowers white/pink/red, small fruit
+- Blue Spruce/White Pine/Scotch Pine: evergreen — distinguish by needle count and color
+- Serviceberry (Amelanchier): white spring flowers, multi-stem, smooth gray bark
+- Honeysuckle: multi-stem shrub, opposite leaves, peeling tan/gray bark
+If identification is uncertain or photo lacks clear diagnostic features set id_confidence to Medium or Low and explain in id_notes what you could and could not see.
+NEVER confuse shrub-form multi-stem species (Lilac, Serviceberry, Honeysuckle, Forsythia) with single-trunk tree species.
+
+PRUNING TECHNIQUE RULES — ANSI A300 accuracy required:
+
+ZONE PLACEMENT — be precise and tight:
+- Region MUST tightly bound the actual visible feature — not a vague image quadrant
+- Deadwood/problem branch: zone should be small (w 0.05-0.25, h 0.05-0.25), centered on the specific branch
+- Crown envelope: ellipse should match the actual visible crown edge — NOT the full image. If crown occupies 40% of image, w and h should be ~0.4
+- Clearance zone: rect should span from branch tip to the structure surface (narrow, directional)
+- Do NOT set w or h > 0.65 unless the tree truly fills most of the frame
+- For each zone ask: "Am I annotating the actual tree feature or just drawing a generic box?" If generic, tighten it.
+
+SHAPES:
+- shape: "ellipse" for crown/canopy zones (remove, final-crown, protect on single-trunk trees)
+- shape: "rect" for directional zones (clearance, drop-zone) and ALL shrub/multi-stem annotations
+
+ZONE COUNT by service:
+- Trimming & Pruning: 1-3 remove zones for specific deadwood/crossers/overextended limbs; 1 final-crown ellipse (smaller than current crown); 1 clearance rect if structure nearby
+- Full Removal: 1 remove ellipse over full canopy+trunk; 1 drop-zone rect on ground below
+- Stump Grinding: 1 remove ellipse over stump only; 1 protect ellipse (2× DBH radius around root flare)
+
+SHRUBS & MULTI-STEM PLANTS (Lilac, Serviceberry, Forsythia, Honeysuckle, Viburnum, Spirea):
+- Use shape: "rect" for all zones — stems are vertical, not circular crowns
+- Trimming: annotate the 2-3 oldest/tallest canes as narrow remove rects; label "Renewal pruning — remove oldest canes"
+- Removal: one remove rect over the full clump; protect rect around root crown
+- technical_standard for shrubs: "ISA BMP — Shrub Pruning: renewal method, remove ⅓ oldest canes per season"
+- client_label should say "stems" or "canes" not "crown" or "limbs"
+
+SPECIFIC ANSI A300 CITATIONS — use these exact section references:
+- Crown cleaning: "ANSI A300 Part 1 §4.1 — Crown cleaning: dead, diseased, rubbing branches ≥1 in."
+- Crown thinning: "ANSI A300 Part 1 §4.2 — Crown thinning: ≤25% live crown, uniform distribution"
+- Crown raising: "ANSI A300 Part 1 §4.3 — Crown raising: remove lowest limbs for clearance"
+- Crown reduction: "ANSI A300 Part 1 §4.4 — Crown reduction: lateral cuts only, to ≥⅓-dia. lateral"
+- Structural pruning: "ANSI A300 Part 1 §4.5 — Structural pruning: subordinate co-dominant stems"
+- Clearance pruning: "ANSI A300 Part 1 §4.6 — Clearance pruning: utility/structure separation"
+- Full removal: "ISA Z133 §8.1 — Safe felling: sectional dismantling, approved rigging"
+- Root protection: "ISA BMP §7 — Root zone: no grade change or soil compaction within drip line"
+
+CUT POINTS — Trimming & Pruning only (2-6 points):
+- Place at actual visible branch unions where pruning cuts will occur
+- technique: three-cut (limbs >2" dia) | lateral-reduction | collar-cut (small branches) | crown-raise
+- short_technique (for canvas label): "3-Cut" | "Lat. Red." | "Collar Cut" | "C. Raise"
+- PROHIBITED: topping | heading cuts | flush cuts | stub cuts | lion's tailing | removing >25% live crown
+
+LABEL LANGUAGE:
+- client_label: plain English for homeowner, specific to location ("Remove deadwood — upper right crown", "Cane renewal — 3 oldest stems left side")
+- technical_standard: exact ANSI A300 §section or ISA BMP §section as above
+
+If not a tree set is_tree false and omit annotations and cut_points. Base quotes on SE Michigan residential pricing.`;
+
+  const response = await fetch(apiEndpoint(), {
+    method: "POST",
+    headers: apiHeaders(),
+    body: JSON.stringify({
+      model: "claude-sonnet-4-5",
+      max_tokens: 2000,
+      messages: [{ role: "user", content: [
+        { type: "image", source: { type: "base64", media_type: mediaType, data: base64 } },
+        { type: "text", text: PROMPT }
+      ]}]
+    })
+  });
+
+  if (!response.ok) {
+    const err = await response.json().catch(()=>({}));
+    throw new Error(err.error?.message || `API error ${response.status}`);
+  }
+  const data = await response.json();
+  const text = data.content.filter(b=>b.type==='text').map(b=>b.text).join('\n');
+  let parsed;
+  try { parsed = JSON.parse(text.replace(/```json|```/g,'').trim()); }
+  catch { throw new Error("Could not read analysis. Please try a clearer photo."); }
+  if (!parsed.is_tree) throw new Error("No tree detected. Please upload a clear full-tree photo.");
+  return parsed;
+}
+
+/* ═══════════════════════════════════════════ RESULTS ═ */
+function renderResults(r) {
+  // Set original photo
+  const resultPhoto = document.getElementById('result-photo');
+  resultPhoto.src = STATE.photoDataUrl;
+  if (isDemoMode()) document.getElementById('demo-banner').style.display = 'block';
+
+  // Generate annotated canvas after the image loads
+  if (r.annotations && r.annotations.length) {
+    const doAnnotate = () => {
+      generateAnnotatedPhoto(r.annotations, r.cut_points || []);
+      document.getElementById('photo-annotated-wrap').style.display = 'block';
+      document.getElementById('photo-original-wrap').style.display = 'none';
+      document.getElementById('photo-tabs').style.display = 'flex';
+    };
+    if (resultPhoto.complete && resultPhoto.naturalWidth) {
+      doAnnotate();
+    } else {
+      resultPhoto.onload = doAnnotate;
+    }
+  }
+
+  // After description
+  if (r.after_description) {
+    document.getElementById('after-desc-text').textContent = r.after_description;
+    document.getElementById('after-desc-wrap').style.display = 'block';
+  }
+  if (r.live_crown_retained_pct) {
+    const badge = document.getElementById('crown-retained-badge');
+    badge.innerHTML = `<span class="crown-badge"><i class="ti ti-leaf" aria-hidden="true"></i> ${r.live_crown_retained_pct}% live crown retained — ANSI A300 min. 60%</span>`;
+    badge.style.display = 'block';
+  }
+
+  const conditionColors = { 'Excellent':'badge-green','Good':'badge-green','Fair':'badge-amber','Poor':'badge-warn','Dead/Hazardous':'badge-muted' };
+  const badgeEl = document.getElementById('result-badge');
+  badgeEl.className = 'badge ' + (conditionColors[r.condition] || 'badge-muted');
+  badgeEl.textContent = (r.condition || 'Unknown') + ' condition';
+
+  document.getElementById('result-species').textContent = r.common_name || 'Unknown Species';
+  document.getElementById('result-latin').textContent   = r.latin_name || '';
+  const confEl = document.getElementById('result-id-confidence');
+  if (confEl && (r.id_confidence || r.id_notes)) {
+    const conf = r.id_confidence || '';
+    const confColor = conf === 'High' ? 'var(--em-rich)' : conf === 'Medium' ? 'var(--amber)' : 'var(--muted)';
+    confEl.innerHTML = conf ? `<span style="font-weight:700;color:${confColor};">ID confidence: ${conf}</span>${r.id_notes ? ' — ' + r.id_notes : ''}` : (r.id_notes || '');
+    confEl.style.display = 'block';
+  }
+
+  const qRange = document.getElementById('result-quote-range');
+  qRange.innerHTML = '$' + num(r.quote_low) + ' <span class="range">– $' + num(r.quote_high) + '</span>';
+  document.getElementById('result-service').textContent = r.recommended_service || 'tree service';
+  const qCondEl = document.getElementById('q-condition');
+  const qRiskEl = document.getElementById('q-risk');
+  const qSvcEl  = document.getElementById('q-service-short');
+  if (qCondEl) qCondEl.textContent = r.condition || '—';
+  if (qRiskEl) qRiskEl.textContent = r.isa_risk_rating || '—';
+  if (qSvcEl)  qSvcEl.textContent  = (r.recommended_service || '—').replace('Trimming & Pruning','Trim').replace('Full Tree Removal','Removal').replace('Stump Grinding','Stump');
+
+  document.getElementById('result-facts').innerHTML = `
+    <div class="fact-card"><div class="k">Est. height</div><div class="v">${r.est_height_ft||'—'}</div></div>
+    <div class="fact-card"><div class="k">DBH (trunk)</div><div class="v">${r.est_dbh_in||'—'}</div></div>
+    <div class="fact-card"><div class="k">Crown spread</div><div class="v">${r.crown_spread_ft||'—'}</div></div>
+    <div class="fact-card"><div class="k">Risk rating</div><div class="v">${r.isa_risk_rating||'—'}</div></div>`;
+
+  if (r.notes && r.notes.length) {
+    document.getElementById('result-notes-wrap').style.display = 'block';
+    document.getElementById('result-notes').innerHTML = r.notes.map(n=>`<li>${n}</li>`).join('');
+  }
+  if (r.standard_note) {
+    const sb = document.getElementById('result-standard-box');
+    sb.style.display = 'block';
+    sb.innerHTML = '<strong>Arborist standard:</strong> ' + r.standard_note;
+  }
+}
+
+/* ═══════════════════════════════════════════ PACKAGES ═ */
+function updatePackagePrices(r) {
+  const heightMatch = (r.est_height_ft||'').match(/(\d+)/);
+  const heightFt = heightMatch ? parseInt(heightMatch[1]) : 30;
+  const sizeMult = heightFt < 20 ? 0.7 : heightFt < 35 ? 1.0 : heightFt < 55 ? 1.4 : 1.9;
+
+  Object.entries(PKG_INFO).forEach(([key, pkg]) => {
+    const low  = Math.round(pkg.baseLow  * sizeMult / 25) * 25;
+    const high = Math.round(pkg.baseHigh * sizeMult / 25) * 25;
+    const el = document.getElementById('price-' + key);
+    if (el) el.textContent = '$' + num(low) + ' – $' + num(high);
+    pkg.scaledLow = low; pkg.scaledHigh = high;
+  });
+
+  if (r.recommended_pkg_key) {
+    const rec = r.recommended_pkg_key;
+    const recCard = document.getElementById('pkg-' + rec);
+    if (recCard) {
+      let tag = recCard.querySelector('.recommended-tag');
+      if (!tag) {
+        tag = document.createElement('div');
+        tag.className = 'recommended-tag';
+        recCard.insertBefore(tag, recCard.firstChild);
+      }
+      tag.textContent = '★ Recommended';
+      tag.style.display = 'block';
+    }
+    const treeNote = document.getElementById('pkg-recommended-tree');
+    if (treeNote) {
+      treeNote.style.display = 'inline-flex';
+      treeNote.textContent = '★ Recommended service ' + (PKG_INFO[rec]?.name || rec) + ' for your ' + (r.common_name || 'tree');
+    }
+    selectPkg(rec);
+  }
+}
+
+function selectPkg(key) {
+  STATE.selectedPkg = key;
+  document.querySelectorAll('.pkg-card').forEach(c => c.classList.remove('selected'));
+  const card = document.getElementById('pkg-' + key);
+  if (card) card.classList.add('selected');
+  document.getElementById('book-btn').disabled = false;
+}
+
+/* ═══════════════════════════════════════════ SCHEDULING */
+function setupScheduling() {
+  const pkg = PKG_INFO[STATE.selectedPkg] || PKG_INFO.trim;
+  const tree = STATE.analysis?.common_name || 'Tree';
+
+  document.getElementById('booking-icon').textContent         = pkg.icon;
+  document.getElementById('booking-service-name').textContent = pkg.name;
+  document.getElementById('booking-price').textContent        = '$' + num(pkg.scaledLow||pkg.baseLow) + ' – $' + num(pkg.scaledHigh||pkg.baseHigh);
+  document.getElementById('booking-tree').textContent         = tree;
+
+  const wrap = document.getElementById('calendly-embed-wrap');
+  const note = document.getElementById('calendly-note');
+
+  if (!CONFIG.CALENDLY_URL || CONFIG.CALENDLY_URL.includes('YOUR_USERNAME')) {
+    note.style.display = 'block';
+    wrap.innerHTML = `<div class="calendly-placeholder"><div class="big-icon">📅</div><h3>Scheduling ready</h3><p>Add your Calendly URL in CONFIG to enable live calendar booking.</p><a href="tel:${CONFIG.PHONE}" style="display:block;text-decoration:none;margin-top:16px;"><button class="btn-primary">Call to schedule: ${CONFIG.PHONE}</button></a></div>`;
+    return;
+  }
+
+  note.style.display = 'none';
+  const prefill = { customAnswers: { a1: (STATE.analysis?.common_name||'') + ' — ' + (STATE.selectedPkg ? PKG_INFO[STATE.selectedPkg].name : '') } };
+
+  if (window.Calendly) {
+    wrap.innerHTML = '';
+    Calendly.initInlineWidget({ url: CONFIG.CALENDLY_URL, parentElement: wrap, prefill, utm: { utmSource: 'treevision-app' } });
+  } else {
+    wrap.innerHTML = `<iframe src="${CONFIG.CALENDLY_URL}?hide_landing_page_details=1&hide_gdpr_banner=1" width="100%" height="630" frameborder="0" style="border:none;border-radius:20px;"></iframe>`;
+  }
+}
+
+/* ═══════════════════════════════════════════ SAVE ═════ */
+async function saveEstimate() {
+  const btn = document.getElementById('save-btn');
+  const errEl = document.getElementById('save-error');
+  const successEl = document.getElementById('save-success');
+  errEl.style.display = 'none';
+  btn.disabled = true;
+  btn.textContent = 'Saving…';
+
+  const pkg = PKG_INFO[STATE.selectedPkg] || {};
+
+  try {
+    const resp = await fetch(CONFIG.SAVE_URL, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        analysis: STATE.analysis,
+        service: pkg.name,
+        contact: {
+          name:    document.getElementById('ct-name').value.trim(),
+          phone:   document.getElementById('ct-phone').value.trim(),
+          email:   document.getElementById('ct-email').value.trim(),
+          address: document.getElementById('ct-address').value.trim(),
+        },
+        internal_notes: document.getElementById('ct-notes').value.trim(),
+      }),
+    });
+
+    const data = await resp.json();
+    if (!resp.ok) throw new Error(data.error || 'Save failed');
+
+    STATE.savedId = data.id;
+    document.getElementById('saved-id').textContent = data.id;
+    successEl.style.display = 'block';
+    btn.textContent = '✓ Saved — continue to scheduling';
+    btn.onclick = () => goTo(6);
+    btn.disabled = false;
+  } catch (err) {
+    errEl.textContent = 'Could not save: ' + err.message;
+    errEl.style.display = 'block';
+    btn.textContent = 'Retry';
+    btn.disabled = false;
+  }
+}
+
+/* ═══════════════════════════════════════════ ANNOTATIONS ══ */
+
+function showPhotoView(view) {
+  document.getElementById('photo-original-wrap').style.display  = view === 'original'  ? 'block' : 'none';
+  document.getElementById('photo-annotated-wrap').style.display = view === 'annotated' ? 'block' : 'none';
+  document.getElementById('photo-after-wrap').style.display     = view === 'after'     ? 'block' : 'none';
+  document.querySelectorAll('.photo-tab').forEach(t => {
+    const map = { original:'original', annotated:'annotated', after:'after' };
+    const tv = Object.entries(map).find(([k]) => t.textContent.trim().toLowerCase().startsWith(k));
+    t.classList.toggle('active', tv && tv[0] === view);
+  });
+}
+
+function selectResPkg(key) {
+  STATE.selectedPkg = key;
+  document.querySelectorAll('.res-pkg').forEach(c => c.classList.remove('selected'));
+  const card = document.getElementById('res-' + key);
+  if (card) card.classList.add('selected');
+  // also sync screen 5 selection
+  selectPkg(key);
+  const btn = document.getElementById('res-schedule-btn');
+  if (btn) {
+    btn.disabled = false;
+    btn.textContent = 'Schedule ' + (PKG_INFO[key]?.name || '') + ' →';
+  }
+}
+
+function proceedToSchedule() {
+  goTo(55);
+}
+
+function downloadAnnotated() {
+  const canvas = document.getElementById('annotated-canvas');
+  if (!canvas || !canvas.toDataURL) return;
+  const species = STATE.analysis?.common_name || 'tree';
+  const a = document.createElement('a');
+  a.download = 'treevision-scope-' + species.toLowerCase().replace(/\s+/g,'-') + '.jpg';
+  a.href = canvas.toDataURL('image/jpeg', 0.92);
+  a.click();
+}
+
+function generateAfterRendering(annotations) {
+  if (!annotations?.length) return;
+  const imgEl = document.getElementById('result-photo');
+  if (!imgEl?.src) return;
+  const canvas = document.getElementById('after-canvas');
+  const W = imgEl.naturalWidth || 1200;
+  const H = imgEl.naturalHeight || 900;
+  canvas.width = W; canvas.height = H;
+  const ctx = canvas.getContext('2d');
+  ctx.drawImage(imgEl, 0, 0, W, H);
+
+  // Fade out removal zones — suggest branches are gone
+  annotations.filter(a => a.type === 'remove').forEach(ann => {
+    const x = ann.region.x*W, y = ann.region.y*H, w = ann.region.w*W, h = ann.region.h*H;
+    ctx.save();
+    // Sky/blur effect — lighten the area where material is removed
+    ctx.globalAlpha = 0.55;
+    ctx.fillStyle = '#d1fae5';
+    ctx.beginPath();
+    ctx.ellipse(x+w/2, y+h/2, w/2, h/2, 0, 0, Math.PI*2);
+    ctx.fill();
+    ctx.restore();
+  });
+
+  // Draw final crown outline
+  annotations.filter(a => a.type === 'final-crown').forEach(ann => {
+    const x = ann.region.x*W, y = ann.region.y*H, w = ann.region.w*W, h = ann.region.h*H;
+    const lw = Math.max(3, W/200), gap = Math.max(12, W/80);
+    ctx.save();
+    ctx.globalAlpha = 0.2;
+    ctx.fillStyle = '#22c55e';
+    ctx.beginPath(); ctx.ellipse(x+w/2, y+h/2, w/2, h/2, 0, 0, Math.PI*2); ctx.fill();
+    ctx.globalAlpha = 0.9;
+    ctx.strokeStyle = '#22c55e'; ctx.lineWidth = lw;
+    ctx.setLineDash([gap, gap*0.4]);
+    ctx.beginPath(); ctx.ellipse(x+w/2, y+h/2, w/2-lw/2, h/2-lw/2, 0, 0, Math.PI*2); ctx.stroke();
+    ctx.restore();
+  });
+
+  // "AFTER SERVICE" label
+  const fs = Math.max(13, Math.min(20, W/60));
+  ctx.save();
+  ctx.globalAlpha = 0.92;
+  ctx.fillStyle = '#052e16';
+  const lbw = ctx.measureText('AFTER SERVICE').width + fs*2.2;
+  ctx.fillRect(W - lbw - 10, 10, lbw, fs*1.9);
+  ctx.globalAlpha = 1;
+  ctx.fillStyle = '#4ade80';
+  ctx.font = `700 ${fs}px system-ui, sans-serif`;
+  ctx.fillText('AFTER SERVICE', W - lbw, 10 + fs*1.4);
+  ctx.restore();
+
+  // Show the After tab
+  document.getElementById('after-tab').style.display = 'block';
+}
+
+function generateAnnotatedPhoto(annotations, cutPoints) {
+  if (!annotations || !annotations.length) return;
+  const imgEl = document.getElementById('result-photo');
+  if (!imgEl || !imgEl.src) return;
+
+  const canvas = document.getElementById('annotated-canvas');
+  const W = imgEl.naturalWidth || 1200;
+  const H = imgEl.naturalHeight || 900;
+  const HEADER = Math.round(H * 0.06);
+  const FOOTER = Math.round(H * 0.055);
+  canvas.width = W;
+  canvas.height = H + HEADER + FOOTER;
+  const ctx = canvas.getContext('2d');
+
+  // roundRect polyfill
+  if (!ctx.roundRect) {
+    ctx.roundRect = function(x,y,w,h,r){
+      ctx.beginPath();
+      ctx.moveTo(x+r,y); ctx.lineTo(x+w-r,y);
+      ctx.quadraticCurveTo(x+w,y,x+w,y+r); ctx.lineTo(x+w,y+h-r);
+      ctx.quadraticCurveTo(x+w,y+h,x+w-r,y+h); ctx.lineTo(x+r,y+h);
+      ctx.quadraticCurveTo(x,y+h,x,y+h-r); ctx.lineTo(x,y+r);
+      ctx.quadraticCurveTo(x,y,x+r,y); ctx.closePath();
+    };
+  }
+
+  // ── HEADER BAR ─────────────────────────────────────
+  ctx.fillStyle = '#052e16';
+  ctx.fillRect(0, 0, W, HEADER);
+  const hFS = Math.max(11, Math.min(18, W/60));
+  ctx.font = `700 ${hFS}px system-ui, sans-serif`;
+  ctx.fillStyle = '#4ade80';
+  ctx.fillText('CONCEPTUAL SCOPE PREVIEW', 16, HEADER * 0.65);
+  ctx.font = `${hFS * 0.75}px system-ui, sans-serif`;
+  ctx.fillStyle = 'rgba(255,255,255,0.5)';
+  const species = STATE.analysis?.common_name || '';
+  const svc = STATE.analysis?.recommended_service || '';
+  ctx.fillText(`${species}  ·  ${svc}  ·  Illustrative only — not a final inspection`, W * 0.28, HEADER * 0.65);
+
+  // ── PHOTO ──────────────────────────────────────────
+  ctx.drawImage(imgEl, 0, HEADER, W, H);
+
+  // ── ANNOTATION ZONES ──────────────────────────────
+  const ORDER = ['drop-zone','final-crown','protect','clearance','remove'];
+  const sorted = [...annotations].sort((a,b) => ORDER.indexOf(a.type) - ORDER.indexOf(b.type));
+  const lw = Math.max(2, W/280);
+  const gap = Math.max(10, W/90);
+
+  sorted.forEach(ann => {
+    const x = ann.region.x * W;
+    const y = HEADER + ann.region.y * H;
+    const w = ann.region.w * W;
+    const h = ann.region.h * H;
+    const op = ann.opacity || 0.42;
+    const useEllipse = (ann.shape === 'ellipse') || ['final-crown','remove','protect'].includes(ann.type);
+    const cx = x + w/2, cy = y + h/2;
+
+    ctx.save();
+
+    if (ann.type === 'final-crown') {
+      // Light fill + prominent dashed ellipse outline
+      ctx.globalAlpha = 0.12;
+      ctx.fillStyle = ann.color;
+      ctx.beginPath();
+      ctx.ellipse(cx, cy, w/2, h/2, 0, 0, Math.PI*2);
+      ctx.fill();
+      ctx.globalAlpha = 0.9;
+      ctx.strokeStyle = ann.color;
+      ctx.lineWidth = lw * 2;
+      ctx.setLineDash([gap*0.9, gap*0.45]);
+      ctx.beginPath();
+      ctx.ellipse(cx, cy, w/2 - lw, h/2 - lw, 0, 0, Math.PI*2);
+      ctx.stroke();
+    } else if (useEllipse) {
+      // Elliptical zone
+      ctx.globalAlpha = op;
+      ctx.fillStyle = ann.color;
+      ctx.beginPath();
+      ctx.ellipse(cx, cy, w/2, h/2, 0, 0, Math.PI*2);
+      ctx.fill();
+      if (ann.hatch) {
+        // Clip hatch to ellipse
+        ctx.globalAlpha = op * 0.55;
+        ctx.strokeStyle = ann.color;
+        ctx.lineWidth = Math.max(1, W/550);
+        ctx.setLineDash([]);
+        ctx.save();
+        ctx.beginPath();
+        ctx.ellipse(cx, cy, w/2, h/2, 0, 0, Math.PI*2);
+        ctx.clip();
+        ctx.beginPath();
+        for (let i = -h; i < w+h; i += gap) {
+          ctx.moveTo(x+i, y); ctx.lineTo(x+i-h, y+h);
+        }
+        ctx.stroke();
+        ctx.restore();
+      }
+      ctx.globalAlpha = 0.82;
+      ctx.strokeStyle = ann.color;
+      ctx.lineWidth = lw;
+      ctx.setLineDash([]);
+      ctx.beginPath();
+      ctx.ellipse(cx, cy, w/2, h/2, 0, 0, Math.PI*2);
+      ctx.stroke();
+    } else {
+      // Rectangular zone (clearance, drop-zone)
+      ctx.globalAlpha = op;
+      ctx.fillStyle = ann.color;
+      ctx.fillRect(x, y, w, h);
+      ctx.globalAlpha = 0.75;
+      ctx.strokeStyle = ann.color;
+      ctx.lineWidth = lw;
+      ctx.setLineDash([]);
+      ctx.strokeRect(x, y, w, h);
+    }
+    ctx.restore();
+  });
+
+  // ── CUT POINT MARKERS with technique labels ────────
+  const cpR   = Math.max(10, W/80);
+  const cpFS  = Math.max(8,  Math.min(12, W/90));
+  const cpLFS = Math.max(7,  Math.min(11, W/100));
+  if (cutPoints && cutPoints.length) {
+    cutPoints.forEach(cp => {
+      const cx = cp.x * W, cy = HEADER + cp.y * H;
+      const techLabel = cp.short_technique || (
+        cp.technique === 'three-cut' ? '3-Cut' :
+        cp.technique === 'lateral-reduction' ? 'Lat. Red.' :
+        cp.technique === 'collar-cut' ? 'Collar' :
+        cp.technique === 'crown-raise' ? 'C. Raise' : cp.technique || ''
+      );
+      ctx.save();
+      // Outer ring
+      ctx.globalAlpha = 0.88;
+      ctx.fillStyle = '#ffffff';
+      ctx.beginPath(); ctx.arc(cx, cy, cpR + 2, 0, Math.PI*2); ctx.fill();
+      ctx.strokeStyle = '#ef4444';
+      ctx.lineWidth = Math.max(2, W/300);
+      ctx.setLineDash([]);
+      ctx.beginPath(); ctx.arc(cx, cy, cpR + 2, 0, Math.PI*2); ctx.stroke();
+      // Inner fill
+      ctx.globalAlpha = 1;
+      ctx.fillStyle = '#ef4444';
+      ctx.beginPath(); ctx.arc(cx, cy, cpR - 2, 0, Math.PI*2); ctx.fill();
+      // Scissors
+      ctx.fillStyle = '#ffffff';
+      ctx.font = `bold ${cpFS}px system-ui, sans-serif`;
+      ctx.textAlign = 'center'; ctx.textBaseline = 'middle';
+      ctx.fillText('✂', cx, cy);
+      // Technique label below marker
+      if (techLabel) {
+        const lw2 = ctx.measureText(techLabel).width + cpLFS * 2;
+        const lh2 = cpLFS * 1.8;
+        let lx = cx - lw2 / 2, ly = cy + cpR + 5;
+        if (lx < 2) lx = 2;
+        if (lx + lw2 > W - 2) lx = W - lw2 - 2;
+        if (ly + lh2 > H + HEADER - 2) ly = cy - cpR - lh2 - 5;
+        ctx.globalAlpha = 0.9;
+        ctx.fillStyle = '#1e293b';
+        ctx.roundRect ? ctx.roundRect(lx, ly, lw2, lh2, 3) : (() => { ctx.beginPath(); ctx.rect(lx,ly,lw2,lh2); })();
+        ctx.fill();
+        ctx.fillStyle = '#fca5a5';
+        ctx.font = `600 ${cpLFS}px system-ui, sans-serif`;
+        ctx.textAlign = 'center'; ctx.textBaseline = 'middle';
+        ctx.fillText(techLabel, lx + lw2/2, ly + lh2/2);
+      }
+      ctx.restore();
+    });
+  }
+
+  // ── CALLOUT LABELS with overlap prevention ─────────
+  const labFS = Math.max(11, Math.min(16, W/58));
+  const labSm = Math.max(8,  Math.min(11, W/85));
+  const usedRects = []; // track placed label boxes to prevent overlap
+
+  function overlaps(r1, r2) {
+    return !(r1.x + r1.w < r2.x || r2.x + r2.w < r1.x ||
+             r1.y + r1.h < r2.y || r2.y + r2.h < r1.y);
+  }
+  function findLabelPos(prefX, prefY, tw, ph, margin) {
+    const candidates = [
+      { x: prefX, y: prefY },
+      { x: prefX, y: prefY + ph + margin },
+      { x: W - tw - 6, y: prefY },
+      { x: 4, y: prefY },
+      { x: prefX, y: HEADER + margin },
+      { x: W - tw - 6, y: HEADER + margin },
+    ];
+    for (const c of candidates) {
+      c.x = Math.max(4, Math.min(W - tw - 4, c.x));
+      c.y = Math.max(HEADER + 4, Math.min(HEADER + H - ph - 4, c.y));
+      const rect = { x: c.x, y: c.y, w: tw, h: ph };
+      if (!usedRects.some(u => overlaps(u, rect))) {
+        usedRects.push(rect);
+        return c;
+      }
+    }
+    // fallback — stack downward from last used
+    const last = usedRects[usedRects.length - 1] || { y: HEADER + 4, h: 0 };
+    const fb = { x: 4, y: last.y + last.h + 4 };
+    usedRects.push({ x: fb.x, y: fb.y, w: tw, h: ph });
+    return fb;
+  }
+
+  sorted.forEach(ann => {
+    const x = ann.region.x * W;
+    const y = HEADER + ann.region.y * H;
+    const w = ann.region.w * W;
+    const h = ann.region.h * H;
+    const clientLabel = ann.client_label || ann.label || ann.type;
+    const techStd = ann.technical_standard || ann.standard || '';
+    // Extract compact citation: "ANSI A300 Part 1 §4.1 — Crown cleaning" → "§4.1 Crown cleaning"
+    const secMatch = techStd.match(/§([\d.]+)[^—]*—\s*(.+)/);
+    const stdShort = secMatch ? `§${secMatch[1]} ${secMatch[2].substring(0,28)}` :
+                     (techStd.includes('—') ? techStd.split('—')[1]?.trim().substring(0,32) : techStd.substring(0,32));
+
+    ctx.save();
+    ctx.font = `600 ${labFS}px system-ui, sans-serif`;
+    const tw = Math.max(
+      ctx.measureText(clientLabel).width,
+      stdShort ? ctx.measureText(stdShort).width : 0
+    ) + labFS * 1.8;
+    const ph = stdShort ? labFS + labSm + labFS * 1.55 : labFS * 1.85;
+
+    // Prefer above zone top-left; overlap prevention finds clear spot
+    const prefX = x + w * 0.05;
+    const prefY = y - ph - 10;
+    const pos = findLabelPos(prefX, prefY, tw, ph, 6);
+
+    // Draw connector line from label to zone center
+    const zoneCx = x + w/2, zoneCy = y + h/2;
+    const labCx  = pos.x + tw/2, labCy = pos.y + ph;
+    ctx.globalAlpha = 0.35;
+    ctx.strokeStyle = ann.color;
+    ctx.lineWidth = Math.max(1, W/500);
+    ctx.setLineDash([4, 3]);
+    ctx.beginPath(); ctx.moveTo(labCx, labCy); ctx.lineTo(zoneCx, zoneCy); ctx.stroke();
+    ctx.setLineDash([]);
+
+    // Background pill
+    ctx.globalAlpha = 0.94;
+    ctx.fillStyle = '#0f172a';
+    if (ctx.roundRect) { ctx.roundRect(pos.x, pos.y, tw, ph, 6); ctx.fill(); }
+    else { ctx.fillRect(pos.x, pos.y, tw, ph); }
+
+    // Color left accent
+    ctx.globalAlpha = 1;
+    ctx.fillStyle = ann.color;
+    ctx.fillRect(pos.x, pos.y, 4, ph);
+
+    // Client label
+    ctx.fillStyle = '#ffffff';
+    ctx.font = `600 ${labFS}px system-ui, sans-serif`;
+    ctx.textAlign = 'left';
+    ctx.fillText(clientLabel, pos.x + 11, pos.y + labFS * 1.08);
+
+    // Standard citation
+    if (stdShort) {
+      ctx.fillStyle = ann.color;
+      ctx.font = `${labSm}px system-ui, sans-serif`;
+      ctx.fillText(stdShort, pos.x + 11, pos.y + labFS * 1.08 + labSm * 1.6);
+    }
+    ctx.restore();
+  });
+
+  // ── FOOTER BAR ─────────────────────────────────────
+  const fy = HEADER + H;
+  ctx.fillStyle = '#0f172a';
+  ctx.fillRect(0, fy, W, FOOTER);
+  const fFS = Math.max(9, Math.min(13, W/80));
+  ctx.font = `600 ${fFS}px system-ui, sans-serif`;
+  ctx.fillStyle = '#4ade80';
+  ctx.fillText(CONFIG.COMPANY_NAME, 16, fy + FOOTER * 0.55);
+  ctx.fillStyle = 'rgba(255,255,255,0.35)';
+  ctx.font = `${fFS * 0.88}px system-ui, sans-serif`;
+  ctx.fillText('Conceptual scope preview — illustrative zones based on photo analysis. Not a final on-site inspection.', W * 0.22, fy + FOOTER * 0.55);
+  // Color legend
+  const legend = [
+    { color:'#ef4444', label:'Remove' },
+    { color:'#22c55e', label:'Final crown' },
+    { color:'#f59e0b', label:'Clearance' },
+    { color:'#3b82f6', label:'Protect' },
+  ];
+  let lx = W - legend.length * (fFS*5.5) - 12;
+  legend.forEach(l => {
+    ctx.fillStyle = l.color;
+    ctx.fillRect(lx, fy + FOOTER * 0.28, fFS * 0.9, fFS * 0.9);
+    ctx.fillStyle = 'rgba(255,255,255,0.6)';
+    ctx.font = `${fFS*0.85}px system-ui, sans-serif`;
+    ctx.fillText(l.label, lx + fFS * 1.1, fy + FOOTER * 0.28 + fFS * 0.85);
+    lx += fFS * 5.5;
+  });
+}
+
+/* ═══════════════════════════════════════════ UTILS ════ */
+function num(n) { return Number(n).toLocaleString('en-US'); }
+</script>
+</body>
+</html>
