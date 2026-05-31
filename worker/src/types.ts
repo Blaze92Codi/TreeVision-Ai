@@ -24,6 +24,8 @@ export type Bindings = {
   RATE_LIMIT_PER_DAY: string;
   PUBLIC_BASE_URL: string;
   TWILIO_FROM_NUMBER?: string;
+  OPERATOR_SMS?: string;          // operator phone(s) for new-lead text alerts
+  ZAPIER_WEBHOOK_URL?: string;    // POST each lead here (Zapier/Make/Sheets)
 };
 
 export type PkgKey = "trim" | "removal" | "stump" | "treatment";
@@ -89,6 +91,7 @@ export type EstimateRow = {
   bundle_discount_pct: number;
   share_token: string | null;
   notes: string | null;
+  preferred_times: string | null;
   created_at: string;
   updated_at: string;
 };

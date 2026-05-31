@@ -286,6 +286,15 @@ p { line-height: 1.6; color: var(--muted); font-size: .95rem; }
 }
 .field input:focus, .field textarea:focus { outline: none; border-color: var(--green); box-shadow: 0 0 0 3px var(--green-soft); }
 .field .hint { font-size: .75rem; color: var(--muted); }
+.time-chips { display: flex; flex-wrap: wrap; gap: 8px; }
+.time-chip {
+  border: 1.5px solid var(--line); background: var(--card); color: var(--ink);
+  border-radius: 999px; padding: 8px 14px; font-size: .85rem; font-weight: 600;
+  font-family: inherit; transition: border-color .15s, background .15s;
+}
+.time-chip:hover { border-color: var(--green); }
+.time-chip.on { border-color: var(--green); background: var(--green-soft); color: var(--green-deep); }
+.time-chip:focus-visible { outline: none; box-shadow: 0 0 0 3px var(--green-soft); }
 
 /* ── SCHEDULING ───────────────────────────────── */
 .booking-summary { background: var(--green-soft); border-radius: var(--r-md); padding: 14px 16px; display: flex; gap: 12px; align-items: center; }
@@ -486,6 +495,16 @@ p { line-height: 1.6; color: var(--muted); font-size: .95rem; }
         <div class="field">
           <label for="ct-address">Property address</label>
           <input id="ct-address" type="text" autocomplete="street-address" required placeholder="123 Main St, City, State">
+        </div>
+        <div class="field">
+          <label>When works best for you? <span style="font-weight:400;color:var(--muted);">(optional)</span></label>
+          <div class="time-chips" id="time-chips" role="group" aria-label="Preferred times">
+            <button type="button" class="time-chip" data-t="Weekday mornings" onclick="toggleTime(this)">Weekday mornings</button>
+            <button type="button" class="time-chip" data-t="Weekday afternoons" onclick="toggleTime(this)">Weekday afternoons</button>
+            <button type="button" class="time-chip" data-t="Evenings" onclick="toggleTime(this)">Evenings</button>
+            <button type="button" class="time-chip" data-t="Weekends" onclick="toggleTime(this)">Weekends</button>
+            <button type="button" class="time-chip" data-t="ASAP / flexible" onclick="toggleTime(this)">ASAP / flexible</button>
+          </div>
         </div>
         <div class="field">
           <label for="ct-notes">Site notes <span style="font-weight:400;color:var(--muted);">(optional)</span></label>
@@ -1264,6 +1283,11 @@ async function cancelTreeReview() {
 /* ════════════════════════════════════════════════════
    CONTACT SUBMIT
 ════════════════════════════════════════════════════ */
+function toggleTime(btn) { btn.classList.toggle('on'); }
+function getPreferredTimes() {
+  return [...document.querySelectorAll('.time-chip.on')].map(b => b.dataset.t).join(', ');
+}
+
 async function submitContact() {
   const payload = {
     name:    document.getElementById('ct-name').value.trim(),
@@ -1271,6 +1295,7 @@ async function submitContact() {
     phone:   document.getElementById('ct-phone').value.trim(),
     address: document.getElementById('ct-address').value.trim(),
     property_notes: document.getElementById('ct-notes').value.trim(),
+    preferred_times: getPreferredTimes(),
   };
   const errEl = document.getElementById('contact-error');
   errEl.style.display = 'none';

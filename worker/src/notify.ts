@@ -129,6 +129,7 @@ export function buildOperatorLeadEmail(
   estimate: EstimateSummary,
   contact: ContactSummary,
   baseUrl: string,
+  preferredTimes?: string | null,
 ): EmailMsg {
   const treesHtml = estimate.trees.map(t => `
     <tr>
@@ -162,6 +163,7 @@ export function buildOperatorLeadEmail(
     <tr><td style="padding:4px 0;color:#6b7c70;">Email</td><td><a href="mailto:${esc(contact.email ?? "")}">${esc(contact.email ?? "—")}</a></td></tr>
     <tr><td style="padding:4px 0;color:#6b7c70;">Phone</td><td><a href="tel:${esc(contact.phone ?? "")}">${esc(contact.phone ?? "—")}</a></td></tr>
     <tr><td style="padding:4px 0;color:#6b7c70;">Address</td><td>${esc(contact.address ?? "—")}</td></tr>
+    ${preferredTimes ? `<tr><td style="padding:4px 0;color:#6b7c70;">Prefers</td><td><strong>${esc(preferredTimes)}</strong></td></tr>` : ""}
   </table>
 
   <h3 style="margin:24px 0 8px;">Trees on this estimate</h3>
@@ -187,6 +189,7 @@ export function buildOperatorLeadEmail(
     `Email:   ${contact.email ?? "—"}`,
     `Phone:   ${contact.phone ?? "—"}`,
     `Address: ${contact.address ?? "—"}`,
+    ...(preferredTimes ? [`Prefers: ${preferredTimes}`] : []),
     ``,
     `Trees:`,
     ...estimate.trees.map(t => `  • ${t.species ?? "Unknown"} — ${t.selected_pkg ?? "—"} — ${fmtMoney(t.quote_low)}–${fmtMoney(t.quote_high)}`),
@@ -355,4 +358,39 @@ export function buildFollowUpSms(env: Bindings, contact: ContactSummary, estimat
   const first = contact.name ? contact.name.split(" ")[0] : "there";
   const range = `${fmtMoney(estimate.total_low)}–${fmtMoney(estimate.total_high)}`;
   return `Hi ${first}, ${env.COMPANY_NAME} here — your tree estimate (${range}) is still waiting if you'd like to book. Anything we can answer? ${resumeUrl}`;
+}
+
+// Short text alert to the operator when a new lead comes in.
+export function buildLeadSms(contact: ContactSummary, estimate: EstimateSummary, preferredTimes?: string | null): string {
+  const n = estimate.trees.length;
+  const range = `${fmtMoney(estimate.total_low)}–${fmtMoney(estimate.total_high)}`;
+  return [
+    `🌳 New lead: ${contact.name ?? "Customer"}`,
+    `${n} tree${n === 1 ? "" : "s"}, ${range}`,
+    contact.phone ? `📞 ${contact.phone}` : "",
+    preferredTimes ? `Prefers: ${preferredTimes}` : "",
+  ].filter(Boolean).join("\n");
+}
+
+// Send the operator lead alert SMS to OPERATOR_SMS (may be comma-separated).
+export async function sendLeadSms(env: Bindings, body: string): Promise<void> {
+  if (!env.OPERATOR_SMS) return;
+  for (const to of env.OPERATOR_SMS.split(",").map(s => s.trim()).filter(Boolean)) {
+    try { await sendSms(env, to, body); } catch (err: any) { console.error("Lead SMS failed", to, err?.message); }
+  }
+}
+
+// POST a structured lead to a Zapier/Make webhook (→ Google Sheets, CRM, Slack…).
+export async function postLeadWebhook(env: Bindings, payload: Record<string, unknown>): Promise<void> {
+  if (!env.ZAPIER_WEBHOOK_URL || !/^https?:\/\//i.test(env.ZAPIER_WEBHOOK_URL)) return;
+  try {
+    const res = await fetch(env.ZAPIER_WEBHOOK_URL, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify(payload),
+    });
+    if (!res.ok) console.error("Zapier webhook non-2xx", res.status);
+  } catch (err: any) {
+    console.error("Zapier webhook failed", err?.message);
+  }
 }

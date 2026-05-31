@@ -37,8 +37,12 @@ ISA_CERT = "ISA Certified Arborist®"
 # from the first web request and persists it (app_settings.base_url). Only set
 # this if you want to force a specific URL (e.g. a custom domain before traffic).
 PUBLIC_BASE_URL = ""
-# Twilio sender number for outbound follow-up SMS, e.g. "+15551234567"
+# Twilio sender number for outbound SMS (follow-ups + lead alerts), e.g. "+15551234567"
 TWILIO_FROM_NUMBER = ""
+# Operator phone(s) to text on every new lead (comma-separated). Needs Twilio.
+OPERATOR_SMS = ""
+# POST each new lead to this URL (Zapier/Make "Catch Hook" → Google Sheets, etc.).
+ZAPIER_WEBHOOK_URL = ""
 # Comma-separated allowed origins for CORS; "*" allows all
 ALLOWED_ORIGINS = "*"
 # Rate limits per IP

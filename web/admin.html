@@ -661,6 +661,7 @@ function renderEstimateDetail(target, data) {
               <dt>Email</dt>   <dd>${contact.email ? `<a href="mailto:${escapeAttr(contact.email)}">${escapeHtml(contact.email)}</a>` : '—'}</dd>
               <dt>Phone</dt>   <dd>${contact.phone ? `<a href="tel:${escapeAttr(contact.phone)}">${escapeHtml(contact.phone)}</a>` : '—'}</dd>
               <dt>Address</dt> <dd>${escapeHtml(contact.address || '—')}</dd>
+              ${e.preferred_times ? `<dt>Prefers</dt><dd><strong>${escapeHtml(e.preferred_times)}</strong></dd>` : ''}
               ${contact.property_notes ? `<dt>Site notes</dt><dd>${escapeHtml(contact.property_notes)}</dd>` : ''}
             </dl>
             <button class="btn-ghost" onclick="openContact('${escapeAttr(contact.id)}')" style="margin-top:12px;">View all activity →</button>

@@ -9,7 +9,7 @@ import { checkAndRecord, hashIp, verifyTurnstile } from "./ratelimit";
 import { extractBookingFields, verifyCalendlySignature } from "./calendly";
 import {
   buildOperatorBookingEmail, buildOperatorLeadEmail, buildCustomerEstimateEmail, buildFollowUpSms,
-  sendEmail, sendSms,
+  buildLeadSms, sendLeadSms, postLeadWebhook, sendEmail, sendSms,
 } from "./notify";
 
 const app = new Hono<{ Bindings: Bindings }>();
@@ -61,13 +61,13 @@ app.get("/api/config", c => {
 // ────────────────────────────────────────────────────────────
 async function loadEstimate(env: Bindings, id: string): Promise<EstimateRow | null> {
   return env.DB.prepare(
-    "SELECT id, contact_id, status, total_low, total_high, bundle_discount_pct, share_token, notes, created_at, updated_at FROM estimates WHERE id = ?"
+    "SELECT id, contact_id, status, total_low, total_high, bundle_discount_pct, share_token, notes, preferred_times, created_at, updated_at FROM estimates WHERE id = ?"
   ).bind(id).first<EstimateRow>();
 }
 
 async function loadEstimateByToken(env: Bindings, token: string): Promise<EstimateRow | null> {
   return env.DB.prepare(
-    "SELECT id, contact_id, status, total_low, total_high, bundle_discount_pct, share_token, notes, created_at, updated_at FROM estimates WHERE share_token = ?"
+    "SELECT id, contact_id, status, total_low, total_high, bundle_discount_pct, share_token, notes, preferred_times, created_at, updated_at FROM estimates WHERE share_token = ?"
   ).bind(token).first<EstimateRow>();
 }
 
@@ -382,6 +382,7 @@ app.post("/api/estimate/:id/contact", async c => {
   const phone   = String(body.phone   ?? "").trim().slice(0, 32);
   const address = String(body.address ?? "").trim().slice(0, 300);
   const propertyNotes = String(body.property_notes ?? "").trim().slice(0, 1000) || null;
+  const preferredTimes = String(body.preferred_times ?? "").trim().slice(0, 200) || null;
 
   if (!name || !email || !phone) {
     throw new HTTPException(400, { message: "Name, email, and phone are required" });
@@ -409,8 +410,8 @@ app.post("/api/estimate/:id/contact", async c => {
   }
 
   await c.env.DB.prepare(
-    "UPDATE estimates SET contact_id = ?, status = 'contact_provided', updated_at = datetime('now') WHERE id = ?"
-  ).bind(contactId, estimateId).run();
+    "UPDATE estimates SET contact_id = ?, preferred_times = ?, status = 'contact_provided', updated_at = datetime('now') WHERE id = ?"
+  ).bind(contactId, preferredTimes, estimateId).run();
 
   await logInteraction(c.env, {
     contactId, estimateId, channel: "system", direction: "system",
@@ -452,11 +453,12 @@ app.post("/api/estimate/:id/submit", async c => {
     // the deferred work so we don't call waitUntil after the response is sent.
     const base = publicBase(c);
     const resumeUrl = `${base}/?token=${estimate.share_token}`;
+    const preferredTimes = refreshed!.preferred_times;
 
-    // Send both emails AFTER responding — don't make the customer wait on two
-    // Resend round-trips. Each has its own try/catch so one failure can't block
-    // the other, and a failure never breaks the submit.
-    const sendEmails = async () => {
+    // Fan out notifications AFTER responding — don't make the customer wait on
+    // email/SMS/webhook round-trips. Each has its own try/catch so one failure
+    // can't block the others, and a failure never breaks the submit.
+    const notify = async () => {
       try {
         const msg = buildCustomerEstimateEmail(c.env, summary, contact, resumeUrl, base);
         await sendEmail(c.env, msg);
@@ -466,20 +468,39 @@ app.post("/api/estimate/:id/submit", async c => {
         });
       } catch (err: any) { console.error("Customer estimate email failed", err?.message); }
 
-      // Operator lead alert (Palmer & Brian). Without this, email-only
+      // Operator lead alert email (Palmer & Brian). Without this, email-only
       // submissions never reach the owners (booking emails only fire on Calendly).
       try {
-        const opMsg = buildOperatorLeadEmail(c.env, summary, contact, base);
+        const opMsg = buildOperatorLeadEmail(c.env, summary, contact, base, preferredTimes);
         await sendEmail(c.env, opMsg);
         await logInteraction(c.env, {
           contactId: contact.id, estimateId, channel: "email_out", direction: "outbound",
           body: `Lead alert sent to operator(s) (${opMsg.subject})`,
         });
       } catch (err: any) { console.error("Operator lead email failed", err?.message); }
+
+      // Operator SMS alert (no-ops unless OPERATOR_SMS + Twilio are configured).
+      try {
+        await sendLeadSms(c.env, buildLeadSms(contact, summary, preferredTimes));
+      } catch (err: any) { console.error("Lead SMS failed", err?.message); }
+
+      // Push the lead to a Zapier/Make webhook (no-ops unless ZAPIER_WEBHOOK_URL set).
+      try {
+        await postLeadWebhook(c.env, {
+          estimate_id: estimateId,
+          submitted_at: new Date().toISOString(),
+          name: contact.name, email: contact.email, phone: contact.phone, address: contact.address,
+          preferred_times: preferredTimes,
+          tree_count: summary.trees.length,
+          total_low: summary.total_low, total_high: summary.total_high,
+          trees: summary.trees.map(t => ({ species: t.species, service: t.selected_pkg, low: t.quote_low, high: t.quote_high })),
+          resume_url: resumeUrl,
+        });
+      } catch (err: any) { console.error("Lead webhook failed", err?.message); }
     };
 
-    if (c.executionCtx?.waitUntil) c.executionCtx.waitUntil(sendEmails());
-    else await sendEmails();
+    if (c.executionCtx?.waitUntil) c.executionCtx.waitUntil(notify());
+    else await notify();
   }
 
   return c.json({ ok: true, status: "submitted" });
