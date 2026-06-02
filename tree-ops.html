@@ -1,0 +1,178 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Dynamic Tree Service — Tree Ops</title>
+<meta name="theme-color" content="#052e16">
+<link rel="manifest" href="manifest.json">
+<link href="https://fonts.googleapis.com/css2?family=Bricolage+Grotesque:opsz,wght@12..96,400;12..96,700;12..96,800&family=Spline+Sans:wght@400;500;600&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="shared.css">
+</head>
+<body>
+
+<nav class="site-nav">
+  <a href="./" class="site-brand">Dynamic Tree Service</a>
+  <ul>
+    <li><a data-nav="index.html" href="./">Client</a></li>
+    <li><a data-nav="dashboard.html" href="dashboard.html">Dashboard</a></li>
+    <li><a data-nav="tree-ops.html" href="tree-ops.html">Tree Ops</a></li>
+    <li><a data-nav="schedule.html" href="schedule.html">Schedule</a></li>
+    <li><a data-nav="crew.html" href="crew.html">Crew</a></li>
+    <li><a data-nav="login.html" href="login.html">Login</a></li>
+  </ul>
+</nav>
+
+<main class="ops-shell">
+  <section class="ops-hero" aria-labelledby="ops-title">
+    <div>
+      <p class="eyebrow">Tree Ops Dashboard + Analyzer</p>
+      <h1 id="ops-title">Guided tree inventory, annotation, and standards-ready reporting.</h1>
+      <p class="ops-hero-copy">Coordinate site trees, map work zones, mark pruning intent, and generate a consistent crew-ready report with references to ANSI A300 pruning/risk-assessment concepts and ANSI Z133 safety planning.</p>
+      <div class="ops-actions">
+        <button class="button-link primary" type="button" id="exportReportBtn">Export site CSV</button>
+        <button class="button-link secondary" type="button" id="printReportBtn">Print report packet</button>
+      </div>
+    </div>
+    <aside class="ops-decision-card" aria-label="Prototype decisions">
+      <h2>v1 defaults</h2>
+      <ul>
+        <li><strong>Mode:</strong> web-first with field-printable packets</li>
+        <li><strong>Inputs:</strong> photos + GPS/map pin placeholders</li>
+        <li><strong>Standards:</strong> A300 Part 1, A300 Part 9, Z133</li>
+      </ul>
+      <p>Not a substitute for a qualified arborist inspection, utility clearance, or site-specific safety plan.</p>
+    </aside>
+  </section>
+
+  <section class="ops-grid ops-grid-3" aria-label="Operational metrics">
+    <article class="ops-metric"><span id="metricQueued">0</span><small>jobs queued</small></article>
+    <article class="ops-metric"><span id="metricTrees">0</span><small>inventory trees</small></article>
+    <article class="ops-metric"><span id="metricHighRisk">0</span><small>elevated risk</small></article>
+  </section>
+
+  <section class="ops-grid ops-grid-main">
+    <article class="ops-panel">
+      <div class="ops-panel-head">
+        <div>
+          <p class="ops-kicker">Job queue</p>
+          <h2>Sites needing review</h2>
+        </div>
+        <span class="ops-pill">Live prototype</span>
+      </div>
+      <div id="opsJobQueue" class="ops-job-list"></div>
+    </article>
+
+    <article class="ops-panel">
+      <div class="ops-panel-head">
+        <div>
+          <p class="ops-kicker">Inventory</p>
+          <h2>Per-site tree register</h2>
+        </div>
+        <label class="ops-select-label">Site
+          <select id="siteSelect" class="ops-select"></select>
+        </label>
+      </div>
+      <div class="ops-table-wrap">
+        <table class="ops-table">
+          <thead><tr><th>ID</th><th>Species</th><th>DBH</th><th>Height</th><th>Condition</th><th>Risk</th></tr></thead>
+          <tbody id="treeInventoryBody"></tbody>
+        </table>
+      </div>
+    </article>
+  </section>
+
+  <section class="ops-grid ops-grid-map">
+    <article class="ops-panel">
+      <div class="ops-panel-head">
+        <div>
+          <p class="ops-kicker">Map / GIS</p>
+          <h2>Tree locations and clearance envelopes</h2>
+        </div>
+        <span id="selectedSiteLabel" class="ops-pill muted">—</span>
+      </div>
+      <div class="ops-map" id="opsMap" role="img" aria-label="Mock GIS map with tree pins and clearance zones"></div>
+      <div class="ops-legend">
+        <span><i class="legend-dot low"></i>Low</span>
+        <span><i class="legend-dot moderate"></i>Moderate</span>
+        <span><i class="legend-dot high"></i>High</span>
+        <span><i class="legend-zone"></i>Utility clearance envelope</span>
+      </div>
+    </article>
+
+    <article class="ops-panel">
+      <div class="ops-panel-head">
+        <div>
+          <p class="ops-kicker">Report basis</p>
+          <h2>Standards-backed output tags</h2>
+        </div>
+      </div>
+      <div id="standardsBasis" class="standards-list"></div>
+    </article>
+  </section>
+
+  <section class="ops-panel analyzer-panel" aria-labelledby="analyzer-title">
+    <div class="ops-panel-head">
+      <div>
+        <p class="ops-kicker">Tree Analyzer</p>
+        <h2 id="analyzer-title">Guided annotation canvas</h2>
+      </div>
+      <label class="ops-upload">Load photo
+        <input id="photoInput" type="file" accept="image/*">
+      </label>
+    </div>
+
+    <div class="analyzer-layout">
+      <aside class="toolbox" aria-label="Analyzer tools">
+        <label>Objective
+          <select id="objectiveSelect" class="ops-select">
+            <option value="crown-cleaning">Crown cleaning</option>
+            <option value="clearance">Utility / structure clearance</option>
+            <option value="risk-mitigation">Risk mitigation</option>
+          </select>
+        </label>
+        <div class="tool-group">
+          <button class="tool-btn active" type="button" data-tool="trim-zone">Trim zone polygon</button>
+          <button class="tool-btn" type="button" data-tool="deadwood">Deadwood dot</button>
+          <button class="tool-btn" type="button" data-tool="cut-marker">3-cut marker</button>
+          <button class="tool-btn" type="button" data-tool="defect">Defect callout</button>
+          <button class="tool-btn" type="button" data-tool="drop-zone">Drop zone</button>
+          <button class="tool-btn" type="button" data-tool="clearance">Equipment clearance</button>
+        </div>
+        <button class="button-link secondary full" type="button" id="clearAnnotationsBtn">Clear annotations</button>
+      </aside>
+
+      <div class="canvas-card">
+        <div class="annotation-canvas" id="annotationCanvas" aria-label="Annotation canvas. Click to add the selected marker." tabindex="0">
+          <div class="canvas-photo" id="canvasPhoto"></div>
+          <svg class="canvas-tree" viewBox="0 0 700 420" aria-hidden="true">
+            <path d="M350 370 C340 305 342 242 350 170" class="tree-trunk"/>
+            <path d="M350 235 C292 218 250 185 220 130" class="tree-limb"/>
+            <path d="M354 230 C420 207 470 168 505 105" class="tree-limb"/>
+            <path d="M348 185 C310 145 300 103 316 66" class="tree-limb thin"/>
+            <path d="M360 182 C418 150 445 112 450 58" class="tree-limb thin"/>
+            <ellipse cx="350" cy="150" rx="210" ry="120" class="tree-crown"/>
+          </svg>
+          <div class="zone trim">Trim Zone</div>
+          <div class="zone no-cut">No-cut Zone</div>
+          <div class="zone root">Root Protection Zone</div>
+          <div class="zone utility">Utility clearance envelope</div>
+          <div id="annotationLayer" class="annotation-layer"></div>
+        </div>
+        <div class="canvas-caption">Click the canvas to place the active symbol. The legend and warning engine update from the selected objective.</div>
+      </div>
+
+      <aside class="suggestion-card">
+        <h3>Suggestion engine</h3>
+        <div id="suggestions"></div>
+        <h3>Legend</h3>
+        <div id="symbolLegend" class="symbol-legend"></div>
+      </aside>
+    </div>
+  </section>
+</main>
+
+<script src="app.js"></script>
+<script src="tree-ops.js"></script>
+</body>
+</html>

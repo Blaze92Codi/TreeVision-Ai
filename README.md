@@ -31,12 +31,17 @@ A static, GitHub-ready browser app for starting preliminary tree canopy trimming
 - Installs as a standalone browser app through the web manifest and caches the app shell for field use with poor signal.
 - Requires human approval before final quote.
 
+- Adds a Tree Ops Dashboard + Analyzer prototype with job queue, per-site inventory, mock GIS pins, standards-basis tags, annotation canvas tools, CSV export, and print-ready report packets.
+
 ## Files
 
 ```text
 index.html
-styles.css
-script.js
+dashboard.html
+tree-ops.html
+tree-ops.js
+shared.css
+app.js
 portal.html
 portal.js
 manifest.json
@@ -56,6 +61,8 @@ python3 -m http.server 8097
 ```
 
 Then open `http://127.0.0.1:8097`.
+
+Open `tree-ops.html` for the Tree Ops Dashboard + Analyzer prototype.
 
 Open `portal.html` for the company client portal demo. It includes:
 
