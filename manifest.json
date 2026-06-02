@@ -2,7 +2,7 @@
   "name": "TreeVision AI Field App",
   "short_name": "TreeVision",
   "description": "Field-first tree scope, crew packet, owner review, and preliminary estimating app.",
-  "start_url": "./client.html",
+  "start_url": "./",
   "scope": "./",
   "display": "standalone",
   "background_color": "#eef4ed",
