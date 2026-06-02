@@ -45,7 +45,7 @@ jobs:
       - name: Apply pending D1 migrations
         working-directory: worker
         run: |
-          CREATE_OUT=$(npx wrangler d1 create treevision 2>&1)
+          CREATE_OUT=$(npx wrangler d1 create treevision 2>&1) || true
           DB=$(echo "$CREATE_OUT" | grep -o 'database_id = "[a-f0-9-]*"' | grep -o '[a-f0-9-]\{36\}' || echo "")
           [ -z "$DB" ] && DB=$(npx wrangler d1 list --json 2>&1 | grep -o '"uuid":"[a-f0-9-]*"' | grep -o '[a-f0-9-]\{36\}' | head -1)
           [ -n "$DB" ] && sed -i "s/database_id = \"[^\"]*\"/database_id = \"$DB\"/" wrangler.toml
