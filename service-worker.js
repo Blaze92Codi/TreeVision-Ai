@@ -1,38 +1,34 @@
-const CACHE_NAME = "treevision-field-v4";
-const APP_SHELL = [
-  "./",
-  "./index.html",
-  "./dashboard.html",
-  "./login.html",
-  "./schedule.html",
-  "./crew.html",
-  "./shared.css",
-  "./app.js",
-  "./manifest.json",
-  "./treevision-icon.svg"
-];
-
-self.addEventListener("install", event => {
-  event.waitUntil(caches.open(CACHE_NAME).then(cache => cache.addAll(APP_SHELL)));
+/* ───────────────────────────────────────────────────────────────
+   KILL-SWITCH service worker.
+   The site no longer uses a service worker. A previous version
+   (cache "treevision-field-v4") could get stuck serving a stale
+   app shell, causing a blank screen for returning visitors.
+   This replacement deletes all caches, unregisters itself, and
+   reloads any open pages so everyone recovers automatically.
+─────────────────────────────────────────────────────────────── */
+self.addEventListener('install', function () {
   self.skipWaiting();
 });
 
-self.addEventListener("activate", event => {
-  event.waitUntil(
-    caches.keys().then(keys => Promise.all(
-      keys.filter(key => key !== CACHE_NAME).map(key => caches.delete(key))
-    ))
-  );
-  self.clients.claim();
+self.addEventListener('activate', function (event) {
+  event.waitUntil((async function () {
+    try {
+      // 1) delete every cache this origin has
+      const keys = await caches.keys();
+      await Promise.all(keys.map(function (k) { return caches.delete(k); }));
+      // 2) take control, then unregister self
+      await self.clients.claim();
+      await self.registration.unregister();
+      // 3) force any open tabs to reload fresh from the network
+      const clients = await self.clients.matchAll({ type: 'window' });
+      clients.forEach(function (client) {
+        try { client.navigate(client.url); } catch (e) { /* ignore */ }
+      });
+    } catch (e) { /* never block activation */ }
+  })());
 });
 
-self.addEventListener("fetch", event => {
-  if (event.request.method !== "GET") return;
-  event.respondWith(
-    caches.match(event.request).then(cached => cached || fetch(event.request).then(response => {
-      const copy = response.clone();
-      caches.open(CACHE_NAME).then(cache => cache.put(event.request, copy));
-      return response;
-    }).catch(() => caches.match("./index.html")))
-  );
+/* Pass all requests straight to the network — no caching. */
+self.addEventListener('fetch', function (event) {
+  event.respondWith(fetch(event.request));
 });
