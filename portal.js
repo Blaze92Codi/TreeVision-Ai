@@ -15,6 +15,10 @@ const CONFIG = {
   COMPANY_NAME:    "Dynamic Tree Service",
 };
 
+/* ── Tiny HTML escaper for safe rendering of DB values into innerHTML ──────── */
+const esc = (s) => String(s ?? "").replace(/[&<>"']/g, (c) =>
+  ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" }[c]));
+
 /* ══════════════════════════════════════════════════════════════════════════
    SUPABASE LOADER
    Injects the Supabase SDK if not already present, then boots the portal.
@@ -172,35 +176,40 @@ async function loadApprovalsFromDB() {
   if (!approvalList) return;
   approvalList.innerHTML = '<p style="padding:1rem;color:#666">Loading estimates…</p>';
   try {
-    const res = await fetch(
-      `${CONFIG.SUPABASE_URL}/rest/v1/estimates?select=id,customer_name,customer_email,service_type,approved_quote_low,approved_quote_high,status,created_at&status=in.(pending,approved,scheduled)&order=created_at.desc&limit=50`,
-      { headers: { apikey: CONFIG.SUPABASE_KEY, Authorization: "Bearer " + CONFIG.SUPABASE_KEY, Accept: "application/json" } }
-    );
-    if (!res.ok) throw new Error("HTTP " + res.status);
-    const rows = await res.json();
-    if (!rows.length) {
+    // Authenticated read — uses the signed-in manager's session JWT, so the
+    // "staff read estimates" RLS policy applies. The public anon key can no
+    // longer read this table (PII is no longer exposed).
+    const { data: rows, error } = await _sb
+      .from("estimates")
+      .select("id,customer_name,customer_email,selected_service,recommended_service,approved_quote_low,approved_quote_high,status,created_at")
+      .in("status", ["pending", "approved", "scheduled"])
+      .order("created_at", { ascending: false })
+      .limit(50);
+    if (error) throw error;
+    if (!rows || !rows.length) {
       approvalList.innerHTML = '<p style="padding:1rem;color:#666">No pending estimates. Customer submissions will appear here.</p>';
       return;
     }
     approvalList.innerHTML = rows.map((est) => {
       const range = (est.approved_quote_low && est.approved_quote_high)
         ? `$${est.approved_quote_low}–$${est.approved_quote_high}` : "Pending";
+      const service = est.selected_service || est.recommended_service || "Tree service";
       const canSend = est.status === "approved" || est.status === "scheduled";
       return `
-        <div class="approval-row" id="row-${est.id}">
+        <div class="approval-row" id="row-${esc(est.id)}">
           <div>
-            <strong>${est.customer_name || "Unknown"}</strong>
-            <small>${est.service_type || "Tree service"} · <em>${est.customer_email || "no email"}</em> · ${range}</small>
+            <strong>${esc(est.customer_name || "Unknown")}</strong>
+            <small>${esc(service)} · <em>${esc(est.customer_email || "no email")}</em> · ${range}</small>
           </div>
-          <span class="status-pill ${est.status === "pending" ? "warn" : ""}" style="margin-right:.5rem">${est.status}</span>
+          <span class="status-pill ${est.status === "pending" ? "warn" : ""}" style="margin-right:.5rem">${esc(est.status)}</span>
           ${canSend
-            ? `<button class="secondary-btn send-quote-btn" type="button" data-id="${est.id}" data-email="${est.customer_email || ''}">Send Quote</button>`
+            ? `<button class="secondary-btn send-quote-btn" type="button" data-id="${esc(est.id)}" data-email="${esc(est.customer_email || '')}">Send Quote</button>`
             : `<button class="secondary-btn" type="button" disabled>Awaiting Approval</button>`}
         </div>`;
     }).join("");
     approvalList.querySelectorAll(".send-quote-btn").forEach((b) => b.addEventListener("click", () => handleSendQuote(b)));
   } catch (err) {
-    approvalList.innerHTML = `<p style="padding:1rem;color:#c00">Failed to load: ${err.message}</p>`;
+    approvalList.innerHTML = `<p style="padding:1rem;color:#c00">Failed to load: ${esc(err.message)}</p>`;
   }
 }
 
@@ -210,10 +219,19 @@ async function handleSendQuote(btn) {
   if (!confirm(`Send quote email to ${email}?`)) return;
   btn.disabled = true; btn.textContent = "Sending…";
   try {
+    // Send the manager's session token so the Edge Function can verify the
+    // caller is authenticated staff. "approvedBy" is derived server-side from
+    // the token — never trusted from the client.
+    const { data: { session } } = await _sb.auth.getSession();
+    const token = session?.access_token;
     const res = await fetch(CONFIG.SEND_QUOTE_URL, {
       method: "POST",
-      headers: { "Content-Type": "application/json", Authorization: "Bearer " + CONFIG.SUPABASE_KEY },
-      body: JSON.stringify({ estimate_id: id, approvedBy: "Manager" }),
+      headers: {
+        "Content-Type": "application/json",
+        apikey: CONFIG.SUPABASE_KEY,
+        Authorization: "Bearer " + (token || CONFIG.SUPABASE_KEY),
+      },
+      body: JSON.stringify({ estimate_id: id }),
     });
     const data = await res.json().catch(() => ({}));
     if (res.ok) {

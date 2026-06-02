@@ -6,17 +6,35 @@ const corsHeaders = {
   "Access-Control-Allow-Headers": "authorization, x-client-info, apikey, content-type",
 };
 
+const json = (body: unknown, status = 200) =>
+  new Response(JSON.stringify(body), {
+    status,
+    headers: { ...corsHeaders, "Content-Type": "application/json" },
+  });
+
+// Escape user-controlled strings before interpolating into the email HTML.
+const escapeHtml = (s: unknown) =>
+  String(s ?? "").replace(/[&<>"']/g, (c) =>
+    ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" }[c]!));
+
 /**
  * send-quote Edge Function
  *
  * Fetches an approved estimate from the DB, builds an HTML email,
  * and sends it to the customer via Resend.
  *
- * Expected POST body (from dashboard.html sendQuote()):
+ * SECURITY:
+ *   - Caller must be an authenticated staff member (owner or crew_manager).
+ *     The anon key is NOT a valid caller — it carries no user identity, so
+ *     supabase.auth.getUser() rejects it. This closes the previous abuse path
+ *     where anyone could trigger emails through the verified Resend sender.
+ *   - All customer-supplied fields are HTML-escaped before templating.
+ *
+ * Expected POST body (from portal.js handleSendQuote()):
  * {
  *   estimate_id: string    — UUID of the estimate (primary key)
- *   approvedBy?: string    — name/email of the approving manager (optional)
  * }
+ * Authorization header must carry the signed-in manager's access token.
  *
  * Required secrets:
  *   RESEND_API_KEY      — api.resend.com key
@@ -40,16 +58,25 @@ serve(async (req: Request) => {
       Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!
     );
 
+    // ── Require an authenticated staff caller ────────────────────────────────
+    const callerJwt = (req.headers.get("Authorization") ?? "").replace(/^Bearer\s+/i, "");
+    const { data: { user: caller }, error: callerErr } = await supabase.auth.getUser(callerJwt);
+    if (callerErr || !caller) {
+      return json({ error: "Unauthorized — sign in as staff to send quotes." }, 401);
+    }
+    const { data: profile } = await supabase
+      .from("profiles").select("role").eq("id", caller.id).single();
+    if (!profile || !["owner", "crew_manager"].includes(profile.role)) {
+      return json({ error: "Forbidden — staff role required to send quotes." }, 403);
+    }
+    const approvedBy = caller.email ?? "Manager";
+
     const body = await req.json();
-    // Accept both estimate_id (dashboard.html) and jobId (legacy) 
+    // Accept both estimate_id (portal/dashboard) and jobId (legacy)
     const estimateId = body.estimate_id || body.jobId;
-    const approvedBy = body.approvedBy || "Manager";
 
     if (!estimateId) {
-      return new Response(
-        JSON.stringify({ error: "estimate_id is required" }),
-        { status: 400, headers: { ...corsHeaders, "Content-Type": "application/json" } }
-      );
+      return json({ error: "estimate_id is required" }, 400);
     }
 
     // Fetch the estimate from DB
@@ -60,41 +87,43 @@ serve(async (req: Request) => {
       .single();
 
     if (fetchError || !estimate) {
-      return new Response(
-        JSON.stringify({ error: `Estimate not found: ${estimateId}` }),
-        { status: 404, headers: { ...corsHeaders, "Content-Type": "application/json" } }
-      );
+      return json({ error: `Estimate not found: ${estimateId}` }, 404);
     }
 
     if (!estimate.customer_email) {
-      return new Response(
-        JSON.stringify({ error: "Estimate has no customer email — cannot send quote" }),
-        { status: 400, headers: { ...corsHeaders, "Content-Type": "application/json" } }
-      );
+      return json({ error: "Estimate has no customer email — cannot send quote" }, 400);
     }
 
     if (estimate.status !== "approved" && estimate.status !== "scheduled") {
-      return new Response(
-        JSON.stringify({
-          error: `Estimate status is "${estimate.status}". Must be "approved" or "scheduled" to send.`,
-        }),
-        { status: 409, headers: { ...corsHeaders, "Content-Type": "application/json" } }
-      );
+      return json({
+        error: `Estimate status is "${estimate.status}". Must be "approved" or "scheduled" to send.`,
+      }, 409);
     }
 
     // Use manager-approved quote if available, otherwise fall back to AI quote
     const quoteLow  = estimate.approved_quote_low  ?? estimate.quote_low  ?? 0;
     const quoteHigh = estimate.approved_quote_high ?? estimate.quote_high ?? 0;
     const service   = estimate.selected_service    ?? estimate.recommended_service ?? "tree service";
-    const notes     = (estimate.ai_notes as string[] | null) ?? [];
+    const notes     = Array.isArray(estimate.ai_notes) ? estimate.ai_notes as string[] : [];
+
+    // Pre-escape every customer-controlled field used in the template.
+    const eName      = escapeHtml(estimate.customer_name);
+    const eAddress   = escapeHtml(estimate.job_address);
+    const eService   = escapeHtml(service);
+    const eSpecies   = escapeHtml(estimate.species);
+    const eLatin     = escapeHtml(estimate.latin_name);
+    const eCondition = escapeHtml(estimate.condition);
+    const eHeight    = escapeHtml(estimate.est_height);
+    const eMgrNotes  = escapeHtml(estimate.manager_notes);
+    const eApprovedBy = escapeHtml(approvedBy);
 
     const notesHtml = notes.length
-      ? `<ul style="margin:8px 0 0;padding-left:20px;font-size:14px;color:#374151;">${notes.map((n) => `<li style="margin-bottom:4px;">${n}</li>`).join("")}</ul>`
+      ? `<ul style="margin:8px 0 0;padding-left:20px;font-size:14px;color:#374151;">${notes.map((n) => `<li style="margin-bottom:4px;">${escapeHtml(n)}</li>`).join("")}</ul>`
       : "";
 
     const managerNotesHtml = estimate.manager_notes
       ? `<div style="background:#f0fdf4;border-left:4px solid #166534;padding:10px 14px;border-radius:4px;margin-top:8px;font-size:14px;color:#374151;">
-          <strong>From our team:</strong> ${estimate.manager_notes}
+          <strong>From our team:</strong> ${eMgrNotes}
          </div>`
       : "";
 
@@ -104,18 +133,18 @@ serve(async (req: Request) => {
 <body style="font-family:Arial,sans-serif;color:#111827;max-width:640px;margin:0 auto;padding:24px;background:#f9fafb;">
 
   <div style="background:#166534;padding:20px 24px;border-radius:8px 8px 0 0;">
-    <h1 style="color:#ffffff;margin:0;font-size:22px;">${companyName}</h1>
+    <h1 style="color:#ffffff;margin:0;font-size:22px;">${escapeHtml(companyName)}</h1>
     <p style="color:#bbf7d0;margin:6px 0 0;font-size:13px;">Professional Tree Service Estimate</p>
   </div>
 
   <div style="background:#ffffff;border:1px solid #e5e7eb;border-top:none;padding:24px;border-radius:0 0 8px 8px;">
 
-    <p style="font-size:16px;margin-top:0;">Hello${estimate.customer_name ? " <strong>" + estimate.customer_name + "</strong>" : ""},</p>
-    <p style="color:#6b7280;font-size:14px;">Thank you for choosing ${companyName}. Here is your professional estimate based on our tree assessment.</p>
+    <p style="font-size:16px;margin-top:0;">Hello${eName ? " <strong>" + eName + "</strong>" : ""},</p>
+    <p style="color:#6b7280;font-size:14px;">Thank you for choosing ${escapeHtml(companyName)}. Here is your professional estimate based on our tree assessment.</p>
 
-    ${estimate.job_address ? `
+    ${eAddress ? `
     <p style="background:#f0fdf4;padding:10px 14px;border-left:4px solid #166534;border-radius:4px;font-weight:600;font-size:14px;margin:0 0 16px;">
-      📍 ${estimate.job_address}
+      📍 ${eAddress}
     </p>` : ""}
 
     <h2 style="color:#166534;font-size:16px;border-bottom:1px solid #e5e7eb;padding-bottom:8px;">Service Estimate</h2>
@@ -123,7 +152,7 @@ serve(async (req: Request) => {
     <table style="width:100%;border-collapse:collapse;margin-bottom:16px;">
       <tr>
         <td style="padding:10px;background:#f0fdf4;border:1px solid #d1fae5;font-size:13px;color:#6b7280;width:40%;">Service</td>
-        <td style="padding:10px;background:#f0fdf4;border:1px solid #d1fae5;font-size:14px;font-weight:600;">${service}</td>
+        <td style="padding:10px;background:#f0fdf4;border:1px solid #d1fae5;font-size:14px;font-weight:600;">${eService}</td>
       </tr>
       <tr>
         <td style="padding:10px;background:#f8fafc;border:1px solid #e5e7eb;font-size:13px;color:#6b7280;">Estimate Range</td>
@@ -131,17 +160,17 @@ serve(async (req: Request) => {
           $${quoteLow.toLocaleString()} – $${quoteHigh.toLocaleString()}
         </td>
       </tr>
-      ${estimate.species ? `<tr>
+      ${eSpecies ? `<tr>
         <td style="padding:10px;background:#f0fdf4;border:1px solid #d1fae5;font-size:13px;color:#6b7280;">Tree Species</td>
-        <td style="padding:10px;background:#f0fdf4;border:1px solid #d1fae5;font-size:14px;">${estimate.species}${estimate.latin_name ? " <em style='color:#6b7280;font-size:12px;'>(" + estimate.latin_name + ")</em>" : ""}</td>
+        <td style="padding:10px;background:#f0fdf4;border:1px solid #d1fae5;font-size:14px;">${eSpecies}${eLatin ? " <em style='color:#6b7280;font-size:12px;'>(" + eLatin + ")</em>" : ""}</td>
       </tr>` : ""}
-      ${estimate.condition ? `<tr>
+      ${eCondition ? `<tr>
         <td style="padding:10px;background:#f8fafc;border:1px solid #e5e7eb;font-size:13px;color:#6b7280;">Condition</td>
-        <td style="padding:10px;background:#f8fafc;border:1px solid #e5e7eb;font-size:14px;">${estimate.condition}</td>
+        <td style="padding:10px;background:#f8fafc;border:1px solid #e5e7eb;font-size:14px;">${eCondition}</td>
       </tr>` : ""}
-      ${estimate.est_height ? `<tr>
+      ${eHeight ? `<tr>
         <td style="padding:10px;background:#f0fdf4;border:1px solid #d1fae5;font-size:13px;color:#6b7280;">Est. Height</td>
-        <td style="padding:10px;background:#f0fdf4;border:1px solid #d1fae5;font-size:14px;">${estimate.est_height}</td>
+        <td style="padding:10px;background:#f0fdf4;border:1px solid #d1fae5;font-size:14px;">${eHeight}</td>
       </tr>` : ""}
     </table>
 
@@ -158,11 +187,11 @@ serve(async (req: Request) => {
 
     <div style="margin-top:24px;padding-top:16px;border-top:1px solid #e5e7eb;">
       <p style="font-size:14px;margin:0 0 8px;">Ready to schedule? Give us a call or reply to this email.</p>
-      <p style="font-size:13px;color:#6b7280;margin:0;">Best regards,<br><strong>${companyName} Team</strong></p>
+      <p style="font-size:13px;color:#6b7280;margin:0;">Best regards,<br><strong>${escapeHtml(companyName)} Team</strong></p>
     </div>
 
     <p style="font-size:11px;color:#9ca3af;margin-top:24px;border-top:1px solid #f3f4f6;padding-top:12px;">
-      Reference: ${estimate.id.substring(0, 8).toUpperCase()} · Approved by: ${approvedBy}
+      Reference: ${escapeHtml(String(estimate.id).substring(0, 8).toUpperCase())} · Approved by: ${eApprovedBy}
     </p>
   </div>
 </body>
@@ -178,7 +207,8 @@ serve(async (req: Request) => {
       body: JSON.stringify({
         from: fromAddress,
         to: [estimate.customer_email],
-        subject: `Your Tree Service Estimate — ${service}${estimate.job_address ? " at " + estimate.job_address : ""}`,
+        // Strip CR/LF from header-bound values to avoid header injection.
+        subject: `Your Tree Service Estimate — ${service}${estimate.job_address ? " at " + estimate.job_address : ""}`.replace(/[\r\n]+/g, " "),
         html: emailHtml,
       }),
     });
@@ -201,20 +231,14 @@ serve(async (req: Request) => {
       })
       .eq("id", estimateId);
 
-    return new Response(
-      JSON.stringify({
-        success: true,
-        emailId: resendData.id,
-        sentTo: estimate.customer_email,
-        estimateId,
-      }),
-      { status: 200, headers: { ...corsHeaders, "Content-Type": "application/json" } }
-    );
+    return json({
+      success: true,
+      emailId: resendData.id,
+      sentTo: estimate.customer_email,
+      estimateId,
+    });
   } catch (err) {
     console.error("send-quote error:", err);
-    return new Response(
-      JSON.stringify({ error: err.message ?? "Internal server error" }),
-      { status: 500, headers: { ...corsHeaders, "Content-Type": "application/json" } }
-    );
+    return json({ error: err.message ?? "Internal server error" }, 500);
   }
 });
