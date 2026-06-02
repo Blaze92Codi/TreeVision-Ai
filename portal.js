@@ -48,6 +48,22 @@ function bootPortal() {
     return data.session;
   }
 
+
+  /* ── Inject sign-out button + user badge if not present in HTML ────────── */
+  function injectAuthUI() {
+    // Add a sign-out bar to the sidebar if not already there
+    if (!document.getElementById("signOutBtn")) {
+      const bar = document.createElement("div");
+      bar.id = "authBar";
+      bar.style.cssText = "padding:.75rem 1rem;border-top:1px solid #d1fae5;font-size:.8rem;color:#374151;display:flex;align-items:center;gap:.5rem;flex-wrap:wrap;";
+      bar.innerHTML = `<span id="portalUserEmail" style="flex:1;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;"></span><button id="signOutBtn" style="background:#ef4444;color:#fff;border:none;border-radius:5px;padding:.3rem .7rem;font-size:.8rem;cursor:pointer;font-weight:600;">Sign Out</button>`;
+      const sidebar = document.querySelector(".sidebar") || document.body;
+      sidebar.appendChild(bar);
+    }
+  }
+
+  injectAuthUI();
+
   requireAuth().then((session) => {
     const userEmailEl = document.getElementById("portalUserEmail");
     if (userEmailEl) userEmailEl.textContent = session.user.email || "";
