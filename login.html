@@ -1,35 +1,152 @@
 <!DOCTYPE html>
 <html lang="en">
 <head>
-<meta charset="UTF-8">
-<meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>Dynamic Tree Service — Login</title>
-<meta name="theme-color" content="#052e16">
-<link rel="manifest" href="manifest.json">
-<link href="https://fonts.googleapis.com/css2?family=Bricolage+Grotesque:opsz,wght@12..96,400;12..96,800&family=Spline+Sans:wght@400;500;600&display=swap" rel="stylesheet">
-<link rel="stylesheet" href="shared.css">
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Dynamic Tree Service — Login</title>
+  <meta name="theme-color" content="#052e16">
+  <link rel="manifest" href="manifest.json">
+  <link href="https://fonts.googleapis.com/css2?family=Bricolage+Grotesque:opsz,wght@12..96,400;12..96,800&family=Spline+Sans:wght@400;500;600&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="shared.css">
+  <style>
+    .login-wrap {
+      min-height: 100vh;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      background: #f0fdf4;
+    }
+    .login-card {
+      background: #fff;
+      border: 1px solid #d1fae5;
+      border-radius: 12px;
+      padding: 2.5rem 2rem;
+      width: 100%;
+      max-width: 380px;
+      box-shadow: 0 4px 24px rgba(5,46,22,.08);
+    }
+    .login-card h1 {
+      font-size: 1.5rem;
+      font-weight: 800;
+      color: #052e16;
+      margin: 0 0 .25rem;
+    }
+    .login-card p.sub {
+      color: #6b7280;
+      font-size: .875rem;
+      margin: 0 0 1.5rem;
+    }
+    .login-card label {
+      display: block;
+      font-size: .875rem;
+      font-weight: 600;
+      color: #374151;
+      margin-bottom: .3rem;
+    }
+    .login-card input[type="email"],
+    .login-card input[type="password"] {
+      width: 100%;
+      padding: .6rem .75rem;
+      border: 1px solid #d1d5db;
+      border-radius: 6px;
+      font-size: .95rem;
+      margin-bottom: 1rem;
+      box-sizing: border-box;
+      outline: none;
+      transition: border-color .2s;
+    }
+    .login-card input:focus {
+      border-color: #16a34a;
+    }
+    .login-btn {
+      width: 100%;
+      padding: .7rem;
+      background: #16a34a;
+      color: #fff;
+      border: none;
+      border-radius: 6px;
+      font-size: 1rem;
+      font-weight: 700;
+      cursor: pointer;
+      transition: background .2s;
+    }
+    .login-btn:hover { background: #15803d; }
+    .login-btn:disabled { background: #86efac; cursor: not-allowed; }
+    #loginError {
+      color: #dc2626;
+      font-size: .85rem;
+      margin-top: .75rem;
+      display: none;
+    }
+    .brand-top {
+      display: flex;
+      align-items: center;
+      gap: .5rem;
+      margin-bottom: 1.5rem;
+      font-weight: 800;
+      color: #052e16;
+      font-size: 1.1rem;
+    }
+    .brand-top svg { width: 28px; height: 28px; }
+  </style>
 </head>
 <body>
-
-<nav class="site-nav">
-  <a href="./" class="site-brand">Dynamic Tree Service</a>
-  <ul>
-    <li><a data-nav="index.html" href="./">Client</a></li>
-    <li><a data-nav="dashboard.html" href="dashboard.html">Dashboard</a></li>
-    <li><a data-nav="schedule.html" href="schedule.html">Schedule</a></li>
-    <li><a data-nav="crew.html" href="crew.html">Crew</a></li>
-    <li><a data-nav="login.html" href="login.html">Login</a></li>
-  </ul>
-</nav>
-
-<main class="coming-soon">
-  <div class="card">
-    <h1>Coming Soon</h1>
-    <p>This feature is in development. Check back soon.</p>
+<div class="login-wrap">
+  <div class="login-card">
+    <div class="brand-top">
+      <svg viewBox="0 0 32 32" fill="none" xmlns="http://www.w3.org/2000/svg">
+        <circle cx="16" cy="16" r="16" fill="#052e16"/>
+        <path d="M16 6 C10 6 7 11 9 15 C7 15 6 17 8 18 L24 18 C26 17 25 15 23 15 C25 11 22 6 16 6Z" fill="#4ade80"/>
+        <rect x="15" y="18" width="2" height="8" rx="1" fill="#86efac"/>
+      </svg>
+      Dynamic Tree Service
+    </div>
+    <h1>Manager Login</h1>
+    <p class="sub">Sign in to access the company portal.</p>
+    <form id="loginForm" novalidate>
+      <label for="loginEmail">Email</label>
+      <input type="email" id="loginEmail" placeholder="you@example.com" autocomplete="email" required>
+      <label for="loginPassword">Password</label>
+      <input type="password" id="loginPassword" placeholder="••••••••" autocomplete="current-password" required>
+      <button type="submit" class="login-btn" id="loginBtn">Sign In</button>
+      <div id="loginError"></div>
+    </form>
   </div>
-</main>
+</div>
 
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
-<script src="app.js"></script>
+<script>
+  const SUPABASE_URL = "https://hydlxwjtdkzcnxxukakt.supabase.co";
+  const SUPABASE_KEY = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Imh5ZGx4d2p0ZGt6Y254eHVrYWt0Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3Nzk2ODcyNjQsImV4cCI6MjA5NTI2MzI2NH0.vXLOWjXh_6z8sSoBVqKA6wwwEKKMozjhRoIIUffwnzI";
+  const sb = supabase.createClient(SUPABASE_URL, SUPABASE_KEY);
+
+  // If already logged in, go straight to portal
+  sb.auth.getSession().then(({ data }) => {
+    if (data.session) window.location.replace("portal.html");
+  });
+
+  const form  = document.getElementById("loginForm");
+  const btn   = document.getElementById("loginBtn");
+  const errEl = document.getElementById("loginError");
+
+  form.addEventListener("submit", async (e) => {
+    e.preventDefault();
+    const email    = document.getElementById("loginEmail").value.trim();
+    const password = document.getElementById("loginPassword").value;
+    errEl.style.display = "none";
+    btn.disabled = true;
+    btn.textContent = "Signing in…";
+
+    const { error } = await sb.auth.signInWithPassword({ email, password });
+    if (error) {
+      errEl.textContent = error.message || "Login failed. Check your credentials.";
+      errEl.style.display = "block";
+      btn.disabled = false;
+      btn.textContent = "Sign In";
+    } else {
+      window.location.replace("portal.html");
+    }
+  });
+</script>
 </body>
 </html>
