@@ -7,9 +7,9 @@
 ═══════════════════════════════════════════════════════════════ */
 (function () {
   try {
-    var page = (location.pathname.split('/').pop() || 'index.html').toLowerCase();
-    var INTERNAL = ['dashboard.html', 'schedule.html', 'crew.html', 'login.html'];
-    if (INTERNAL.indexOf(page) === -1) return;            // public pages: do nothing
+    var page = (location.pathname.split('/').pop() || 'index').toLowerCase().replace(/\.html$/, '');
+    var INTERNAL = ['dashboard', 'schedule', 'crew', 'login'];
+    if (INTERNAL.indexOf(page) === -1) return;            // public pages (incl. client) do nothing
     if (sessionStorage.getItem('dts_staff') === '1') return; // already unlocked this session
 
     var STAFF_PASSWORD = 'treecrew2026';
