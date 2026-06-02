@@ -1,7 +1,7 @@
-const CACHE_NAME = "treevision-field-v3";
+const CACHE_NAME = "treevision-field-v4";
 const APP_SHELL = [
   "./",
-  "./client.html",
+  "./index.html",
   "./dashboard.html",
   "./login.html",
   "./schedule.html",
@@ -33,6 +33,6 @@ self.addEventListener("fetch", event => {
       const copy = response.clone();
       caches.open(CACHE_NAME).then(cache => cache.put(event.request, copy));
       return response;
-    }).catch(() => caches.match("./client.html")))
+    }).catch(() => caches.match("./index.html")))
   );
 });

@@ -32,10 +32,10 @@ if (typeof window !== 'undefined' && window.supabase && typeof window.supabase.c
 
 /* Highlight the nav link matching the current page */
 function setActiveNav() {
-  const path = (location.pathname.split('/').pop() || 'client.html').toLowerCase();
+  const path = (location.pathname.split('/').pop() || 'index.html').toLowerCase();
   document.querySelectorAll('.site-nav a[data-nav]').forEach(a => {
     const target = (a.getAttribute('data-nav') || '').toLowerCase();
-    if (target === path || (path === '' && target === 'client.html')) {
+    if (target === path || (path === '' && target === 'index.html')) {
       a.classList.add('nav-active');
     } else {
       a.classList.remove('nav-active');
