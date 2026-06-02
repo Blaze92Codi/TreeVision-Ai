@@ -45,8 +45,9 @@ jobs:
       - name: Apply pending D1 migrations
         working-directory: worker
         run: |
-          npx wrangler d1 create treevision 2>/dev/null || true
-          DB=$(npx wrangler d1 list --json 2>/dev/null | python3 -c "import sys,json;dbs=json.load(sys.stdin);db=next((d for d in dbs if d['name']=='treevision'),None);print(db['uuid'] if db else '')" || echo "")
+          CREATE_OUT=$(npx wrangler d1 create treevision 2>&1)
+          DB=$(echo "$CREATE_OUT" | grep -o 'database_id = "[a-f0-9-]*"' | grep -o '[a-f0-9-]\{36\}' || echo "")
+          [ -z "$DB" ] && DB=$(npx wrangler d1 list --json 2>&1 | grep -o '"uuid":"[a-f0-9-]*"' | grep -o '[a-f0-9-]\{36\}' | head -1)
           [ -n "$DB" ] && sed -i "s/database_id = \"[^\"]*\"/database_id = \"$DB\"/" wrangler.toml
           npx wrangler d1 migrations apply treevision --remote
 
