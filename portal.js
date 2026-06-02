@@ -16,45 +16,60 @@ const CONFIG = {
 };
 
 /* ══════════════════════════════════════════════════════════════════════════
-   AUTH GUARD — must be first thing that runs
-   Checks for a valid Supabase session; redirects to /login if none.
+   SUPABASE LOADER
+   Injects the Supabase SDK if not already present, then boots the portal.
 ══════════════════════════════════════════════════════════════════════════ */
-const _sb = supabase.createClient(CONFIG.SUPABASE_URL, CONFIG.SUPABASE_KEY);
-
-async function requireAuth() {
-  const { data } = await _sb.auth.getSession();
-  if (!data.session) {
-    window.location.replace("login.html");
-    throw new Error("Not authenticated — redirecting");
+function loadSupabase(cb) {
+  if (window.supabase && typeof window.supabase.createClient === "function") {
+    cb(); return;
   }
-  return data.session;
+  const s = document.createElement("script");
+  s.src = "https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2";
+  s.onload = cb;
+  s.onerror = () => { document.body.innerHTML = '<p style="padding:2rem;color:#c00">Failed to load Supabase SDK. Check your connection.</p>'; };
+  document.head.appendChild(s);
 }
 
-// Run auth check; only continue initialising the rest of the page if authed.
-requireAuth().then((session) => {
-  // Show user email in the Account tab if we have one
-  const userEmailEl = document.getElementById("portalUserEmail");
-  if (userEmailEl) userEmailEl.textContent = session.user.email || "";
+loadSupabase(bootPortal);
 
-  initPortal();
-});
+/* ══════════════════════════════════════════════════════════════════════════
+   BOOT — called after Supabase SDK is ready
+══════════════════════════════════════════════════════════════════════════ */
+function bootPortal() {
+  const _sb = supabase.createClient(CONFIG.SUPABASE_URL, CONFIG.SUPABASE_KEY);
 
-/* ── Sign-out handler ───────────────────────────────────────────────────── */
-function bindSignOut() {
-  const btn = document.getElementById("signOutBtn");
-  if (!btn) return;
-  btn.addEventListener("click", async () => {
-    await _sb.auth.signOut();
-    window.location.replace("login.html");
+  /* ── Auth guard ─────────────────────────────────────────────────────────── */
+  async function requireAuth() {
+    const { data } = await _sb.auth.getSession();
+    if (!data.session) {
+      window.location.replace("login.html");
+      throw new Error("Not authenticated");
+    }
+    return data.session;
+  }
+
+  requireAuth().then((session) => {
+    const userEmailEl = document.getElementById("portalUserEmail");
+    if (userEmailEl) userEmailEl.textContent = session.user.email || "";
+    initPortal(_sb);
   });
+
+  /* ── Sign-out ────────────────────────────────────────────────────────────── */
+  const signOutBtn = document.getElementById("signOutBtn");
+  if (signOutBtn) {
+    signOutBtn.addEventListener("click", async () => {
+      await _sb.auth.signOut();
+      window.location.replace("login.html");
+    });
+  }
 }
 
 /* ══════════════════════════════════════════════════════════════════════════
    PORTAL INIT — called only after auth passes
 ══════════════════════════════════════════════════════════════════════════ */
-function initPortal() {
+function initPortal(_sb) {
 
-/* ── In-memory demo state (used for Dashboard / New Lead tabs) ──────────── */
+/* ── In-memory demo state (Dashboard / New Lead tabs) ───────────────────── */
 const state = {
   usedScans: 38,
   scanLimit: 100,
@@ -96,15 +111,14 @@ const scanLimit      = document.getElementById("scanLimit");
 
 /* ── View switching ─────────────────────────────────────────────────────── */
 function setView(viewName) {
-  views.forEach((view) => view.classList.toggle("active", view.id === viewName));
-  document.querySelectorAll("[data-view]").forEach((item) => {
-    item.classList.toggle("active", item.dataset.view === viewName);
-  });
+  views.forEach((v) => v.classList.toggle("active", v.id === viewName));
+  document.querySelectorAll("[data-view]").forEach((item) =>
+    item.classList.toggle("active", item.dataset.view === viewName));
   if (viewTitle) viewTitle.textContent = viewTitles[viewName] || "Portal";
   if (viewName === "approvals") loadApprovalsFromDB();
 }
 
-/* ── Dashboard job list (demo data) ─────────────────────────────────────── */
+/* ── Dashboard job list ─────────────────────────────────────────────────── */
 function renderJobs() {
   if (!jobList) return;
   jobList.innerHTML = state.jobs.map((job) => `
@@ -116,113 +130,94 @@ function renderJobs() {
       <span class="status-pill ${job.risk === "High" ? "danger" : job.status === "Needs Review" ? "warn" : ""}">${job.status}</span>
     </div>
   `).join("");
-
-  const metricPending = document.getElementById("metricPending");
-  if (metricPending) metricPending.textContent = state.jobs.filter((j) => j.status !== "Approved").length;
+  const mp = document.getElementById("metricPending");
+  if (mp) mp.textContent = state.jobs.filter((j) => j.status !== "Approved").length;
 }
 
 /* ── Usage meter ────────────────────────────────────────────────────────── */
 function renderUsage() {
-  const percent = Math.min(100, Math.round((state.usedScans / state.scanLimit) * 100));
-  const set = (id, val) => { const el = document.getElementById(id); if (el) el.textContent = val; };
-  const setW = (id, w) => { const el = document.getElementById(id); if (el) el.style.width = w; };
-  set("usedCount", state.usedScans);
-  set("usedCountSide", state.usedScans);
-  set("limitCountSide", state.scanLimit);
-  set("remainingCount", Math.max(0, state.scanLimit - state.usedScans));
-  set("metricScans", state.usedScans);
-  setW("miniMeterFill", `${percent}%`);
-  setW("bigMeterFill", `${percent}%`);
-
-  const metricScanSmall = document.querySelector("#metricScans + small");
-  if (metricScanSmall) metricScanSmall.textContent = `${Math.max(0, state.scanLimit - state.usedScans)} remaining on current plan`;
-
-  if (usageRows) usageRows.innerHTML = state.usage.map((row) => `
-    <tr><td>${row.user}</td><td>${row.role}</td><td>${row.scans}</td><td>${row.active}</td></tr>
-  `).join("");
+  const pct = Math.min(100, Math.round((state.usedScans / state.scanLimit) * 100));
+  const $ = (id) => document.getElementById(id);
+  const set = (id, v) => { const el = $(id); if (el) el.textContent = v; };
+  const setW = (id, w) => { const el = $(id); if (el) el.style.width = w; };
+  set("usedCount", state.usedScans); set("usedCountSide", state.usedScans);
+  set("limitCountSide", state.scanLimit); set("remainingCount", Math.max(0, state.scanLimit - state.usedScans));
+  set("metricScans", state.usedScans); setW("miniMeterFill", `${pct}%`); setW("bigMeterFill", `${pct}%`);
+  const sm = document.querySelector("#metricScans + small");
+  if (sm) sm.textContent = `${Math.max(0, state.scanLimit - state.usedScans)} remaining on current plan`;
+  if (usageRows) usageRows.innerHTML = state.usage.map((r) =>
+    `<tr><td>${r.user}</td><td>${r.role}</td><td>${r.scans}</td><td>${r.active}</td></tr>`).join("");
 }
 
 /* ══════════════════════════════════════════════════════════════════════════
-   APPROVALS TAB — Live data from Supabase
+   APPROVALS TAB — live Supabase data
 ══════════════════════════════════════════════════════════════════════════ */
 async function loadApprovalsFromDB() {
   if (!approvalList) return;
-  approvalList.innerHTML = '<p style="padding:1rem;color:#666;">Loading estimates…</p>';
+  approvalList.innerHTML = '<p style="padding:1rem;color:#666">Loading estimates…</p>';
   try {
     const res = await fetch(
       `${CONFIG.SUPABASE_URL}/rest/v1/estimates?select=id,customer_name,customer_email,service_type,approved_quote_low,approved_quote_high,status,created_at&status=in.(pending,approved,scheduled)&order=created_at.desc&limit=50`,
-      { headers: { "apikey": CONFIG.SUPABASE_KEY, "Authorization": "Bearer " + CONFIG.SUPABASE_KEY, "Accept": "application/json" } }
+      { headers: { apikey: CONFIG.SUPABASE_KEY, Authorization: "Bearer " + CONFIG.SUPABASE_KEY, Accept: "application/json" } }
     );
     if (!res.ok) throw new Error("HTTP " + res.status);
     const rows = await res.json();
     if (!rows.length) {
-      approvalList.innerHTML = '<p style="padding:1rem;color:#666;">No pending estimates. New customer submissions will appear here.</p>';
+      approvalList.innerHTML = '<p style="padding:1rem;color:#666">No pending estimates. Customer submissions will appear here.</p>';
       return;
     }
     approvalList.innerHTML = rows.map((est) => {
-      const lowHigh = (est.approved_quote_low && est.approved_quote_high)
-        ? `$${est.approved_quote_low}–$${est.approved_quote_high}` : "Estimate pending";
+      const range = (est.approved_quote_low && est.approved_quote_high)
+        ? `$${est.approved_quote_low}–$${est.approved_quote_high}` : "Pending";
       const canSend = est.status === "approved" || est.status === "scheduled";
       return `
         <div class="approval-row" id="row-${est.id}">
           <div>
             <strong>${est.customer_name || "Unknown"}</strong>
-            <small>${est.service_type || "Tree service"} · <em>${est.customer_email || "no email"}</em> · Estimate: ${lowHigh}</small>
+            <small>${est.service_type || "Tree service"} · <em>${est.customer_email || "no email"}</em> · ${range}</small>
           </div>
           <span class="status-pill ${est.status === "pending" ? "warn" : ""}" style="margin-right:.5rem">${est.status}</span>
           ${canSend
             ? `<button class="secondary-btn send-quote-btn" type="button" data-id="${est.id}" data-email="${est.customer_email || ''}">Send Quote</button>`
-            : `<button class="secondary-btn" type="button" disabled>Awaiting Approval</button>`
-          }
-        </div>
-      `;
+            : `<button class="secondary-btn" type="button" disabled>Awaiting Approval</button>`}
+        </div>`;
     }).join("");
-    approvalList.querySelectorAll(".send-quote-btn").forEach((btn) => btn.addEventListener("click", () => handleSendQuote(btn)));
+    approvalList.querySelectorAll(".send-quote-btn").forEach((b) => b.addEventListener("click", () => handleSendQuote(b)));
   } catch (err) {
-    approvalList.innerHTML = `<p style="padding:1rem;color:#c00;">Failed to load estimates: ${err.message}</p>`;
+    approvalList.innerHTML = `<p style="padding:1rem;color:#c00">Failed to load: ${err.message}</p>`;
   }
 }
 
 async function handleSendQuote(btn) {
-  const estimateId = btn.dataset.id;
-  const email      = btn.dataset.email;
-  if (!email) { alert("This estimate has no customer email — cannot send quote."); return; }
-  if (!window.confirm(`Send quote email to ${email}?`)) return;
-  btn.disabled = true;
-  btn.textContent = "Sending…";
+  const id = btn.dataset.id, email = btn.dataset.email;
+  if (!email) { alert("No customer email on this estimate."); return; }
+  if (!confirm(`Send quote email to ${email}?`)) return;
+  btn.disabled = true; btn.textContent = "Sending…";
   try {
     const res = await fetch(CONFIG.SEND_QUOTE_URL, {
       method: "POST",
-      headers: { "Content-Type": "application/json", "Authorization": "Bearer " + CONFIG.SUPABASE_KEY },
-      body: JSON.stringify({ estimate_id: estimateId, approvedBy: "Manager" }),
+      headers: { "Content-Type": "application/json", Authorization: "Bearer " + CONFIG.SUPABASE_KEY },
+      body: JSON.stringify({ estimate_id: id, approvedBy: "Manager" }),
     });
     const data = await res.json().catch(() => ({}));
     if (res.ok) {
-      btn.textContent = "✓ Sent";
-      btn.style.background = "#2d6a2d";
-      btn.style.color = "#fff";
-      const row = document.getElementById("row-" + estimateId);
-      const pill = row && row.querySelector(".status-pill");
+      btn.textContent = "✓ Sent"; btn.style.background = "#2d6a2d"; btn.style.color = "#fff";
+      const pill = document.querySelector("#row-" + id + " .status-pill");
       if (pill) { pill.textContent = "sent"; pill.classList.remove("warn"); }
     } else {
-      btn.disabled = false;
-      btn.textContent = "Send Quote";
+      btn.disabled = false; btn.textContent = "Send Quote";
       alert("Error: " + (data.error || res.status));
     }
-  } catch (err) {
-    btn.disabled = false;
-    btn.textContent = "Send Quote";
-    alert("Network error: " + err.message);
-  }
+  } catch (err) { btn.disabled = false; btn.textContent = "Send Quote"; alert("Network error: " + err.message); }
 }
 
 /* ── Demo: add job ──────────────────────────────────────────────────────── */
 function addJob({ client, address, work, priority }) {
-  const highRisk = priority === "Emergency" || /removal|storm|dead/i.test(work);
+  const hi = priority === "Emergency" || /removal|storm|dead/i.test(work);
   state.jobs.unshift({ id: `TV-${1050 + state.jobs.length}`, client, address, work,
-    status: highRisk ? "Site Visit Required" : "Needs Review",
-    risk: highRisk ? "High" : "Medium", estimate: highRisk ? "Field quote" : "$575-$875" });
-  state.usedScans += 1; state.usage[1].scans += 1; state.usage[1].active = "Just now";
+    status: hi ? "Site Visit Required" : "Needs Review", risk: hi ? "High" : "Medium",
+    estimate: hi ? "Field quote" : "$575-$875" });
+  state.usedScans++; state.usage[1].scans++; state.usage[1].active = "Just now";
   renderJobs(); renderUsage();
 }
 
@@ -230,9 +225,9 @@ function addJob({ client, address, work, priority }) {
 navItems.forEach((item) => item.addEventListener("click", () => setView(item.dataset.view || item.dataset.viewLink)));
 
 if (scanPhoto) scanPhoto.addEventListener("change", () => {
-  const file = scanPhoto.files && scanPhoto.files[0];
-  if (!file) { if (uploadPreview) uploadPreview.hidden = true; return; }
-  if (uploadedPhotoPreview) uploadedPhotoPreview.src = URL.createObjectURL(file);
+  const f = scanPhoto.files?.[0];
+  if (!f) { if (uploadPreview) uploadPreview.hidden = true; return; }
+  if (uploadedPhotoPreview) uploadedPhotoPreview.src = URL.createObjectURL(f);
   if (uploadPreview) uploadPreview.hidden = false;
 });
 
@@ -253,7 +248,7 @@ if (seedJob) seedJob.addEventListener("click", () =>
 
 if (exportUsage) exportUsage.addEventListener("click", () => {
   const rows = [["Company","User","Role","Scans","Last Active"],
-    ...state.usage.map((row) => [document.getElementById("companyNameSide")?.textContent || CONFIG.COMPANY_NAME, row.user, row.role, row.scans, row.active])];
+    ...state.usage.map((r) => [document.getElementById("companyNameSide")?.textContent || CONFIG.COMPANY_NAME, r.user, r.role, r.scans, r.active])];
   const csv = rows.map((r) => r.map((c) => `"${String(c).replaceAll('"','""')}"`).join(",")).join("\n");
   const url = URL.createObjectURL(new Blob([csv], { type: "text/csv" }));
   Object.assign(document.createElement("a"), { href: url, download: "treevision-usage.csv" }).click();
@@ -261,14 +256,9 @@ if (exportUsage) exportUsage.addEventListener("click", () => {
 });
 
 if (companyName) companyName.addEventListener("input", () => {
-  const el = document.getElementById("companyNameSide");
-  if (el) el.textContent = companyName.value || "Company";
-});
+  const el = document.getElementById("companyNameSide"); if (el) el.textContent = companyName.value || "Company"; });
 
 if (scanLimit) scanLimit.addEventListener("input", () => { state.scanLimit = Number(scanLimit.value) || 100; renderUsage(); });
-
-/* ── Sign-out ────────────────────────────────────────────────────────────── */
-bindSignOut();
 
 /* ── Initial render ─────────────────────────────────────────────────────── */
 renderJobs();
