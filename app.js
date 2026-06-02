@@ -51,8 +51,12 @@
     function submit() {
       if (input.value === STAFF_PASSWORD) {
         sessionStorage.setItem('dts_staff', '1');
-        var lock = document.getElementById('dts-lock'); if (lock) lock.remove();
-        ov.remove();
+        ov.style.transition = 'opacity .25s ease';
+        ov.style.opacity = '0';
+        setTimeout(function () {
+          var lock = document.getElementById('dts-lock'); if (lock) lock.remove();
+          ov.remove();
+        }, 260);
       } else {
         err.textContent = 'Incorrect password — try again.';
         input.value = ''; input.focus();
