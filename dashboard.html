@@ -243,18 +243,12 @@ async function sendQuote(id, el) {
   const orig = btn?.textContent;
   if (btn) { btn.disabled = true; btn.textContent = 'Sending…'; }
   try {
-    const resp = await fetch('https://hydlxwjtdkzcnxxukakt.supabase.co/functions/v1/send-quote', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ estimate_id: id }),
-    });
-    const data = await resp.json();
-    if (!resp.ok) throw new Error(data.error || 'Send failed');
+    // sendQuoteEmail() is defined in app.js — uses CONFIG.SEND_QUOTE_URL
+    await sendQuoteEmail(id, 'Manager');
     await loadEstimates();
   } catch (err) {
-    alert('Could not send: ' + err.message);
-    btn.disabled = false;
-    btn.textContent = orig;
+    alert('Could not send quote: ' + err.message);
+    if (btn) { btn.disabled = false; btn.textContent = orig; }
   }
 }
 
