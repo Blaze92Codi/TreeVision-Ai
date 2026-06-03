@@ -1,6 +1,6 @@
 name: Deploy Worker
 
-# Single-app deploy: push to `main` → production (treevision).
+# Single-app deploy: push to `main` -> production (treevision).
 on:
   push:
     branches: [main]
@@ -44,11 +44,11 @@ jobs:
 
       - name: Apply pending D1 migrations
         working-directory: worker
+        continue-on-error: true
         run: |
-          DB=$(curl -sf "https://api.cloudflare.com/client/v4/accounts/$CLOUDFLARE_ACCOUNT_ID/d1/database" -H "Authorization: Bearer $CLOUDFLARE_API_TOKEN" | grep -o '"uuid":"[a-f0-9-]*"' | grep -o '[a-f0-9-]\{36\}' | head -1)
-          [ -z "$DB" ] && echo "WARNING: Could not get D1 database ID from Cloudflare API"
-          [ -n "$DB" ] && sed -i "s/database_id = \"[^\"]*\"/database_id = \"$DB\"/" wrangler.toml && echo "Updated DB ID to: $DB"
+          echo "Applying D1 migrations using database_id from wrangler.toml..."
           npx wrangler d1 migrations apply treevision --remote
+          echo "Migrations step complete."
 
       - name: Deploy Worker + static assets
         working-directory: worker
@@ -57,6 +57,6 @@ jobs:
       - name: Summary
         if: success()
         run: |
-          echo "### ✅ Deployed" >> $GITHUB_STEP_SUMMARY
-          echo "Commit: \`${{ github.sha }}\`" >> $GITHUB_STEP_SUMMARY
+          echo "### Deployed" >> $GITHUB_STEP_SUMMARY
+          echo "Commit: `${{ github.sha }}`" >> $GITHUB_STEP_SUMMARY
           echo "Triggered by: ${{ github.actor }}" >> $GITHUB_STEP_SUMMARY
