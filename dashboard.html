@@ -35,6 +35,11 @@
   <button class="topbar-refresh" onclick="loadEstimates()">↻ Refresh</button>
 </div>
 
+<!-- Photo lightbox (openPhoto/Escape target) -->
+<div id="photo-lightbox" style="display:none;position:fixed;inset:0;background:rgba(0,0,0,.85);z-index:9999;align-items:center;justify-content:center;cursor:zoom-out;" onclick="this.style.display='none'">
+  <img id="lightbox-img" alt="Tree photo" style="max-width:92vw;max-height:92vh;border-radius:8px;box-shadow:0 8px 40px rgba(0,0,0,.6);">
+</div>
+
 <div class="shell">
   <!-- Stats -->
   <div class="stats-strip">
@@ -163,7 +168,7 @@ function renderCard(e) {
         ${(e.price_range_low || 0) ? `<div><div class="lbl">Approved quote</div><div class="val">$${num((e.price_range_low || 0))} – $${num((e.price_range_high || 0))}</div></div>` : ''}
         ${e.approved_at ? `<div><div class="lbl">Decided</div><div class="val">${timeAgo(e.approved_at)}</div></div>` : ''}
         ${e.quote_sent_at ? `<div><div class="lbl">Quote sent</div><div class="val">${timeAgo(e.quote_sent_at)}</div></div>` : ''}
-        ${'' ? `<div style="width:100%;"><div class="lbl">Manager notes</div><div style="font-size:.85rem;margin-top:2px;">${esc('')}</div></div>` : ''}
+        ${e.manager_notes ? `<div style="width:100%;"><div class="lbl">Manager notes</div><div style="font-size:.85rem;margin-top:2px;">${esc(e.manager_notes)}</div></div>` : ''}
         <div style="margin-left:auto;display:flex;gap:8px;align-items:center;flex-wrap:wrap;">
           ${e.client_email
             ? e.quote_sent_at
@@ -240,12 +245,26 @@ async function updateEstimate(id, status) {
   await loadEstimates();
 }
 
+async function sendQuoteEmail(estimateId, approvedBy) {
+  const url = (typeof CONFIG !== 'undefined' && CONFIG.SUPABASE_URL)
+    ? CONFIG.SUPABASE_URL + '/functions/v1/send-quote'
+    : SUPABASE_URL + '/functions/v1/send-quote';
+  const key = (typeof CONFIG !== 'undefined' && CONFIG.SUPABASE_KEY) || SUPABASE_ANON;
+  const res = await fetch(url, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json', Authorization: 'Bearer ' + key },
+    body: JSON.stringify({ estimate_id: estimateId, approvedBy }),
+  });
+  const data = await res.json().catch(() => ({}));
+  if (!res.ok) throw new Error(data.error || ('HTTP ' + res.status));
+  return data;
+}
+
 async function sendQuote(id, el) {
   const btn = el || event?.target;
   const orig = btn?.textContent;
   if (btn) { btn.disabled = true; btn.textContent = 'Sending…'; }
   try {
-    // sendQuoteEmail() is defined in app.js — uses CONFIG.SEND_QUOTE_URL
     await sendQuoteEmail(id, 'Manager');
     await loadEstimates();
   } catch (err) {
@@ -265,7 +284,7 @@ function openPhoto(url) {
   document.getElementById('lightbox-img').src = url;
   lb.style.display = 'flex';
 }
-document.addEventListener('keydown', e => { if (e.estimate_number === 'Escape') document.getElementById('photo-lightbox').style.display = 'none'; });
+document.addEventListener('keydown', e => { if (e.key === 'Escape') { const lb = document.getElementById('photo-lightbox'); if (lb) lb.style.display = 'none'; } });
 
 function esc(s) {
   if (!s) return '';
