@@ -17,9 +17,17 @@ export default defineWorkersConfig(async () => {
           wrangler: { configPath: "./wrangler.toml" },
           miniflare: {
             // Hand the parsed migrations to the setup file via a test-only binding.
-            // ADMIN_TOKEN is a production secret (absent from wrangler.toml), so set
-            // a known value here to exercise the admin-auth happy path.
-            bindings: { TEST_MIGRATIONS: migrations, ADMIN_TOKEN: "test-admin-token" },
+            // The rest are production secrets (absent from wrangler.toml) set here so
+            // tests can drive the auth, webhook, and SMS paths. RESEND_API_KEY is left
+            // unset on purpose so sendEmail() no-ops (no Resend calls to mock).
+            bindings: {
+              TEST_MIGRATIONS: migrations,
+              ADMIN_TOKEN: "test-admin-token",
+              CALENDLY_WEBHOOK_SIGNING_KEY: "test-calendly-key",
+              TWILIO_ACCOUNT_SID: "ACtest",
+              TWILIO_AUTH_TOKEN: "test-twilio-token",
+              TWILIO_FROM_NUMBER: "+15550000000",
+            },
           },
         },
       },
