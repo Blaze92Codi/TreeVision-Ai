@@ -821,3 +821,7 @@ export default {
     await runFollowUpCron(env);
   },
 };
+
+// Exposed for integration tests (test/routes.test.ts), which drive routes via
+// app.request() with a real D1 binding. Not used by the deployed worker.
+export { app };
