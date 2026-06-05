@@ -151,10 +151,10 @@
 
         <div id="upload-area">
           <div class="dropzone" id="dropzone" onclick="document.getElementById('file-input').click()">
-            <input type="file" id="file-input" accept="image/*" capture="environment">
+            <input type="file" id="file-input" accept="image/*">
             <div class="dz-icon-wrap"><i class="ti ti-camera" aria-hidden="true"></i></div>
-            <div class="dz-title">Tap to photograph your tree</div>
-            <div class="dz-hint">Or drag &amp; drop &nbsp;·&nbsp; JPG, PNG, HEIC</div>
+            <div class="dz-title">Tap to add your tree photo</div>
+            <div class="dz-hint">Take a photo or upload from your library &nbsp;·&nbsp; JPG, PNG, HEIC</div>
           </div>
         </div>
 
@@ -625,10 +625,10 @@ function clearPhoto() {
   document.getElementById('analyze-btn').disabled = true;
   document.getElementById('upload-area').innerHTML = `
     <div class="dropzone" id="dropzone" onclick="document.getElementById('file-input').click()">
-      <input type="file" id="file-input" accept="image/*" capture="environment">
+      <input type="file" id="file-input" accept="image/*">
       <div class="dz-icon">📷</div>
-      <div class="dz-title">Tap to photograph tree</div>
-      <div class="dz-hint">Or drag and drop · JPG, PNG, HEIC</div>
+      <div class="dz-title">Tap to add your tree photo</div>
+      <div class="dz-hint">Take a photo or upload from your library · JPG, PNG, HEIC</div>
     </div>`;
   bindDropzone();
 }
