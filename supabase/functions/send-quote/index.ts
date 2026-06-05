@@ -94,10 +94,10 @@ serve(async (req: Request) => {
       : (estimate.hazard_flags ? [estimate.hazard_flags] : []);
 
     // tree_species stored as "Common Name (Latin name)" — split for display.
-    const speciesRaw = (estimate.tree_species || "").trim();
+    const speciesRaw = (estimate.tree_species || estimate.common_name || "").trim();
     const speciesMatch = speciesRaw.match(/^(.*?)\s*\(([^)]+)\)\s*$/);
     const commonName = speciesMatch ? speciesMatch[1].trim() : speciesRaw;
-    const latinName  = speciesMatch ? speciesMatch[2].trim() : (estimate.scientific_name || "");
+    const latinName  = speciesMatch ? speciesMatch[2].trim() : (estimate.latin_name || "");
 
     const heightStr = estimate.estimated_height_ft ? `${estimate.estimated_height_ft} ft` : "";
 
@@ -217,7 +217,6 @@ serve(async (req: Request) => {
       .from("estimates")
       .update({
         quote_sent_at: new Date().toISOString(),
-        quote_email_id: resendData.id ?? null,
         approved_by: approvedBy,
       })
       .eq("id", estimateId);

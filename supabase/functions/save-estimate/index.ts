@@ -85,15 +85,16 @@ serve(async (req: Request) => {
       client_name:    contact?.name    || null,
       client_email:   contact?.email   || null,
       client_address: contact?.address || null,
+      client_phone:   contact?.phone   || null,
       customer_phone: contact?.phone   || null,
 
-      // Tree identification
-      tree_species:    treeSpecies,
-      scientific_name: analysis.latin_name || null,
+      // Tree identification (deployed schema has both formatted + separated)
+      tree_species: treeSpecies,
+      common_name:  analysis.common_name || null,
+      latin_name:   analysis.latin_name  || null,
 
-      // Measurements — DB columns are integers; AI returns strings like "45-55 ft"
+      // Measurements — DB integer columns; AI returns strings like "45-55 ft"
       estimated_height_ft: parseLeadingInt(analysis.est_height_ft),
-      estimated_dbh_in:    parseLeadingInt(analysis.est_dbh_in),
       crown_diameter_ft:   parseLeadingInt(analysis.crown_spread_ft),
 
       // Health & risk
