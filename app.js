@@ -233,14 +233,13 @@ try {
    Nav active state
 ═══════════════════════════════════════════════════════════════ */
 function setActiveNav() {
-  const path = (location.pathname.split('/').pop() || 'index.html').toLowerCase();
+  // Vercel cleanUrls strips ".html" from the path, so normalize both
+  // sides of the comparison or no nav item ever matches.
+  const raw  = (location.pathname.split('/').pop() || '').toLowerCase().replace(/\.html$/, '');
+  const path = raw || 'index';
   document.querySelectorAll('.site-nav a[data-nav]').forEach(a => {
-    const target = (a.getAttribute('data-nav') || '').toLowerCase();
-    if (target === path || (path === '' && target === 'index.html')) {
-      a.classList.add('nav-active');
-    } else {
-      a.classList.remove('nav-active');
-    }
+    const target = (a.getAttribute('data-nav') || '').toLowerCase().replace(/\.html$/, '');
+    a.classList.toggle('nav-active', target === path);
   });
 }
 if (typeof document !== 'undefined') {

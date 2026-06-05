@@ -567,9 +567,8 @@ document.addEventListener('DOMContentLoaded', () => {
   const yr = new Date().getFullYear() - parseInt(CONFIG.FOUNDED);
   document.getElementById('founded-years').textContent = yr + 'yr';
 
-  const fi = document.getElementById('file-input');
-  if (fi) fi.addEventListener('change', e => { if (e.target.files[0]) handleFile(e.target.files[0]); });
-
+  // bindDropzone() attaches the file-input change handler; don't bind it
+  // twice here or handleFile() fires for every upload.
   bindDropzone();
 });
 
