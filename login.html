@@ -118,16 +118,61 @@
 <script>
   const SUPABASE_URL = "https://hydlxwjtdkzcnxxukakt.supabase.co";
   const SUPABASE_KEY = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Imh5ZGx4d2p0ZGt6Y254eHVrYWt0Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3Nzk2ODcyNjQsImV4cCI6MjA5NTI2MzI2NH0.vXLOWjXh_6z8sSoBVqKA6wwwEKKMozjhRoIIUffwnzI";
-  const sb = supabase.createClient(SUPABASE_URL, SUPABASE_KEY);
-
-  // If already logged in, go straight to portal
-  sb.auth.getSession().then(({ data }) => {
-    if (data.session) window.location.replace("portal.html");
-  });
 
   const form  = document.getElementById("loginForm");
   const btn   = document.getElementById("loginBtn");
   const errEl = document.getElementById("loginError");
+
+  function showErr(msg) {
+    errEl.textContent = msg;
+    errEl.style.display = "block";
+  }
+
+  // Surface any error passed in the URL (e.g. from a failed auth redirect).
+  const urlErr = new URLSearchParams(location.search).get("error");
+  if (urlErr) {
+    if (/ByteString|character at index|greater than 255/i.test(urlErr)) {
+      // Stale session in localStorage contains a non-Latin1 char (e.g. em dash
+      // in user_metadata) that supabase-js can't base64-encode. Purge it.
+      purgeSupabaseStorage();
+      showErr("Your previous session was corrupted and has been cleared. Please sign in again.");
+    } else {
+      showErr(urlErr);
+    }
+    history.replaceState({}, "", location.pathname);
+  }
+
+  function purgeSupabaseStorage() {
+    try {
+      for (let i = localStorage.length - 1; i >= 0; i--) {
+        const k = localStorage.key(i);
+        if (k && (k.startsWith("sb-") || k.startsWith("supabase."))) localStorage.removeItem(k);
+      }
+      for (let i = sessionStorage.length - 1; i >= 0; i--) {
+        const k = sessionStorage.key(i);
+        if (k && (k.startsWith("sb-") || k.startsWith("supabase."))) sessionStorage.removeItem(k);
+      }
+    } catch (_) { /* ignore */ }
+  }
+
+  let sb;
+  try {
+    sb = supabase.createClient(SUPABASE_URL, SUPABASE_KEY);
+  } catch (e) {
+    purgeSupabaseStorage();
+    sb = supabase.createClient(SUPABASE_URL, SUPABASE_KEY);
+  }
+
+  // If already logged in, go straight to portal. Guard against corrupted
+  // localStorage payloads that make supabase-js throw on read.
+  (async () => {
+    try {
+      const { data } = await sb.auth.getSession();
+      if (data && data.session) window.location.replace("portal.html");
+    } catch (e) {
+      purgeSupabaseStorage();
+    }
+  })();
 
   form.addEventListener("submit", async (e) => {
     e.preventDefault();
@@ -137,14 +182,22 @@
     btn.disabled = true;
     btn.textContent = "Signing in…";
 
-    const { error } = await sb.auth.signInWithPassword({ email, password });
-    if (error) {
-      errEl.textContent = error.message || "Login failed. Check your credentials.";
-      errEl.style.display = "block";
+    try {
+      const { error } = await sb.auth.signInWithPassword({ email, password });
+      if (error) {
+        showErr(error.message || "Login failed. Check your credentials.");
+        btn.disabled = false;
+        btn.textContent = "Sign In";
+      } else {
+        window.location.replace("portal.html");
+      }
+    } catch (e) {
+      // Most common cause here: supabase-js btoa() fails on a session payload
+      // containing characters > 255. Clear and ask the user to retry.
+      purgeSupabaseStorage();
+      showErr("Sign-in failed due to a stored session error. Please try again.");
       btn.disabled = false;
       btn.textContent = "Sign In";
-    } else {
-      window.location.replace("portal.html");
     }
   });
 </script>
