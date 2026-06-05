@@ -1,0 +1,43 @@
+name: CI
+
+# Type-check + unit tests on every PR and on branch pushes, so regressions are
+# caught before they reach `main` (where deploy.yml ships straight to prod).
+on:
+  pull_request:
+    paths:
+      - 'worker/**'
+      - '.github/workflows/ci.yml'
+  push:
+    branches-ignore: [main]
+    paths:
+      - 'worker/**'
+      - '.github/workflows/ci.yml'
+
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    permissions:
+      contents: read
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Set up Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+          cache: 'npm'
+          cache-dependency-path: worker/package-lock.json
+
+      - name: Install dependencies
+        working-directory: worker
+        run: npm ci
+
+      - name: Type-check
+        working-directory: worker
+        run: npx tsc --noEmit
+
+      - name: Test
+        working-directory: worker
+        run: npm test
