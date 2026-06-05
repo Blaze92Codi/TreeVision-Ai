@@ -110,8 +110,20 @@ function setFilter(f) {
   render();
 }
 
+// Filter UI labels ↔ DB status values. The DB uses draft/sent for
+// records awaiting review and declined/expired for rejected.
+const FILTER_STATUSES = {
+  pending:   ['draft', 'sent'],
+  approved:  ['approved'],
+  scheduled: ['scheduled'],
+  rejected:  ['declined', 'expired'],
+};
+
 function render() {
-  const list = currentFilter === 'all' ? allEstimates : allEstimates.filter(e => e.status === currentFilter);
+  const allowed = FILTER_STATUSES[currentFilter];
+  const list = currentFilter === 'all'
+    ? allEstimates
+    : allEstimates.filter(e => allowed ? allowed.includes(e.status) : e.status === currentFilter);
   const el = document.getElementById('estimate-list');
   if (!list.length) {
     el.innerHTML = `<div class="empty"><div class="empty-icon">📭</div><h3>No ${currentFilter === 'all' ? '' : currentFilter} estimates</h3><p>They'll appear here when submitted via the field app.</p></div>`;
@@ -158,7 +170,7 @@ function renderCard(e) {
         <div class="review-actions">
           <button class="btn-approve"  onclick="updateEstimate('${e.id}','approved')">✓ Approve &amp; confirm quote</button>
           <button class="btn-schedule" onclick="updateEstimate('${e.id}','scheduled')">📅 Mark as scheduled</button>
-          <button class="btn-reject"   onclick="updateEstimate('${e.id}','rejected')">✕ Reject</button>
+          <button class="btn-reject"   onclick="updateEstimate('${e.id}','declined')">✕ Reject</button>
         </div>
       </div>
     </div>` : e.status !== 'pending' ? `
