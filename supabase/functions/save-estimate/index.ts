@@ -10,24 +10,44 @@ const corsHeaders = {
  * save-estimate Edge Function
  *
  * Receives the AI analysis result + customer contact details from index.html
- * and persists them to the estimates table.
+ * and persists them to the `estimates` table using the deployed schema:
+ *   client_name, client_email, client_address, customer_phone,
+ *   tree_species, scientific_name,
+ *   estimated_height_ft, estimated_dbh_in, crown_diameter_ft,
+ *   health_summary, health_score, hazard_flags[],
+ *   recommended_services[], price_range_low, price_range_high,
+ *   scope_description, photo_urls[], status
  *
  * Expected POST body (from index.html saveEstimate()):
  * {
  *   analysis: { ... }           — full AI response object from callClaude()
  *   service: string             — selected service name e.g. "Trimming & Pruning"
  *   photo_url: string | null    — Supabase Storage URL of uploaded photo
- *   contact: {
- *     name: string
- *     phone: string
- *     email: string
- *     address: string
- *   }
+ *   contact: { name, phone, email, address }
  *   internal_notes: string      — estimator-only notes
  * }
  *
- * Returns: { id: string }       — UUID of the created/updated estimate
+ * Returns: { id: string }       — UUID of the created estimate
  */
+
+function parseLeadingInt(s: unknown): number | null {
+  if (s == null) return null;
+  const m = String(s).match(/-?\d+/);
+  return m ? parseInt(m[0], 10) : null;
+}
+
+function conditionToScore(c: unknown): number | null {
+  if (!c) return null;
+  const map: Record<string, number> = {
+    "Excellent": 10,
+    "Good": 8,
+    "Fair": 6,
+    "Poor": 4,
+    "Dead/Hazardous": 2,
+  };
+  return map[String(c)] ?? null;
+}
+
 serve(async (req: Request) => {
   if (req.method === "OPTIONS") {
     return new Response("ok", { headers: corsHeaders });
@@ -49,46 +69,50 @@ serve(async (req: Request) => {
       );
     }
 
+    // Dashboard parses tree_species as "Common Name (Latin name)" — store both forms.
+    const treeSpecies = analysis.common_name
+      ? (analysis.latin_name
+          ? `${analysis.common_name} (${analysis.latin_name})`
+          : analysis.common_name)
+      : null;
+
+    const recommendedService = analysis.recommended_service || service || null;
+
     const record = {
-      // Status starts as pending — manager reviews in dashboard.html
-      status: "pending",
+      status: "draft",
 
       // Customer contact
-      customer_name:  contact?.name    || null,
+      client_name:    contact?.name    || null,
+      client_email:   contact?.email   || null,
+      client_address: contact?.address || null,
       customer_phone: contact?.phone   || null,
-      customer_email: contact?.email   || null,
-      job_address:    contact?.address || null,
 
-      // AI analysis fields — mirror the JSON keys from callClaude() response
-      species:                  analysis.common_name           || null,
-      latin_name:               analysis.latin_name            || null,
-      id_confidence:            analysis.id_confidence         || null,
-      est_height:               analysis.est_height_ft         || null,
-      est_dbh:                  analysis.est_dbh_in            || null,
-      crown_spread:             analysis.crown_spread_ft       || null,
-      condition:                analysis.condition             || null,
-      isa_risk_rating:          analysis.isa_risk_rating       || null,
-      recommended_service:      analysis.recommended_service   || service || null,
-      recommended_pkg_key:      analysis.recommended_pkg_key   || null,
-      ansi_standard:            analysis.ansi_standard         || null,
-      after_description:        analysis.after_description     || null,
-      live_crown_retained_pct:  analysis.live_crown_retained_pct ?? null,
-      ai_notes:                 Array.isArray(analysis.notes) ? analysis.notes : [],
-      annotations:              Array.isArray(analysis.annotations) ? analysis.annotations : [],
-      cut_points:               Array.isArray(analysis.cut_points) ? analysis.cut_points : [],
+      // Tree identification
+      tree_species:    treeSpecies,
+      scientific_name: analysis.latin_name || null,
 
-      // Preliminary quote from AI
-      quote_low:  typeof analysis.quote_low  === "number" ? analysis.quote_low  : null,
-      quote_high: typeof analysis.quote_high === "number" ? analysis.quote_high : null,
+      // Measurements — DB columns are integers; AI returns strings like "45-55 ft"
+      estimated_height_ft: parseLeadingInt(analysis.est_height_ft),
+      estimated_dbh_in:    parseLeadingInt(analysis.est_dbh_in),
+      crown_diameter_ft:   parseLeadingInt(analysis.crown_spread_ft),
 
-      // Selected service (from package picker)
-      selected_service: service || null,
+      // Health & risk
+      health_summary: analysis.condition || null,
+      health_score:   conditionToScore(analysis.condition),
+      hazard_flags:   analysis.isa_risk_rating ? [analysis.isa_risk_rating] : [],
 
-      // Photo
-      photo_url: photo_url || null,
+      // Service recommendation
+      recommended_services: recommendedService ? [recommendedService] : [],
 
-      // Internal notes
-      internal_notes: internal_notes || null,
+      // Quote range
+      price_range_low:  typeof analysis.quote_low  === "number" ? analysis.quote_low  : null,
+      price_range_high: typeof analysis.quote_high === "number" ? analysis.quote_high : null,
+
+      // Photo (array column even with a single URL)
+      photo_urls: photo_url ? [photo_url] : [],
+
+      // Estimator notes
+      scope_description: internal_notes || null,
     };
 
     const { data, error } = await supabase
@@ -106,7 +130,7 @@ serve(async (req: Request) => {
   } catch (err) {
     console.error("save-estimate error:", err);
     return new Response(
-      JSON.stringify({ error: err.message ?? "Internal server error" }),
+      JSON.stringify({ error: (err as Error).message ?? "Internal server error" }),
       { status: 500, headers: { ...corsHeaders, "Content-Type": "application/json" } }
     );
   }

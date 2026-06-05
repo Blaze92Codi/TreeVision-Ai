@@ -9,18 +9,18 @@ const corsHeaders = {
 /**
  * send-quote Edge Function
  *
- * Fetches an approved estimate from the DB, builds an HTML email,
- * and sends it to the customer via Resend.
+ * Fetches an approved estimate from the DB (deployed schema), builds an
+ * HTML email, and sends it to the customer via Resend.
  *
  * Expected POST body (from dashboard.html sendQuote()):
  * {
  *   estimate_id: string    — UUID of the estimate (primary key)
- *   approvedBy?: string    — name/email of the approving manager (optional)
+ *   approvedBy?: string    — name/email of the approving manager
  * }
  *
  * Required secrets:
  *   RESEND_API_KEY      — api.resend.com key
- *   QUOTE_FROM_EMAIL    — verified sender address (e.g. quotes@yourdomain.com)
+ *   QUOTE_FROM_EMAIL    — verified sender address
  *   COMPANY_NAME        — company name for email branding
  */
 serve(async (req: Request) => {
@@ -41,7 +41,6 @@ serve(async (req: Request) => {
     );
 
     const body = await req.json();
-    // Accept both estimate_id (dashboard.html) and jobId (legacy) 
     const estimateId = body.estimate_id || body.jobId;
     const approvedBy = body.approvedBy || "Manager";
 
@@ -52,7 +51,6 @@ serve(async (req: Request) => {
       );
     }
 
-    // Fetch the estimate from DB
     const { data: estimate, error: fetchError } = await supabase
       .from("estimates")
       .select("*")
@@ -66,7 +64,7 @@ serve(async (req: Request) => {
       );
     }
 
-    if (!estimate.customer_email) {
+    if (!estimate.client_email) {
       return new Response(
         JSON.stringify({ error: "Estimate has no customer email — cannot send quote" }),
         { status: 400, headers: { ...corsHeaders, "Content-Type": "application/json" } }
@@ -82,20 +80,41 @@ serve(async (req: Request) => {
       );
     }
 
-    // Use manager-approved quote if available, otherwise fall back to AI quote
-    const quoteLow  = estimate.approved_quote_low  ?? estimate.quote_low  ?? 0;
-    const quoteHigh = estimate.approved_quote_high ?? estimate.quote_high ?? 0;
-    const service   = estimate.selected_service    ?? estimate.recommended_service ?? "tree service";
-    const notes     = (estimate.ai_notes as string[] | null) ?? [];
+    // Manager-approved range takes priority, fall back to AI's price range
+    const quoteLow  = estimate.approved_quote_low  ?? estimate.price_range_low  ?? 0;
+    const quoteHigh = estimate.approved_quote_high ?? estimate.price_range_high ?? 0;
 
-    const notesHtml = notes.length
-      ? `<ul style="margin:8px 0 0;padding-left:20px;font-size:14px;color:#374151;">${notes.map((n) => `<li style="margin-bottom:4px;">${n}</li>`).join("")}</ul>`
-      : "";
+    const services = Array.isArray(estimate.recommended_services)
+      ? estimate.recommended_services
+      : (estimate.recommended_services ? [estimate.recommended_services] : []);
+    const service = services[0] ?? "tree service";
+
+    const hazards = Array.isArray(estimate.hazard_flags)
+      ? estimate.hazard_flags
+      : (estimate.hazard_flags ? [estimate.hazard_flags] : []);
+
+    // tree_species stored as "Common Name (Latin name)" — split for display.
+    const speciesRaw = (estimate.tree_species || "").trim();
+    const speciesMatch = speciesRaw.match(/^(.*?)\s*\(([^)]+)\)\s*$/);
+    const commonName = speciesMatch ? speciesMatch[1].trim() : speciesRaw;
+    const latinName  = speciesMatch ? speciesMatch[2].trim() : (estimate.scientific_name || "");
+
+    const heightStr = estimate.estimated_height_ft ? `${estimate.estimated_height_ft} ft` : "";
+
+    const escapeHtml = (s: string) =>
+      String(s).replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;").replace(/"/g, "&quot;");
 
     const managerNotesHtml = estimate.manager_notes
       ? `<div style="background:#f0fdf4;border-left:4px solid #166534;padding:10px 14px;border-radius:4px;margin-top:8px;font-size:14px;color:#374151;">
-          <strong>From our team:</strong> ${estimate.manager_notes}
+          <strong>From our team:</strong> ${escapeHtml(estimate.manager_notes)}
          </div>`
+      : "";
+
+    const hazardsHtml = hazards.length
+      ? `<tr>
+          <td style="padding:10px;background:#fef9c3;border:1px solid #fde68a;font-size:13px;color:#6b7280;">Risk Flags</td>
+          <td style="padding:10px;background:#fef9c3;border:1px solid #fde68a;font-size:14px;">${hazards.map((h: string) => escapeHtml(h)).join(", ")}</td>
+        </tr>`
       : "";
 
     const emailHtml = `<!DOCTYPE html>
@@ -104,18 +123,18 @@ serve(async (req: Request) => {
 <body style="font-family:Arial,sans-serif;color:#111827;max-width:640px;margin:0 auto;padding:24px;background:#f9fafb;">
 
   <div style="background:#166534;padding:20px 24px;border-radius:8px 8px 0 0;">
-    <h1 style="color:#ffffff;margin:0;font-size:22px;">${companyName}</h1>
+    <h1 style="color:#ffffff;margin:0;font-size:22px;">${escapeHtml(companyName)}</h1>
     <p style="color:#bbf7d0;margin:6px 0 0;font-size:13px;">Professional Tree Service Estimate</p>
   </div>
 
   <div style="background:#ffffff;border:1px solid #e5e7eb;border-top:none;padding:24px;border-radius:0 0 8px 8px;">
 
-    <p style="font-size:16px;margin-top:0;">Hello${estimate.customer_name ? " <strong>" + estimate.customer_name + "</strong>" : ""},</p>
-    <p style="color:#6b7280;font-size:14px;">Thank you for choosing ${companyName}. Here is your professional estimate based on our tree assessment.</p>
+    <p style="font-size:16px;margin-top:0;">Hello${estimate.client_name ? " <strong>" + escapeHtml(estimate.client_name) + "</strong>" : ""},</p>
+    <p style="color:#6b7280;font-size:14px;">Thank you for choosing ${escapeHtml(companyName)}. Here is your professional estimate based on our tree assessment.</p>
 
-    ${estimate.job_address ? `
+    ${estimate.client_address ? `
     <p style="background:#f0fdf4;padding:10px 14px;border-left:4px solid #166534;border-radius:4px;font-weight:600;font-size:14px;margin:0 0 16px;">
-      📍 ${estimate.job_address}
+      📍 ${escapeHtml(estimate.client_address)}
     </p>` : ""}
 
     <h2 style="color:#166534;font-size:16px;border-bottom:1px solid #e5e7eb;padding-bottom:8px;">Service Estimate</h2>
@@ -123,31 +142,33 @@ serve(async (req: Request) => {
     <table style="width:100%;border-collapse:collapse;margin-bottom:16px;">
       <tr>
         <td style="padding:10px;background:#f0fdf4;border:1px solid #d1fae5;font-size:13px;color:#6b7280;width:40%;">Service</td>
-        <td style="padding:10px;background:#f0fdf4;border:1px solid #d1fae5;font-size:14px;font-weight:600;">${service}</td>
+        <td style="padding:10px;background:#f0fdf4;border:1px solid #d1fae5;font-size:14px;font-weight:600;">${escapeHtml(service)}</td>
       </tr>
       <tr>
         <td style="padding:10px;background:#f8fafc;border:1px solid #e5e7eb;font-size:13px;color:#6b7280;">Estimate Range</td>
         <td style="padding:10px;background:#f8fafc;border:1px solid #e5e7eb;font-size:18px;font-weight:700;color:#166534;">
-          $${quoteLow.toLocaleString()} – $${quoteHigh.toLocaleString()}
+          $${Number(quoteLow).toLocaleString()} – $${Number(quoteHigh).toLocaleString()}
         </td>
       </tr>
-      ${estimate.species ? `<tr>
+      ${commonName ? `<tr>
         <td style="padding:10px;background:#f0fdf4;border:1px solid #d1fae5;font-size:13px;color:#6b7280;">Tree Species</td>
-        <td style="padding:10px;background:#f0fdf4;border:1px solid #d1fae5;font-size:14px;">${estimate.species}${estimate.latin_name ? " <em style='color:#6b7280;font-size:12px;'>(" + estimate.latin_name + ")</em>" : ""}</td>
+        <td style="padding:10px;background:#f0fdf4;border:1px solid #d1fae5;font-size:14px;">${escapeHtml(commonName)}${latinName ? " <em style='color:#6b7280;font-size:12px;'>(" + escapeHtml(latinName) + ")</em>" : ""}</td>
       </tr>` : ""}
-      ${estimate.condition ? `<tr>
+      ${estimate.health_summary ? `<tr>
         <td style="padding:10px;background:#f8fafc;border:1px solid #e5e7eb;font-size:13px;color:#6b7280;">Condition</td>
-        <td style="padding:10px;background:#f8fafc;border:1px solid #e5e7eb;font-size:14px;">${estimate.condition}</td>
+        <td style="padding:10px;background:#f8fafc;border:1px solid #e5e7eb;font-size:14px;">${escapeHtml(estimate.health_summary)}</td>
       </tr>` : ""}
-      ${estimate.est_height ? `<tr>
+      ${heightStr ? `<tr>
         <td style="padding:10px;background:#f0fdf4;border:1px solid #d1fae5;font-size:13px;color:#6b7280;">Est. Height</td>
-        <td style="padding:10px;background:#f0fdf4;border:1px solid #d1fae5;font-size:14px;">${estimate.est_height}</td>
+        <td style="padding:10px;background:#f0fdf4;border:1px solid #d1fae5;font-size:14px;">${escapeHtml(heightStr)}</td>
       </tr>` : ""}
+      ${hazardsHtml}
     </table>
 
-    ${notesHtml ? `
-    <h2 style="color:#166534;font-size:16px;border-bottom:1px solid #e5e7eb;padding-bottom:8px;">Assessment Notes</h2>
-    ${notesHtml}` : ""}
+    ${estimate.scope_description ? `
+    <h2 style="color:#166534;font-size:16px;border-bottom:1px solid #e5e7eb;padding-bottom:8px;">Scope</h2>
+    <p style="font-size:14px;color:#374151;margin:8px 0 16px;">${escapeHtml(estimate.scope_description)}</p>
+    ` : ""}
 
     ${managerNotesHtml}
 
@@ -158,17 +179,17 @@ serve(async (req: Request) => {
 
     <div style="margin-top:24px;padding-top:16px;border-top:1px solid #e5e7eb;">
       <p style="font-size:14px;margin:0 0 8px;">Ready to schedule? Give us a call or reply to this email.</p>
-      <p style="font-size:13px;color:#6b7280;margin:0;">Best regards,<br><strong>${companyName} Team</strong></p>
+      <p style="font-size:13px;color:#6b7280;margin:0;">Best regards,<br><strong>${escapeHtml(companyName)} Team</strong></p>
     </div>
 
     <p style="font-size:11px;color:#9ca3af;margin-top:24px;border-top:1px solid #f3f4f6;padding-top:12px;">
-      Reference: ${estimate.id.substring(0, 8).toUpperCase()} · Approved by: ${approvedBy}
+      Reference: ${String(estimate.id).substring(0, 8).toUpperCase()} · Approved by: ${escapeHtml(approvedBy)}
     </p>
   </div>
 </body>
 </html>`;
 
-    // Send via Resend
+    const subjectAddress = estimate.client_address ? " at " + estimate.client_address : "";
     const resendResponse = await fetch("https://api.resend.com/emails", {
       method: "POST",
       headers: {
@@ -177,8 +198,8 @@ serve(async (req: Request) => {
       },
       body: JSON.stringify({
         from: fromAddress,
-        to: [estimate.customer_email],
-        subject: `Your Tree Service Estimate — ${service}${estimate.job_address ? " at " + estimate.job_address : ""}`,
+        to: [estimate.client_email],
+        subject: `Your Tree Service Estimate — ${service}${subjectAddress}`,
         html: emailHtml,
       }),
     });
@@ -190,14 +211,14 @@ serve(async (req: Request) => {
 
     const resendData = await resendResponse.json();
 
-    // Mark as sent in DB
+    // Don't mutate status — caller already moved it to approved/scheduled and
+    // dashboard tracks delivery via quote_sent_at timestamp.
     await supabase
       .from("estimates")
       .update({
         quote_sent_at: new Date().toISOString(),
         quote_email_id: resendData.id ?? null,
         approved_by: approvedBy,
-        updated_at: new Date().toISOString(),
       })
       .eq("id", estimateId);
 
@@ -205,7 +226,7 @@ serve(async (req: Request) => {
       JSON.stringify({
         success: true,
         emailId: resendData.id,
-        sentTo: estimate.customer_email,
+        sentTo: estimate.client_email,
         estimateId,
       }),
       { status: 200, headers: { ...corsHeaders, "Content-Type": "application/json" } }
@@ -213,7 +234,7 @@ serve(async (req: Request) => {
   } catch (err) {
     console.error("send-quote error:", err);
     return new Response(
-      JSON.stringify({ error: err.message ?? "Internal server error" }),
+      JSON.stringify({ error: (err as Error).message ?? "Internal server error" }),
       { status: 500, headers: { ...corsHeaders, "Content-Type": "application/json" } }
     );
   }
