@@ -238,7 +238,7 @@
         <div>
           <div class="section-heading"><i class="ti ti-photo" aria-hidden="true"></i>Photo documentation</div>
           <div class="photo-tabs" id="photo-tabs">
-            <button class="photo-tab" onclick="showPhotoView('original')">Original</button>
+            <button class="photo-tab" onclick="showPhotoView('original')">Before</button>
             <button class="photo-tab active" onclick="showPhotoView('annotated')">
               <i class="ti ti-layers-subtract" aria-hidden="true"></i> Annotated
             </button>
@@ -657,7 +657,18 @@ const DEMO_RESULT = {
     "Minor co-dominant stem low on trunk; included bark visible — monitor annually",
     "Dense canopy limiting light penetration; crown thinning will improve air circulation",
   ],
-  standard_note: "Crown cleaning and selective reduction per ANSI A300 Part 1. Live crown removal to remain within 20% given tree's mature age and fair condition rating."
+  standard_note: "Crown cleaning and selective reduction per ANSI A300 Part 1. Live crown removal to remain within 20% given tree's mature age and fair condition rating.",
+  live_crown_retained_pct: 80,
+  after_description: "After crown cleaning and a light reduction, the canopy is balanced and clear of deadwood, with end-weight eased off the limbs over the driveway. About 80% of the live crown is retained to keep the tree healthy.",
+  annotations: [
+    { id: "a1", type: "remove", client_label: "Remove deadwood — upper crown", technical_standard: "ANSI A300 Part 1 §4.1 — Crown cleaning", color: "#ef4444", region: { x: 0.30, y: 0.08, w: 0.22, h: 0.20 }, shape: "ellipse", opacity: 0.42, hatch: true },
+    { id: "a2", type: "clearance", client_label: "Raise limbs clear of driveway", technical_standard: "ANSI A300 Part 1 — Crown raising", color: "#f59e0b", region: { x: 0.58, y: 0.46, w: 0.30, h: 0.22 }, shape: "rect", opacity: 0.40, hatch: false },
+    { id: "a3", type: "final-crown", client_label: "Balanced final crown", technical_standard: "ANSI A300 Part 1 §4.2 — Crown thinning ≤25%", color: "#22c55e", region: { x: 0.22, y: 0.18, w: 0.52, h: 0.50 }, shape: "ellipse", opacity: 0.18, hatch: false }
+  ],
+  cut_points: [
+    { description: "Three-cut removal — branch collar preserved", technique: "three-cut", short_technique: "3-Cut", x: 0.41, y: 0.14 },
+    { description: "Lateral reduction to a suitable growth point", technique: "lateral-reduction", short_technique: "Lat.Red.", x: 0.72, y: 0.42 }
+  ]
 };
 
 function isDemoMode() {
@@ -878,6 +889,7 @@ function renderResults(r) {
   if (r.annotations && r.annotations.length) {
     const doAnnotate = () => {
       generateAnnotatedPhoto(r.annotations, r.cut_points || []);
+      generateAfterRendering(r.annotations);   // conceptual "After service" view — reveals the After tab
       document.getElementById('photo-annotated-wrap').style.display = 'block';
       document.getElementById('photo-original-wrap').style.display = 'none';
       document.getElementById('photo-tabs').style.display = 'flex';
@@ -1093,9 +1105,10 @@ function showPhotoView(view) {
   document.getElementById('photo-annotated-wrap').style.display = view === 'annotated' ? 'block' : 'none';
   document.getElementById('photo-after-wrap').style.display     = view === 'after'     ? 'block' : 'none';
   document.querySelectorAll('.photo-tab').forEach(t => {
-    const map = { original:'original', annotated:'annotated', after:'after' };
-    const tv = Object.entries(map).find(([k]) => t.textContent.trim().toLowerCase().startsWith(k));
-    t.classList.toggle('active', tv && tv[0] === view);
+    // map button label → view name (so "Before" still selects the original view)
+    const map = { before:'original', original:'original', annotated:'annotated', after:'after' };
+    const entry = Object.entries(map).find(([label]) => t.textContent.trim().toLowerCase().startsWith(label));
+    t.classList.toggle('active', !!entry && entry[1] === view);
   });
 }
 
@@ -1169,13 +1182,13 @@ function generateAfterRendering(annotations) {
   // "AFTER SERVICE" label
   const fs = Math.max(13, Math.min(20, W/60));
   ctx.save();
+  ctx.font = `700 ${fs}px system-ui, sans-serif`;   // set font BEFORE measuring so the label box fits
   ctx.globalAlpha = 0.92;
   ctx.fillStyle = '#052e16';
   const lbw = ctx.measureText('AFTER SERVICE').width + fs*2.2;
   ctx.fillRect(W - lbw - 10, 10, lbw, fs*1.9);
   ctx.globalAlpha = 1;
   ctx.fillStyle = '#4ade80';
-  ctx.font = `700 ${fs}px system-ui, sans-serif`;
   ctx.fillText('AFTER SERVICE', W - lbw, 10 + fs*1.4);
   ctx.restore();
 
