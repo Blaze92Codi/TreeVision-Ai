@@ -30,10 +30,19 @@ serve(async (req: Request) => {
 
   try {
     const resendKey = Deno.env.get("RESEND_API_KEY");
-    if (!resendKey) throw new Error("RESEND_API_KEY environment variable not set");
+    if (!resendKey) {
+      // Clear, actionable error instead of a generic 500 crash.
+      return new Response(
+        JSON.stringify({ error: "Email service not configured. Add a RESEND_API_KEY secret in Supabase → Project Settings → Edge Functions → Secrets." }),
+        { status: 503, headers: { ...corsHeaders, "Content-Type": "application/json" } }
+      );
+    }
 
-    const fromAddress = Deno.env.get("QUOTE_FROM_EMAIL") ?? "quotes@treevision.app";
     const companyName = Deno.env.get("COMPANY_NAME") ?? "Dynamic Tree Service";
+    // Default to Resend's shared test sender so quotes can go out before a sending
+    // domain is verified. It only delivers to the Resend account's own email until
+    // you verify a domain and set QUOTE_FROM_EMAIL (e.g. "quotes@yourdomain.com").
+    const fromAddress = Deno.env.get("QUOTE_FROM_EMAIL") ?? `${companyName} <onboarding@resend.dev>`;
 
     const supabase = createClient(
       Deno.env.get("SUPABASE_URL")!,
@@ -64,12 +73,20 @@ serve(async (req: Request) => {
       );
     }
 
-    if (!estimate.client_email) {
+    // Tolerate the table's mixed naming: prefer client_*, fall back to customer_*/contact_*.
+    const toEmail   = estimate.client_email   || estimate.customer_email   || estimate.contact_email;
+    const toName    = estimate.client_name    || estimate.customer_name    || estimate.contact_name    || "";
+    const toAddress = estimate.client_address || estimate.customer_address || estimate.job_address      || "";
+    if (!toEmail) {
       return new Response(
         JSON.stringify({ error: "Estimate has no customer email — cannot send quote" }),
         { status: 400, headers: { ...corsHeaders, "Content-Type": "application/json" } }
       );
     }
+    // Normalize so the rest of the email builder can read estimate.client_* uniformly.
+    estimate.client_email   = toEmail;
+    estimate.client_name    = toName;
+    estimate.client_address = toAddress;
 
     if (estimate.status !== "approved" && estimate.status !== "scheduled") {
       return new Response(
@@ -206,7 +223,11 @@ serve(async (req: Request) => {
 
     if (!resendResponse.ok) {
       const errText = await resendResponse.text();
-      throw new Error(`Resend API error ${resendResponse.status}: ${errText}`);
+      console.error("Resend rejected send:", resendResponse.status, errText);
+      return new Response(
+        JSON.stringify({ error: `Email provider rejected the send (${resendResponse.status}). ${errText}` }),
+        { status: 502, headers: { ...corsHeaders, "Content-Type": "application/json" } }
+      );
     }
 
     const resendData = await resendResponse.json();
