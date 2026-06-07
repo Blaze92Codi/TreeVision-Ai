@@ -157,6 +157,14 @@
     infoEl.style.display = "block";
   }
 
+  // If we arrived here from a password recovery email, supabase puts a
+  // `type=recovery` token in the URL hash. Hand the user off to the account
+  // page so they can set a new password instead of bouncing into the portal.
+  const _h = new URLSearchParams(location.hash.replace(/^#/, ""));
+  if (_h.get("type") === "recovery") {
+    location.replace("account.html" + location.hash);
+  }
+
   // Surface any error passed in the URL (e.g. from a failed auth redirect).
   const urlErr = new URLSearchParams(location.search).get("error");
   if (urlErr) {
@@ -209,7 +217,7 @@
     forgot.disabled = true;
     try {
       const { error } = await sb.auth.resetPasswordForEmail(email, {
-        redirectTo: location.origin + "/login.html"
+        redirectTo: location.origin + "/account.html"
       });
       if (error) showErr(error.message || "Could not send reset email.");
       else showInfo("Password reset email sent. Check your inbox.");
