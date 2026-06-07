@@ -25,6 +25,7 @@
 
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
 <script src="app.js"></script>
+<script src="tree-annotations.js"></script>
 
 <div class="topbar">
   <div>
@@ -39,6 +40,25 @@
 <!-- Photo lightbox (openPhoto/Escape target) -->
 <div id="photo-lightbox" style="display:none;position:fixed;inset:0;background:rgba(0,0,0,.85);z-index:9999;align-items:center;justify-content:center;cursor:zoom-out;" onclick="this.style.display='none'">
   <img id="lightbox-img" alt="Tree photo" style="max-width:92vw;max-height:92vh;border-radius:8px;box-shadow:0 8px 40px rgba(0,0,0,.6);">
+</div>
+
+<!-- Annotation viewer (Before / Work Plan / After tabs over the estimate photo) -->
+<div id="anno-modal" style="display:none;position:fixed;inset:0;background:rgba(5,20,11,.82);z-index:9998;align-items:center;justify-content:center;padding:24px;">
+  <div style="width:100%;max-width:1040px;max-height:92vh;background:#0b1f17;border-radius:14px;overflow:hidden;display:flex;flex-direction:column;">
+    <div style="display:flex;align-items:center;gap:10px;padding:14px 18px;background:#0e2a1c;border-bottom:1px solid #1f3d2a;">
+      <strong style="color:#fff;flex:1;font-size:14px;">Annotated photo</strong>
+      <button data-anno-view="before"    class="anno-tab" style="background:transparent;border:1px solid #2f7d32;color:#bff0c8;padding:6px 14px;border-radius:999px;font-weight:700;cursor:pointer;font-size:13px;">Before</button>
+      <button data-anno-view="annotated" class="anno-tab" style="background:#2f7d32;border:1px solid #2f7d32;color:#fff;padding:6px 14px;border-radius:999px;font-weight:700;cursor:pointer;font-size:13px;">Work Plan</button>
+      <button data-anno-view="after"     class="anno-tab" style="background:transparent;border:1px solid #2f7d32;color:#bff0c8;padding:6px 14px;border-radius:999px;font-weight:700;cursor:pointer;font-size:13px;">After</button>
+      <button onclick="closeAnnotations()" style="background:transparent;border:none;color:#bff0c8;font-size:22px;cursor:pointer;margin-left:8px;">×</button>
+    </div>
+    <div style="flex:1;overflow:auto;background:#000;display:flex;align-items:center;justify-content:center;">
+      <canvas id="anno-canvas" style="max-width:100%;height:auto;display:block;"></canvas>
+    </div>
+    <div id="anno-empty" style="display:none;padding:18px;color:#cfeede;font-size:13px;text-align:center;background:#0e2a1c;border-top:1px solid #1f3d2a;">
+      This estimate has no photo on file - annotations need a tree photo.
+    </div>
+  </div>
 </div>
 
 <div class="shell">
@@ -217,7 +237,10 @@ function renderCard(e) {
   <div class="est-card ${e.status}" id="card-${e.id}">
     <div class="est-header">
       ${(e.photo_urls && e.photo_urls[0] || "")
-        ? `<img class="est-photo" src="${esc((e.photo_urls && e.photo_urls[0] || ""))}" alt="Tree photo" onclick="openPhoto('${esc((e.photo_urls && e.photo_urls[0] || ""))}')" title="Click to view full photo">`
+        ? `<div class="est-photo-wrap" style="position:relative;">
+             <img class="est-photo" src="${esc((e.photo_urls && e.photo_urls[0] || ""))}" alt="Tree photo" onclick="openPhoto('${esc((e.photo_urls && e.photo_urls[0] || ""))}')" title="Click to view full photo">
+             <button onclick="openAnnotations('${e.id}')" title="View annotated photo" style="position:absolute;bottom:6px;left:6px;background:rgba(11,31,23,.78);color:#bff0c8;border:none;border-radius:6px;padding:4px 9px;font-size:11px;font-weight:700;cursor:pointer;backdrop-filter:blur(2px);">🌳 Annotated</button>
+           </div>`
         : `<div class="est-photo-placeholder"><i class="ti ti-photo-off" aria-hidden="true"></i></div>`
       }
       <div class="est-meta">
@@ -330,7 +353,62 @@ function openPhoto(url) {
   document.getElementById('lightbox-img').src = url;
   lb.style.display = 'flex';
 }
-document.addEventListener('keydown', e => { if (e.key === 'Escape') { const lb = document.getElementById('photo-lightbox'); if (lb) lb.style.display = 'none'; } });
+
+/* ── Annotation viewer ──
+   Renders Before / Work Plan / After via tree-annotations.js. Reads
+   `annotations` and `after_description` from the estimate (gracefully
+   degrades when the AI hasn't populated them yet — the headers, ISA
+   risk pill, and brand watermark still render). */
+let _annoCurrent = null;
+async function openAnnotations(id) {
+  const e = allEstimates.find(x => x.id === id);
+  if (!e) return;
+  _annoCurrent = e;
+  const modal = document.getElementById('anno-modal');
+  const empty = document.getElementById('anno-empty');
+  const canvas = document.getElementById('anno-canvas');
+  const photo = (e.photo_urls && e.photo_urls[0]) || e.photo_url || '';
+  modal.style.display = 'flex';
+  if (!photo) { empty.style.display = 'block'; canvas.style.display = 'none'; return; }
+  empty.style.display = 'none';
+  canvas.style.display = 'block';
+  setAnnoView('annotated');
+}
+
+function closeAnnotations() {
+  document.getElementById('anno-modal').style.display = 'none';
+  _annoCurrent = null;
+}
+
+async function setAnnoView(view) {
+  if (!_annoCurrent || !window.TreeAnnotations) return;
+  document.querySelectorAll('.anno-tab').forEach(b => {
+    const on = b.dataset.annoView === view;
+    b.style.background = on ? '#2f7d32' : 'transparent';
+    b.style.color      = on ? '#fff'    : '#bff0c8';
+  });
+  const e = _annoCurrent;
+  const photo = (e.photo_urls && e.photo_urls[0]) || e.photo_url;
+  const fn = view === 'before' ? 'generateBefore'
+           : view === 'after'  ? 'generateAfterRendering'
+           : 'generateAnnotatedPhoto';
+  try {
+    await TreeAnnotations[fn](photo, e, document.getElementById('anno-canvas'));
+  } catch (err) {
+    console.warn('Annotation render failed:', err);
+  }
+}
+
+document.querySelectorAll('.anno-tab').forEach(b => {
+  b.addEventListener('click', () => setAnnoView(b.dataset.annoView));
+});
+
+document.addEventListener('keydown', e => {
+  if (e.key === 'Escape') {
+    const lb = document.getElementById('photo-lightbox'); if (lb) lb.style.display = 'none';
+    closeAnnotations();
+  }
+});
 
 function esc(s) {
   if (!s) return '';
