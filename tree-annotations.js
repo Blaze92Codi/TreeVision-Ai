@@ -429,22 +429,57 @@
     return { summary, lineItems: items, afterText };
   }
 
+  /* Translate the legacy annotation shape produced by the customer-facing
+     intake prompt (region/shape/client_label/technical_standard with types
+     like "remove" | "clearance" | "final-crown" | "protect" | "drop-zone")
+     into the shape this renderer expects (box/poly + ANNOTATION_TYPES keys).
+     Annotations already in the new shape are returned unchanged. */
+  const LEGACY_TYPE_MAP = {
+    remove:        'removal_zone',
+    deadwood:      'deadwood',
+    clearance:     'clearance',
+    'final-crown': 'preserve_zone',
+    preserve:      'preserve_zone',
+    protect:       'target',
+    'drop-zone':   'target',
+  };
+  function adaptAnnotation(an) {
+    if (!an || typeof an !== 'object') return null;
+    if (an.box || an.poly || typeof an.x === 'number') return an;
+    if (an.region) {
+      const r = an.region;
+      return {
+        type:  LEGACY_TYPE_MAP[an.type] || an.type || 'crown_clean',
+        box:   { x: +r.x, y: +r.y, w: +r.w, h: +r.h },
+        label: an.client_label || an.label || undefined,
+        note:  an.technical_standard || an.note || undefined,
+      };
+    }
+    return an;
+  }
+
   /* ---- normalization: the ONLY place field names are read ---------------- */
   function normalizeAnalysis(raw) {
     raw = raw || {};
-    const svc = (raw.service_type || raw.servicePreset || '').toLowerCase();
+    const svcSource = raw.service_type || raw.servicePreset
+                   || raw.recommended_service || raw.recommended_pkg_key || '';
+    const svc = String(svcSource).toLowerCase();
     const isRemoval = /remov/.test(svc);
+    const annotationsRaw = Array.isArray(raw.annotations) ? raw.annotations
+                         : Array.isArray(raw.annotation)  ? raw.annotation
+                         : [];
     return {
       common_name:    raw.common_name || raw.species || 'Tree',
       latin_name:     raw.latin_name || raw.scientific_name || '',
       est_height_ft:  raw.est_height_ft ?? raw.estimated_height_ft ?? raw.est_height ?? null,
-      isa_risk_rating:raw.isa_risk_rating || raw.risk || raw.observedCondition || '',
-      quote_low:      raw.quote_low ?? raw.price_range_low ?? null,
-      quote_high:     raw.quote_high ?? raw.price_range_high ?? null,
+      isa_risk_rating:raw.isa_risk_rating || raw.risk || raw.observedCondition
+                    || (Array.isArray(raw.hazard_flags) && raw.hazard_flags[0]) || '',
+      quote_low:      raw.quote_low ?? raw.price_range_low ?? raw.approved_quote_low  ?? null,
+      quote_high:     raw.quote_high ?? raw.price_range_high ?? raw.approved_quote_high ?? null,
       after_description: raw.after_description || raw.afterDescription || '',
       service_type:   isRemoval ? 'removal' : (svc || 'trim'),
       service_label:  isRemoval ? 'Full removal · site cleared' : 'Trimmed to ISA standard',
-      annotations:    Array.isArray(raw.annotations) ? raw.annotations : [],
+      annotations:    annotationsRaw.map(adaptAnnotation).filter(Boolean),
     };
   }
 
