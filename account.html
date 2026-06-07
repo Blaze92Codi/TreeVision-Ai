@@ -1,0 +1,291 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Dynamic Tree Service - Account</title>
+  <meta name="theme-color" content="#052e16">
+  <link rel="manifest" href="manifest.json">
+  <link href="https://fonts.googleapis.com/css2?family=Bricolage+Grotesque:opsz,wght@12..96,400;12..96,800&family=Spline+Sans:wght@400;500;600&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="shared.css">
+  <style>
+    .acct-wrap {
+      min-height: 100vh;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      background: #f0fdf4;
+      padding: 1rem;
+    }
+    .acct-card {
+      background: #fff;
+      border: 1px solid #d1fae5;
+      border-radius: 12px;
+      padding: 2.5rem 2rem;
+      width: 100%;
+      max-width: 420px;
+      box-shadow: 0 4px 24px rgba(5,46,22,.08);
+    }
+    .acct-card h1 {
+      font-size: 1.4rem;
+      font-weight: 800;
+      color: #052e16;
+      margin: 0 0 .25rem;
+    }
+    .acct-card p.sub {
+      color: #6b7280;
+      font-size: .875rem;
+      margin: 0 0 1.5rem;
+    }
+    .acct-card label {
+      display: block;
+      font-size: .875rem;
+      font-weight: 600;
+      color: #374151;
+      margin-bottom: .3rem;
+    }
+    .pw-row { position: relative; margin-bottom: 1rem; }
+    .pw-row input {
+      width: 100%;
+      padding: .6rem 2.5rem .6rem .75rem;
+      border: 1px solid #d1d5db;
+      border-radius: 6px;
+      font-size: .95rem;
+      box-sizing: border-box;
+      outline: none;
+      transition: border-color .2s;
+    }
+    .pw-row input:focus { border-color: #16a34a; }
+    .pw-toggle {
+      position: absolute;
+      top: 50%;
+      right: .5rem;
+      transform: translateY(-50%);
+      background: none;
+      border: none;
+      color: #6b7280;
+      font-size: .8rem;
+      cursor: pointer;
+      padding: .25rem .5rem;
+    }
+    .acct-btn {
+      width: 100%;
+      padding: .7rem;
+      background: #16a34a;
+      color: #fff;
+      border: none;
+      border-radius: 6px;
+      font-size: 1rem;
+      font-weight: 700;
+      cursor: pointer;
+      transition: background .2s;
+    }
+    .acct-btn:hover { background: #15803d; }
+    .acct-btn:disabled { background: #86efac; cursor: not-allowed; }
+    .acct-msg { font-size: .85rem; margin-top: .75rem; display: none; }
+    .acct-msg.err { color: #dc2626; }
+    .acct-msg.ok  { color: #15803d; }
+    .acct-rules {
+      font-size: .75rem;
+      color: #6b7280;
+      margin: -.5rem 0 1rem;
+    }
+    .acct-meta {
+      font-size: .85rem;
+      color: #6b7280;
+      margin-bottom: 1.25rem;
+      padding: .6rem .75rem;
+      background: #f0fdf4;
+      border-radius: 6px;
+    }
+    .acct-foot {
+      display: flex;
+      justify-content: space-between;
+      margin-top: 1.25rem;
+      font-size: .85rem;
+    }
+    .acct-foot a, .acct-foot button {
+      color: #16a34a;
+      text-decoration: none;
+      background: none;
+      border: none;
+      cursor: pointer;
+      padding: 0;
+      font: inherit;
+    }
+    .acct-foot a:hover, .acct-foot button:hover { text-decoration: underline; }
+  </style>
+</head>
+<body>
+<div class="acct-wrap">
+  <div class="acct-card" id="card">
+    <h1 id="title">Change password</h1>
+    <p class="sub" id="sub">Choose a new password for your account.</p>
+
+    <div class="acct-meta" id="userMeta" style="display:none"></div>
+
+    <form id="pwForm" novalidate>
+      <label for="pw1">New password</label>
+      <div class="pw-row">
+        <input type="password" id="pw1" autocomplete="new-password" required minlength="8">
+        <button type="button" class="pw-toggle" data-target="pw1">Show</button>
+      </div>
+      <label for="pw2">Confirm password</label>
+      <div class="pw-row">
+        <input type="password" id="pw2" autocomplete="new-password" required minlength="8">
+        <button type="button" class="pw-toggle" data-target="pw2">Show</button>
+      </div>
+      <div class="acct-rules">Minimum 8 characters. Use a mix of letters, numbers, and symbols.</div>
+      <button type="submit" class="acct-btn" id="saveBtn">Save new password</button>
+      <div class="acct-msg err" id="errMsg"></div>
+      <div class="acct-msg ok"  id="okMsg"></div>
+    </form>
+
+    <div class="acct-foot">
+      <a href="dashboard.html" id="backLink">Back to dashboard</a>
+      <button type="button" id="signOutBtn">Sign out</button>
+    </div>
+  </div>
+</div>
+
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+<script>
+  const SUPABASE_URL = "https://hydlxwjtdkzcnxxukakt.supabase.co";
+  const SUPABASE_KEY = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Imh5ZGx4d2p0ZGt6Y254eHVrYWt0Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3Nzk2ODcyNjQsImV4cCI6MjA5NTI2MzI2NH0.vXLOWjXh_6z8sSoBVqKA6wwwEKKMozjhRoIIUffwnzI";
+
+  function purgeSupabaseStorage() {
+    try {
+      for (let i = localStorage.length - 1; i >= 0; i--) {
+        const k = localStorage.key(i);
+        if (k && (k.startsWith("sb-") || k.startsWith("supabase."))) localStorage.removeItem(k);
+      }
+      for (let i = sessionStorage.length - 1; i >= 0; i--) {
+        const k = sessionStorage.key(i);
+        if (k && (k.startsWith("sb-") || k.startsWith("supabase."))) sessionStorage.removeItem(k);
+      }
+    } catch (_) {}
+  }
+
+  let sb;
+  try { sb = supabase.createClient(SUPABASE_URL, SUPABASE_KEY); }
+  catch (_) { purgeSupabaseStorage(); sb = supabase.createClient(SUPABASE_URL, SUPABASE_KEY); }
+
+  const titleEl  = document.getElementById("title");
+  const subEl    = document.getElementById("sub");
+  const metaEl   = document.getElementById("userMeta");
+  const errEl    = document.getElementById("errMsg");
+  const okEl     = document.getElementById("okMsg");
+  const saveBtn  = document.getElementById("saveBtn");
+  const backLink = document.getElementById("backLink");
+  const signOut  = document.getElementById("signOutBtn");
+
+  function showErr(msg) { okEl.style.display = "none"; errEl.textContent = msg; errEl.style.display = "block"; }
+  function showOk(msg)  { errEl.style.display = "none"; okEl.textContent  = msg; okEl.style.display  = "block"; }
+
+  // Show/hide password toggles
+  document.querySelectorAll(".pw-toggle").forEach(b => {
+    b.addEventListener("click", () => {
+      const t = document.getElementById(b.dataset.target);
+      const showing = t.type === "text";
+      t.type = showing ? "password" : "text";
+      b.textContent = showing ? "Show" : "Hide";
+    });
+  });
+
+  // Detect recovery mode: supabase email link drops the token in the URL hash.
+  // We capture this before getSession (which would otherwise just appear as a normal login).
+  const hash = new URLSearchParams(location.hash.replace(/^#/, ""));
+  const isRecovery = hash.get("type") === "recovery"
+                  || new URLSearchParams(location.search).get("mode") === "recovery";
+
+  if (isRecovery) {
+    titleEl.textContent = "Set a new password";
+    subEl.textContent   = "Choose a new password to finish recovering your account.";
+    backLink.style.display = "none";
+  }
+
+  signOut.addEventListener("click", async () => {
+    try { await sb.auth.signOut(); } catch (_) {}
+    purgeSupabaseStorage();
+    location.replace("login.html");
+  });
+
+  // Confirm a session exists, otherwise send back to login.
+  (async () => {
+    let session = null;
+    try {
+      const { data } = await sb.auth.getSession();
+      session = data && data.session;
+    } catch (_) {
+      purgeSupabaseStorage();
+    }
+
+    if (!session) {
+      // No session and not in recovery mode -> back to login
+      if (!isRecovery) {
+        location.replace("login.html");
+        return;
+      }
+      // In recovery mode but no session yet -> wait briefly for supabase-js
+      // to ingest the hash token, then re-check.
+      setTimeout(async () => {
+        try {
+          const { data } = await sb.auth.getSession();
+          if (!(data && data.session)) {
+            showErr("Recovery link is invalid or has expired. Request a new one from the login page.");
+            saveBtn.disabled = true;
+          } else {
+            renderUser(data.session.user);
+          }
+        } catch (_) {
+          showErr("Could not validate recovery link. Request a new one from the login page.");
+          saveBtn.disabled = true;
+        }
+      }, 400);
+      return;
+    }
+    renderUser(session.user);
+  })();
+
+  function renderUser(u) {
+    if (u && u.email) {
+      metaEl.textContent = "Signed in as " + u.email;
+      metaEl.style.display = "block";
+    }
+  }
+
+  document.getElementById("pwForm").addEventListener("submit", async (e) => {
+    e.preventDefault();
+    errEl.style.display = "none"; okEl.style.display = "none";
+
+    const pw1 = document.getElementById("pw1").value;
+    const pw2 = document.getElementById("pw2").value;
+
+    if (pw1.length < 8)      return showErr("Password must be at least 8 characters.");
+    if (pw1 !== pw2)         return showErr("Passwords do not match.");
+
+    saveBtn.disabled = true;
+    saveBtn.textContent = "Saving...";
+
+    try {
+      const { error } = await sb.auth.updateUser({ password: pw1 });
+      if (error) {
+        showErr(error.message || "Could not update password.");
+        saveBtn.disabled = false;
+        saveBtn.textContent = "Save new password";
+        return;
+      }
+      document.getElementById("pw1").value = "";
+      document.getElementById("pw2").value = "";
+      showOk("Password updated. Redirecting...");
+      setTimeout(() => location.replace("dashboard.html"), 1200);
+    } catch (_) {
+      purgeSupabaseStorage();
+      showErr("Could not update password. Please sign in again and retry.");
+      saveBtn.disabled = false;
+      saveBtn.textContent = "Save new password";
+    }
+  });
+</script>
+</body>
+</html>

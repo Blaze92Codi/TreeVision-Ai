@@ -3,7 +3,7 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>Dynamic Tree Service — Login</title>
+  <title>Dynamic Tree Service - Login</title>
   <meta name="theme-color" content="#052e16">
   <link rel="manifest" href="manifest.json">
   <link href="https://fonts.googleapis.com/css2?family=Bricolage+Grotesque:opsz,wght@12..96,400;12..96,800&family=Spline+Sans:wght@400;500;600&display=swap" rel="stylesheet">
@@ -72,8 +72,27 @@
     }
     .login-btn:hover { background: #15803d; }
     .login-btn:disabled { background: #86efac; cursor: not-allowed; }
+    .forgot-link {
+      display: block;
+      text-align: center;
+      margin-top: .9rem;
+      font-size: .85rem;
+      color: #16a34a;
+      text-decoration: none;
+      cursor: pointer;
+      background: none;
+      border: none;
+      width: 100%;
+    }
+    .forgot-link:hover { text-decoration: underline; }
     #loginError {
       color: #dc2626;
+      font-size: .85rem;
+      margin-top: .75rem;
+      display: none;
+    }
+    #loginInfo {
+      color: #15803d;
       font-size: .85rem;
       margin-top: .75rem;
       display: none;
@@ -109,7 +128,9 @@
       <label for="loginPassword">Password</label>
       <input type="password" id="loginPassword" placeholder="••••••••" autocomplete="current-password" required>
       <button type="submit" class="login-btn" id="loginBtn">Sign In</button>
+      <button type="button" class="forgot-link" id="forgotBtn">Forgot password?</button>
       <div id="loginError"></div>
+      <div id="loginInfo"></div>
     </form>
   </div>
 </div>
@@ -119,13 +140,29 @@
   const SUPABASE_URL = "https://hydlxwjtdkzcnxxukakt.supabase.co";
   const SUPABASE_KEY = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Imh5ZGx4d2p0ZGt6Y254eHVrYWt0Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3Nzk2ODcyNjQsImV4cCI6MjA5NTI2MzI2NH0.vXLOWjXh_6z8sSoBVqKA6wwwEKKMozjhRoIIUffwnzI";
 
-  const form  = document.getElementById("loginForm");
-  const btn   = document.getElementById("loginBtn");
-  const errEl = document.getElementById("loginError");
+  const form    = document.getElementById("loginForm");
+  const btn     = document.getElementById("loginBtn");
+  const errEl   = document.getElementById("loginError");
+  const infoEl  = document.getElementById("loginInfo");
+  const forgot  = document.getElementById("forgotBtn");
 
   function showErr(msg) {
+    infoEl.style.display = "none";
     errEl.textContent = msg;
     errEl.style.display = "block";
+  }
+  function showInfo(msg) {
+    errEl.style.display = "none";
+    infoEl.textContent = msg;
+    infoEl.style.display = "block";
+  }
+
+  // If we arrived here from a password recovery email, supabase puts a
+  // `type=recovery` token in the URL hash. Hand the user off to the account
+  // page so they can set a new password instead of bouncing into the portal.
+  const _h = new URLSearchParams(location.hash.replace(/^#/, ""));
+  if (_h.get("type") === "recovery") {
+    location.replace("account.html" + location.hash);
   }
 
   // Surface any error passed in the URL (e.g. from a failed auth redirect).
@@ -173,6 +210,24 @@
       purgeSupabaseStorage();
     }
   })();
+
+  forgot.addEventListener("click", async () => {
+    const email = document.getElementById("loginEmail").value.trim();
+    if (!email) { showErr("Enter your email above, then click Forgot password."); return; }
+    forgot.disabled = true;
+    try {
+      const { error } = await sb.auth.resetPasswordForEmail(email, {
+        redirectTo: location.origin + "/account.html"
+      });
+      if (error) showErr(error.message || "Could not send reset email.");
+      else showInfo("Password reset email sent. Check your inbox.");
+    } catch (_) {
+      purgeSupabaseStorage();
+      showErr("Could not send reset email. Please try again.");
+    } finally {
+      forgot.disabled = false;
+    }
+  });
 
   form.addEventListener("submit", async (e) => {
     e.preventDefault();
