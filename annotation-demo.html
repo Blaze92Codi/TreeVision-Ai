@@ -1,0 +1,170 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>TreeOS - Annotation Rendering Demo</title>
+<style>
+  :root{
+    --ink:#0B1F17; --brand:#2F7D32; --brand-d:#1f5a22;
+    --paper:#fff; --bg:#f4f6f4; --line:#dde4de; --muted:#5b6b60;
+  }
+  *{box-sizing:border-box}
+  body{margin:0;font-family:ui-sans-serif,system-ui,-apple-system,"Segoe UI",Roboto,sans-serif;
+       background:
+         radial-gradient(1200px 600px at 80% -10%, #e7f0e8 0, transparent 60%),
+         var(--bg);
+       color:var(--ink)}
+  header{padding:28px 24px 8px;max-width:1040px;margin:0 auto}
+  h1{margin:0;font-size:26px;letter-spacing:-.02em}
+  .sub{color:var(--muted);margin-top:4px;font-size:15px}
+  .wrap{max-width:1040px;margin:0 auto;padding:16px 24px 60px}
+  .tabs{display:flex;gap:8px;margin:18px 0}
+  .tab{appearance:none;border:1px solid var(--line);background:var(--paper);
+       padding:10px 18px;border-radius:999px;font-weight:700;font-size:14px;
+       cursor:pointer;transition:.15s;color:var(--ink)}
+  .tab[aria-selected="true"]{background:var(--brand);color:#fff;border-color:var(--brand)}
+  .stage{position:relative;border-radius:16px;overflow:hidden;border:1px solid var(--line);
+         background:#0b1f17;box-shadow:0 18px 40px -22px rgba(11,31,23,.5)}
+  canvas{display:block;width:100%;height:auto}
+  .scope{margin-top:22px;background:var(--paper);border:1px solid var(--line);
+         border-radius:16px;padding:20px 22px}
+  .scope h2{margin:0 0 4px;font-size:13px;letter-spacing:.08em;text-transform:uppercase;color:var(--muted)}
+  .summary{font-size:16px;line-height:1.5;margin:6px 0 16px}
+  .items{display:grid;gap:10px}
+  .item{display:flex;gap:12px;align-items:flex-start;padding:12px 14px;
+        border:1px solid var(--line);border-radius:12px;background:#fbfdfb}
+  .dot{width:14px;height:14px;border-radius:4px;margin-top:3px;flex:0 0 auto}
+  .item b{display:block;font-size:15px}
+  .item span{font-size:14px;color:var(--muted)}
+  .after-text{margin-top:14px;padding:14px 16px;border-left:4px solid var(--brand);
+              background:#f0f6f0;border-radius:0 10px 10px 0;font-size:15px;line-height:1.5}
+  .hint{font-size:13px;color:var(--muted);margin-top:24px;line-height:1.6}
+  code{background:#eef3ee;padding:1px 6px;border-radius:5px;font-size:13px}
+</style>
+</head>
+<body>
+<header>
+  <h1>Annotation rendering - live preview</h1>
+  <div class="sub">Same module that powers Before / Work Plan / After on the customer report.</div>
+</header>
+
+<div class="wrap">
+  <div class="tabs" role="tablist">
+    <button class="tab" role="tab" data-view="before"    aria-selected="false">Before</button>
+    <button class="tab" role="tab" data-view="annotated" aria-selected="true">Work Plan</button>
+    <button class="tab" role="tab" data-view="after"     aria-selected="false">After</button>
+  </div>
+
+  <div class="stage"><canvas id="cv"></canvas></div>
+
+  <div class="scope">
+    <h2>Scope of work</h2>
+    <div class="summary" id="summary"></div>
+    <div class="items" id="items"></div>
+    <div class="after-text" id="afterText"></div>
+  </div>
+
+  <div class="hint">
+    Integration: include <code>tree-annotations.js</code>, then call
+    <code>TreeAnnotations.generateAnnotatedPhoto(img, analysis, canvas)</code> /
+    <code>.generateAfterRendering(...)</code> / <code>.generateBefore(...)</code>.
+    Field names are read only in <code>normalizeAnalysis()</code> - remap there if yours differ.
+  </div>
+</div>
+
+<script src="tree-annotations.js"></script>
+<script>
+/* ---- a synthetic tree photo so the demo needs no external asset ---------- */
+function makeSampleTree(){
+  return new Promise((resolve)=>{
+  const c = document.createElement('canvas'); c.width=1100; c.height=825;
+  const x = c.getContext('2d');
+  // sky
+  const sky = x.createLinearGradient(0,0,0,825);
+  sky.addColorStop(0,'#bcd6e8'); sky.addColorStop(1,'#e8f0e6');
+  x.fillStyle=sky; x.fillRect(0,0,1100,825);
+  // ground
+  x.fillStyle='#7a8b5a'; x.fillRect(0,690,1100,135);
+  x.fillStyle='#6d7d50'; x.fillRect(0,690,1100,18);
+  // house (protected target, lower right)
+  x.fillStyle='#c9bca8'; x.fillRect(760,520,300,170);
+  x.fillStyle='#8d5a44'; x.beginPath(); x.moveTo(740,520); x.lineTo(910,440); x.lineTo(1080,520); x.closePath(); x.fill();
+  x.fillStyle='#6b7f93'; x.fillRect(820,560,46,46); x.fillRect(960,560,46,46);
+  // trunk
+  x.fillStyle='#5b4630'; x.fillRect(520,430,60,270);
+  x.fillStyle='#4a3826'; x.fillRect(540,430,18,270);
+  // limbs
+  x.strokeStyle='#5b4630'; x.lineWidth=22; x.lineCap='round';
+  x.beginPath(); x.moveTo(550,470); x.lineTo(410,360); x.stroke();
+  x.beginPath(); x.moveTo(550,500); x.lineTo(700,380); x.stroke();
+  x.beginPath(); x.moveTo(550,540); x.lineTo(720,560); x.stroke(); // low limb over house
+  // a dead grey limb
+  x.strokeStyle='#9a9384'; x.lineWidth=12;
+  x.beginPath(); x.moveTo(550,455); x.lineTo(380,470); x.stroke();
+  // crown
+  function blob(cx,cy,r,col){ x.fillStyle=col; x.beginPath();
+    for(let i=0;i<14;i++){const a=i/14*Math.PI*2; const rr=r*(.8+Math.random()*.4);
+      const px=cx+Math.cos(a)*rr, py=cy+Math.sin(a)*rr*.85; i?x.lineTo(px,py):x.moveTo(px,py);} x.closePath(); x.fill();}
+  blob(470,300,150,'#3f6b3a'); blob(640,290,160,'#4a7a42');
+  blob(560,210,150,'#56894b'); blob(720,360,110,'#3f6b3a');
+  blob(400,380,95,'#456f3d');
+  const im = new Image();
+  im.onload = ()=>resolve(im);
+  im.src = c.toDataURL('image/jpeg',0.9);
+  });
+}
+
+/* ---- sample analysis (shape matches the documented contract) ------------- */
+const analysis = {
+  common_name:'Northern Red Oak',
+  latin_name:'Quercus rubra',
+  est_height_ft:'60-70 ft',
+  isa_risk_rating:'Moderate',
+  quote_low:1850, quote_high:2400,
+  service_type:'trim',
+  after_description:'Crown cleaned and thinned to ISA standard, deadwood removed, and 10 ft of vertical clearance established over the roofline - natural form and long-term health preserved.',
+  annotations:[
+    { type:'deadwood',     x:0.33, y:0.57, note:'Standing dead lateral - remove' },
+    { type:'crown_thin',   poly:[{x:0.50,y:0.20},{x:0.70,y:0.22},{x:0.74,y:0.42},{x:0.55,y:0.46},{x:0.45,y:0.30}], note:'Reduce density ~15%' },
+    { type:'crown_raise',  box:{x:0.49,y:0.62,w:0.20,h:0.12}, note:'Raise limb off roof' },
+    { type:'clearance',    box:{x:0.68,y:0.60,w:0.30,h:0.22}, note:'10 ft from structure' },
+    { type:'preserve_zone',poly:[{x:0.30,y:0.18},{x:0.68,y:0.16},{x:0.74,y:0.40},{x:0.58,y:0.52},{x:0.34,y:0.50},{x:0.24,y:0.34}] },
+  ]
+};
+
+const cv = document.getElementById('cv');
+let img;
+
+async function render(view){
+  const fn = view==='before' ? 'generateBefore'
+           : view==='after'  ? 'generateAfterRendering'
+           : 'generateAnnotatedPhoto';
+  await TreeAnnotations[fn](img, analysis, cv);
+}
+
+function renderScope(){
+  const s = TreeAnnotations.buildScope(analysis);
+  document.getElementById('summary').textContent = s.summary;
+  document.getElementById('afterText').textContent = s.afterText;
+  document.getElementById('items').innerHTML = s.lineItems.map(i=>
+    `<div class="item"><span class="dot" style="background:${i.color}"></span>
+       <div><b>${i.label}</b><span>${i.detail}</span></div></div>`).join('');
+}
+
+document.querySelectorAll('.tab').forEach(t=>{
+  t.addEventListener('click',()=>{
+    document.querySelectorAll('.tab').forEach(x=>x.setAttribute('aria-selected','false'));
+    t.setAttribute('aria-selected','true');
+    render(t.dataset.view);
+  });
+});
+
+(async function init(){
+  img = await makeSampleTree();
+  await render('annotated');
+  renderScope();
+})();
+</script>
+</body>
+</html>

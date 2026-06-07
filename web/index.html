@@ -392,7 +392,7 @@ p { line-height: 1.6; color: var(--muted); font-size: .95rem; }
         </div>
         <div id="upload-area">
           <div class="dropzone" id="dropzone" onclick="document.getElementById('file-input').click()">
-            <input type="file" id="file-input" accept="image/*" capture="environment">
+            <input type="file" id="file-input" accept="image/*">
             <div class="dz-icon">📷</div>
             <div class="dz-title">Tap to photograph</div>
             <div class="dz-hint">Or drag and drop a photo<br>JPG, PNG, HEIC accepted</div>
@@ -852,7 +852,7 @@ function addTree() {
   STATE.pending = null;
   document.getElementById('upload-area').innerHTML = `
     <div class="dropzone" id="dropzone" onclick="document.getElementById('file-input').click()">
-      <input type="file" id="file-input" accept="image/*" capture="environment">
+      <input type="file" id="file-input" accept="image/*">
       <div class="dz-icon">📷</div>
       <div class="dz-title">Tap to photograph</div>
       <div class="dz-hint">Or drag and drop a photo<br>JPG, PNG, HEIC accepted</div>
@@ -956,7 +956,7 @@ function clearPhoto() {
   document.getElementById('analyze-btn').disabled = true;
   document.getElementById('upload-area').innerHTML = `
     <div class="dropzone" id="dropzone" onclick="document.getElementById('file-input').click()">
-      <input type="file" id="file-input" accept="image/*" capture="environment">
+      <input type="file" id="file-input" accept="image/*">
       <div class="dz-icon">📷</div>
       <div class="dz-title">Tap to photograph</div>
       <div class="dz-hint">Or drag and drop a photo<br>JPG, PNG, HEIC accepted</div>
