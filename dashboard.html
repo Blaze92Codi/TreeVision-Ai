@@ -151,37 +151,56 @@ function renderCard(e) {
 
   const internalHtml = (e.scope_description || '') ? `<div class="internal-note-box"><strong>🔒 Estimator notes</strong>${esc((e.scope_description || ''))}</div>` : '<div class="no-contact">No internal notes</div>';
 
-  const footerHtml = (e.status === 'draft' || e.status === 'sent') ? `
-    <div class="est-footer">
-      <div class="review-form">
+  // Manager-approved values take priority over the AI's original estimate.
+  const savedLow   = e.approved_quote_low  ?? e.price_range_low  ?? '';
+  const savedHigh  = e.approved_quote_high ?? e.price_range_high ?? '';
+  const savedNotes = e.manager_notes || '';
+
+  const isPending  = (e.status === 'draft'    || e.status === 'sent');
+  const isApproved = (e.status === 'approved' || e.status === 'scheduled');
+
+  const adjustFormHtml = `
+    <div class="review-form">
+      <div>
+        <div class="review-label">Manager notes (visible to customer if shared)</div>
+        <textarea class="review-textarea" id="mnotes-${e.id}" rows="2" placeholder="Add scope clarifications, conditions, or next steps…">${esc(savedNotes)}</textarea>
+      </div>
+      <div class="review-row">
         <div>
-          <div class="review-label">Manager notes (visible to customer if shared)</div>
-          <textarea class="review-textarea" id="mnotes-${e.id}" rows="2" placeholder="Add scope clarifications, conditions, or next steps…"></textarea>
+          <div class="review-label">Approved quote low ($)</div>
+          <input class="review-input" type="number" min="0" step="1" id="qlo-${e.id}" value="${savedLow}" style="width:120px;">
         </div>
-        <div class="review-row">
-          <div>
-            <div class="review-label">Approved quote low ($)</div>
-            <input class="review-input" type="number" id="qlo-${e.id}" value="${(e.price_range_low || 0)||''}" style="width:120px;">
-          </div>
-          <div>
-            <div class="review-label">Approved quote high ($)</div>
-            <input class="review-input" type="number" id="qhi-${e.id}" value="${(e.price_range_high || 0)||''}" style="width:120px;">
-          </div>
-        </div>
-        <div class="review-actions">
-          <button class="btn-approve"  onclick="updateEstimate('${e.id}','approved')">✓ Approve &amp; confirm quote</button>
-          <button class="btn-schedule" onclick="updateEstimate('${e.id}','scheduled')">📅 Mark as scheduled</button>
-          <button class="btn-reject"   onclick="updateEstimate('${e.id}','declined')">✕ Reject</button>
+        <div>
+          <div class="review-label">Approved quote high ($)</div>
+          <input class="review-input" type="number" min="0" step="1" id="qhi-${e.id}" value="${savedHigh}" style="width:120px;">
         </div>
       </div>
+      <div class="review-actions">
+        ${isPending ? `
+          <button class="btn-approve"  onclick="saveAdjustment('${e.id}','approved')">✓ Approve &amp; confirm quote</button>
+          <button class="btn-schedule" onclick="saveAdjustment('${e.id}','scheduled')">📅 Mark as scheduled</button>
+          <button class="btn-reject"   onclick="saveAdjustment('${e.id}','declined')">✕ Reject</button>
+        ` : isApproved ? `
+          <button class="btn-approve"  onclick="saveAdjustment('${e.id}',null)">💾 Save quote adjustment</button>
+          <button class="btn-schedule" onclick="saveAdjustment('${e.id}','${e.status === 'approved' ? 'scheduled' : 'approved'}')">${e.status === 'approved' ? '📅 Mark as scheduled' : '↩ Move back to approved'}</button>
+          <button class="btn-reject"   onclick="resetToPending('${e.id}')">↩ Reset to pending</button>
+        ` : `
+          <button class="btn-approve" onclick="resetToPending('${e.id}')">↩ Reset to pending</button>
+        `}
+      </div>
+    </div>`;
+
+  const footerHtml = (e.status === 'draft' || e.status === 'sent') ? `
+    <div class="est-footer">
+      ${adjustFormHtml}
     </div>` : e.status !== 'pending' ? `
     <div class="est-footer">
+      ${adjustFormHtml}
       <div class="approved-summary">
         <div><div class="lbl">Decision</div><div class="val">${e.status.charAt(0).toUpperCase() + e.status.slice(1)}</div></div>
-        ${(e.price_range_low || 0) ? `<div><div class="lbl">Approved quote</div><div class="val">$${num((e.price_range_low || 0))} – $${num((e.price_range_high || 0))}</div></div>` : ''}
+        ${(e.approved_quote_low || e.price_range_low) ? `<div><div class="lbl">Approved quote</div><div class="val">$${num(savedLow)} – $${num(savedHigh)}</div></div>` : ''}
         ${e.approved_at ? `<div><div class="lbl">Decided</div><div class="val">${timeAgo(e.approved_at)}</div></div>` : ''}
         ${e.quote_sent_at ? `<div><div class="lbl">Quote sent</div><div class="val">${timeAgo(e.quote_sent_at)}</div></div>` : ''}
-        ${e.manager_notes ? `<div style="width:100%;"><div class="lbl">Manager notes</div><div style="font-size:.85rem;margin-top:2px;">${esc(e.manager_notes)}</div></div>` : ''}
         <div style="margin-left:auto;display:flex;gap:8px;align-items:center;flex-wrap:wrap;">
           ${e.client_email
             ? e.quote_sent_at
@@ -190,7 +209,6 @@ function renderCard(e) {
               : `<button class="btn-send" onclick="sendQuote('${e.id}',this)">✉ Send quote to customer</button>`
             : `<span style="font-size:.78rem;color:var(--muted);">No email — can't send</span>`
           }
-          <button class="btn-approve" style="background:transparent;color:var(--muted);border:1px solid var(--line);font-size:.78rem;padding:7px 12px;" onclick="resetToPending('${e.id}')">↩ Reset</button>
         </div>
       </div>
     </div>` : '';
@@ -242,18 +260,33 @@ function renderCard(e) {
   </div>`;
 }
 
-/* ── Update estimate ── */
-async function updateEstimate(id, status) {
+/* ── Save adjustment / decision ──
+   Saves the manager's edited quote + notes. If `status` is provided the
+   record's status and approved_at timestamp are updated too; passing
+   `status=null` just saves the quote/note adjustment without changing
+   the workflow stage (used to tweak prices after approval). */
+async function saveAdjustment(id, status) {
   const notes  = document.getElementById('mnotes-' + id)?.value || '';
-  const qLo    = parseInt(document.getElementById('qlo-' + id)?.value) || null;
-  const qHi    = parseInt(document.getElementById('qhi-' + id)?.value) || null;
-  const { error } = await db.from('estimates').update({
-    status,
-    manager_notes:      notes,
+  const qLoStr = document.getElementById('qlo-' + id)?.value;
+  const qHiStr = document.getElementById('qhi-' + id)?.value;
+  const qLo    = (qLoStr === '' || qLoStr == null) ? null : parseInt(qLoStr, 10);
+  const qHi    = (qHiStr === '' || qHiStr == null) ? null : parseInt(qHiStr, 10);
+
+  if (qLo != null && qHi != null && qLo > qHi) {
+    alert('Low quote ($' + num(qLo) + ') must be less than high quote ($' + num(qHi) + ').');
+    return;
+  }
+
+  const patch = {
+    manager_notes:       notes || null,
     approved_quote_low:  qLo,
     approved_quote_high: qHi,
-    approved_at:        new Date().toISOString(),
-  }).eq('id', id);
+  };
+  if (status) {
+    patch.status      = status;
+    patch.approved_at = new Date().toISOString();
+  }
+  const { error } = await db.from('estimates').update(patch).eq('id', id);
   if (error) { alert('Error: ' + error.message); return; }
   await loadEstimates();
 }
