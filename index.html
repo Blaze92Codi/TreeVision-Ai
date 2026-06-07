@@ -900,65 +900,95 @@ If not a tree set is_tree false and omit annotations and cut_points. Base quotes
 /* Validate / clamp AI zone geometry so wildly misplaced overlays don't reach
    the customer view. The AI is asked for `tree_box` (the visible tree's
    bounding rect in normalized coords); every annotation region is then
-   forced to live inside it and respect a few type-specific rules. */
+   forced to live inside it AND inside hard image-relative guardrails that
+   reject the lawn and the sky regardless of what the AI returned. */
 function sanitizeAnalysis(r) {
   if (!r || typeof r !== 'object') return r;
   const clip = (v, lo, hi) => Math.max(lo, Math.min(hi, v));
 
-  // 1) Normalize / infer tree_box. Fall back to a generous center-frame box.
+  // Hard image-relative guardrails — independent of tree_box. The center of
+  // any zone must sit inside this band: above the lawn, below the sky.
+  // Clearance zones get a small upward extension toward roofs/lines.
+  const SKY_TOP   = 0.06;   // anything centered above this is the sky
+  const LAWN_TOP  = 0.82;   // anything centered below this is the lawn
+
+  // 1) Normalize / infer tree_box. The fallback is intentionally tight
+  //    (typical residential portrait crops put the tree in the middle).
+  //    A too-generous fallback turns the sanitizer into a no-op.
   let tb = r.tree_box;
-  if (!tb || typeof tb.x !== 'number') tb = { x: 0.10, y: 0.10, w: 0.80, h: 0.80 };
+  const tbValid = tb && ['x','y','w','h'].every(k => typeof tb[k] === 'number'
+                                                    && tb[k] >= 0 && tb[k] <= 1);
+  if (!tbValid) tb = { x: 0.15, y: 0.10, w: 0.70, h: 0.62 };
+  // Even if the AI returned tree_box, refuse one that covers nearly the whole
+  // frame — that's a "I don't know" answer dressed up.
+  if (tb.w > 0.92 || tb.h > 0.92) tb = { x: 0.15, y: 0.10, w: 0.70, h: 0.62 };
   tb = {
-    x: clip(tb.x, 0, 1),
-    y: clip(tb.y, 0, 1),
-    w: clip(tb.w, 0.05, 1 - tb.x),
-    h: clip(tb.h, 0.05, 1 - tb.y),
+    x: clip(tb.x, 0, 0.9),
+    y: clip(tb.y, 0, 0.9),
+    w: clip(tb.w, 0.10, 1 - tb.x),
+    h: clip(tb.h, 0.10, 1 - tb.y),
   };
   r.tree_box = tb;
   const bx = tb.x, by = tb.y, bw = tb.w, bh = tb.h;
   const bRight = bx + bw, bBottom = by + bh;
-  const centerOK = (px, py) => (px >= bx - 0.02 && px <= bRight + 0.02 && py >= by - 0.02 && py <= bBottom + 0.02);
 
-  // 2) Sanitize annotations. Operate on whichever shape the prompt returned
-  //    (legacy `region` + `shape` is what's in production today).
+  function snapInsideTree(cx, cy, w, h) {
+    return {
+      cx: clip(cx, bx + w * 0.4, bRight  - w * 0.4),
+      cy: clip(cy, by + h * 0.4, bBottom - h * 0.4),
+    };
+  }
+
+  // 2) Sanitize annotations.
   if (Array.isArray(r.annotations)) {
     r.annotations = r.annotations.map(a => {
       if (!a) return a;
-      const reg = a.region || a.box || (typeof a.x === 'number' ? null : null);
+      const reg = a.region || a.box;
       if (!reg) return a;
 
       let { x, y, w, h } = reg;
       x = Number(x); y = Number(y); w = Number(w); h = Number(h);
       if (!isFinite(x) || !isFinite(y) || !isFinite(w) || !isFinite(h)) return a;
 
-      // Cap zone size relative to the tree bounds, not the image.
-      // Bigger absolute cap for full-removal/protect; tighter for everything else.
-      const maxFrac = (a.type === 'final-crown' || a.type === 'protect') ? 0.95 : 0.65;
-      w = clip(w, 0.02, bw * maxFrac);
-      h = clip(h, 0.02, bh * maxFrac);
+      // Cap zone size relative to tree bounds (final-crown / protect get more
+      // headroom since they envelope the whole crown).
+      const big = (a.type === 'final-crown' || a.type === 'protect');
+      w = clip(w, 0.02, bw * (big ? 0.95 : 0.60));
+      h = clip(h, 0.02, bh * (big ? 0.95 : 0.60));
+
+      let cx = x + w / 2, cy = y + h / 2;
+      const isRaise     = /raise|crown[-_ ]?raise/i.test(a.client_label || '')
+                         || a.type === 'crown-raise' || a.type === 'crown_raise';
+      const isClearance = a.type === 'clearance';
+      const isFinalCrn  = a.type === 'final-crown';
 
       // Crown-raise: must overlap the bottom third of the tree, never below it.
-      // Snap upward until the zone's center sits inside the lower tree band.
-      if (/raise|crown[-_ ]?raise/i.test(a.client_label || '') || a.type === 'crown-raise' || a.type === 'crown_raise') {
-        const lowerBandTop = by + bh * 0.55;
-        const cy = y + h / 2;
-        if (cy > bBottom - h * 0.25) y = bBottom - h * 0.85;       // pushed below tree → snap up into trunk/lower limbs
-        else if (cy < lowerBandTop)  y = lowerBandTop - h / 2;     // floated too high → drop into lower band
+      if (isRaise) {
+        const lowerBandTop = by + bh * 0.60;
+        const lowerBandBot = bBottom - h * 0.30;
+        cy = clip(cy, lowerBandTop, lowerBandBot);
       }
-
-      // For everything else: if the zone center is clearly outside the tree
-      // box, slide it back inside (preserve size).
-      const cx = x + w / 2, cy = y + h / 2;
-      if (!centerOK(cx, cy)) {
-        const newCx = clip(cx, bx + w * 0.4, bRight - w * 0.4);
-        const newCy = clip(cy, by + h * 0.4, bBottom - h * 0.4);
-        x = newCx - w / 2;
-        y = newCy - h / 2;
+      // Final-crown: the surviving canopy lives in the UPPER half of the tree,
+      // not over the trunk and definitely not in the lawn.
+      if (isFinalCrn) {
+        cx = bx + bw / 2;                          // center horizontally
+        cy = by + bh * 0.40;                       // upper crown band
+        w  = Math.min(w, bw * 0.90);
+        h  = Math.min(h, bh * 0.65);
       }
+      // Hard guardrails: reject the lawn and the sky for everything except
+      // clearance (which may legitimately point upward at a structure).
+      if (!isClearance) {
+        cy = clip(cy, SKY_TOP + h * 0.4, LAWN_TOP - h * 0.4);
+      } else {
+        cy = clip(cy, h * 0.4, 1 - h * 0.4);
+      }
+      // Snap center back inside tree_box if it ended up outside.
+      const snap = snapInsideTree(cx, cy, w, h);
+      cx = snap.cx; cy = snap.cy;
 
-      // Final clip to canvas.
-      x = clip(x, 0, 1 - w);
-      y = clip(y, 0, 1 - h);
+      x = clip(cx - w / 2, 0, 1 - w);
+      y = clip(cy - h / 2, 0, 1 - h);
 
       const fixed = { x, y, w, h };
       if (a.region) return { ...a, region: fixed };
@@ -966,13 +996,13 @@ function sanitizeAnalysis(r) {
     });
   }
 
-  // 3) Cut points: snap any that landed outside the tree box back inside.
+  // 3) Cut points: snap any that landed outside the tree box or in lawn/sky.
   if (Array.isArray(r.cut_points)) {
     r.cut_points = r.cut_points.map(p => {
       if (!p || typeof p.x !== 'number' || typeof p.y !== 'number') return p;
       return { ...p,
-        x: clip(p.x, bx + 0.02, bRight - 0.02),
-        y: clip(p.y, by + 0.02, bBottom - 0.02),
+        x: clip(p.x, bx + 0.02, bRight  - 0.02),
+        y: clip(clip(p.y, SKY_TOP, LAWN_TOP), by + 0.02, bBottom - 0.02),
       };
     });
   }
