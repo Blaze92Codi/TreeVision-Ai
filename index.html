@@ -732,9 +732,18 @@ async function runDemo() {
 async function callClaude(base64, mediaType) {
   const PROMPT = `You are a professional tree service estimator performing a visual assessment per ANSI A300 standards and ISA Best Management Practices.
 
+STEP 1 — BEFORE ANY ANNOTATIONS, locate the tree.
+Output a "tree_box": {x,y,w,h} in normalized 0..1 coords that TIGHTLY bounds
+the visible tree (trunk + foliage). If the tree occupies only part of the
+frame, tree_box must reflect that — do NOT default to the whole image.
+EVERY zone you place must sit inside tree_box (small overshoot for clearance
+zones is OK). Zones that would land in the sky above the tree, in the lawn
+below it, or in the street/yard beside it are PROHIBITED.
+
 Return ONLY a valid JSON object (no markdown, no backticks, no preamble):
 {
   "is_tree": true,
+  "tree_box": { "x": 0.0, "y": 0.0, "w": 0.0, "h": 0.0 },
   "common_name": "string — use the most specific correct common name",
   "latin_name": "string — binomial nomenclature",
   "id_confidence": "High | Medium | Low",
@@ -795,13 +804,32 @@ NEVER confuse shrub-form multi-stem species (Lilac, Serviceberry, Honeysuckle, F
 
 PRUNING TECHNIQUE RULES — ANSI A300 accuracy required:
 
-ZONE PLACEMENT — be precise and tight:
-- Region MUST tightly bound the actual visible feature — not a vague image quadrant
-- Deadwood/problem branch: zone should be small (w 0.05-0.25, h 0.05-0.25), centered on the specific branch
-- Crown envelope: ellipse should match the actual visible crown edge — NOT the full image. If crown occupies 40% of image, w and h should be ~0.4
-- Clearance zone: rect should span from branch tip to the structure surface (narrow, directional)
-- Do NOT set w or h > 0.65 unless the tree truly fills most of the frame
-- For each zone ask: "Am I annotating the actual tree feature or just drawing a generic box?" If generic, tighten it.
+ZONE PLACEMENT — coordinates are relative to the IMAGE, but every zone
+MUST be tested against tree_box before you output it:
+- Region MUST tightly bound the actual visible feature — not a vague image quadrant.
+- Every zone's CENTER must fall inside tree_box. Reject any zone whose center
+  is in the sky (above tree_box.y), in the lawn (below tree_box.y+tree_box.h),
+  or to the side of the trunk (outside tree_box horizontally).
+- Sizing: w and h of any zone must be <= 0.65 * tree_box dimensions (i.e. a
+  zone never covers more than ~⅔ of the visible tree in either axis). The
+  final-crown ellipse may be up to 0.95 * tree_box dims.
+- Deadwood/problem branch: small (w 0.05-0.20 of image, or 0.10-0.30 of
+  tree_box w), centered on the specific branch.
+- Crown envelope: ellipse matches the actual visible crown edge — NOT the
+  full image. If the crown occupies 40% of the image, w and h should be ~0.4.
+- Crown-raise zones: MUST overlap the BOTTOM third of tree_box (the lowest
+  visible limbs). They are NEVER placed below tree_box.y+tree_box.h — that's
+  the lawn, not a limb. If you want to flag "raise crown for 8 ft clearance
+  off the ground," the zone still sits on the visible lower limbs of the tree,
+  not on the grass below them.
+- Clearance zone: rect spans from branch tip to the structure surface
+  (narrow, directional). May extend slightly outside tree_box toward the
+  structure — that is the one exception.
+- Do NOT default to "center of image" coordinates. Look at where the actual
+  feature is in the photo and place the zone there.
+- For each zone ask: "Is the center of this zone inside tree_box, and is
+  the zone smaller than ⅔ of tree_box?" If either answer is no, fix it
+  before outputting.
 
 SHAPES:
 - shape: "ellipse" for crown/canopy zones (remove, final-crown, protect on single-trunk trees)
@@ -830,7 +858,9 @@ SPECIFIC ANSI A300 CITATIONS — use these exact section references:
 - Root protection: "ISA BMP §7 — Root zone: no grade change or soil compaction within drip line"
 
 CUT POINTS — Trimming & Pruning only (2-6 points):
-- Place at actual visible branch unions where pruning cuts will occur
+- Place at actual visible branch unions where pruning cuts will occur.
+- Every cut point's (x,y) MUST fall inside tree_box. A cut point on grass
+  or sky is a bug — branch unions only exist on the tree itself.
 - technique: three-cut (limbs >2" dia) | lateral-reduction | collar-cut (small branches) | crown-raise
 - short_technique (for canvas label): "3-Cut" | "Lat. Red." | "Collar Cut" | "C. Raise"
 - PROHIBITED: topping | heading cuts | flush cuts | stub cuts | lion's tailing | removing >25% live crown
@@ -864,7 +894,90 @@ If not a tree set is_tree false and omit annotations and cut_points. Base quotes
   try { parsed = JSON.parse(text.replace(/```json|```/g,'').trim()); }
   catch { throw new Error("Could not read analysis. Please try a clearer photo."); }
   if (!parsed.is_tree) throw new Error("No tree detected. Please upload a clear full-tree photo.");
-  return parsed;
+  return sanitizeAnalysis(parsed);
+}
+
+/* Validate / clamp AI zone geometry so wildly misplaced overlays don't reach
+   the customer view. The AI is asked for `tree_box` (the visible tree's
+   bounding rect in normalized coords); every annotation region is then
+   forced to live inside it and respect a few type-specific rules. */
+function sanitizeAnalysis(r) {
+  if (!r || typeof r !== 'object') return r;
+  const clip = (v, lo, hi) => Math.max(lo, Math.min(hi, v));
+
+  // 1) Normalize / infer tree_box. Fall back to a generous center-frame box.
+  let tb = r.tree_box;
+  if (!tb || typeof tb.x !== 'number') tb = { x: 0.10, y: 0.10, w: 0.80, h: 0.80 };
+  tb = {
+    x: clip(tb.x, 0, 1),
+    y: clip(tb.y, 0, 1),
+    w: clip(tb.w, 0.05, 1 - tb.x),
+    h: clip(tb.h, 0.05, 1 - tb.y),
+  };
+  r.tree_box = tb;
+  const bx = tb.x, by = tb.y, bw = tb.w, bh = tb.h;
+  const bRight = bx + bw, bBottom = by + bh;
+  const centerOK = (px, py) => (px >= bx - 0.02 && px <= bRight + 0.02 && py >= by - 0.02 && py <= bBottom + 0.02);
+
+  // 2) Sanitize annotations. Operate on whichever shape the prompt returned
+  //    (legacy `region` + `shape` is what's in production today).
+  if (Array.isArray(r.annotations)) {
+    r.annotations = r.annotations.map(a => {
+      if (!a) return a;
+      const reg = a.region || a.box || (typeof a.x === 'number' ? null : null);
+      if (!reg) return a;
+
+      let { x, y, w, h } = reg;
+      x = Number(x); y = Number(y); w = Number(w); h = Number(h);
+      if (!isFinite(x) || !isFinite(y) || !isFinite(w) || !isFinite(h)) return a;
+
+      // Cap zone size relative to the tree bounds, not the image.
+      // Bigger absolute cap for full-removal/protect; tighter for everything else.
+      const maxFrac = (a.type === 'final-crown' || a.type === 'protect') ? 0.95 : 0.65;
+      w = clip(w, 0.02, bw * maxFrac);
+      h = clip(h, 0.02, bh * maxFrac);
+
+      // Crown-raise: must overlap the bottom third of the tree, never below it.
+      // Snap upward until the zone's center sits inside the lower tree band.
+      if (/raise|crown[-_ ]?raise/i.test(a.client_label || '') || a.type === 'crown-raise' || a.type === 'crown_raise') {
+        const lowerBandTop = by + bh * 0.55;
+        const cy = y + h / 2;
+        if (cy > bBottom - h * 0.25) y = bBottom - h * 0.85;       // pushed below tree → snap up into trunk/lower limbs
+        else if (cy < lowerBandTop)  y = lowerBandTop - h / 2;     // floated too high → drop into lower band
+      }
+
+      // For everything else: if the zone center is clearly outside the tree
+      // box, slide it back inside (preserve size).
+      const cx = x + w / 2, cy = y + h / 2;
+      if (!centerOK(cx, cy)) {
+        const newCx = clip(cx, bx + w * 0.4, bRight - w * 0.4);
+        const newCy = clip(cy, by + h * 0.4, bBottom - h * 0.4);
+        x = newCx - w / 2;
+        y = newCy - h / 2;
+      }
+
+      // Final clip to canvas.
+      x = clip(x, 0, 1 - w);
+      y = clip(y, 0, 1 - h);
+
+      const fixed = { x, y, w, h };
+      if (a.region) return { ...a, region: fixed };
+      return { ...a, box: fixed };
+    });
+  }
+
+  // 3) Cut points: snap any that landed outside the tree box back inside.
+  if (Array.isArray(r.cut_points)) {
+    r.cut_points = r.cut_points.map(p => {
+      if (!p || typeof p.x !== 'number' || typeof p.y !== 'number') return p;
+      return { ...p,
+        x: clip(p.x, bx + 0.02, bRight - 0.02),
+        y: clip(p.y, by + 0.02, bBottom - 0.02),
+      };
+    });
+  }
+
+  return r;
 }
 
 /* ═══════════════════════════════════════════ RESULTS ═ */
