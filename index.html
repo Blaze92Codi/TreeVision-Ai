@@ -587,11 +587,16 @@ function bindDropzone() {
 }
 
 function handleFile(file) {
-  if (!file.type.startsWith('image/')) { showUploadError("Please select an image file."); return; }
+  // iOS hands many Photo-Library / HEIC images over with a blank or non-standard
+  // MIME type, so only reject when a type is present AND clearly not an image —
+  // the <img> decode below is the real validator.
+  if (file.type && !file.type.startsWith('image/')) { showUploadError("Please choose a photo (JPG, PNG, or HEIC)."); return; }
   hideUploadError();
   const reader = new FileReader();
+  reader.onerror = () => showUploadError("Couldn't read that file. Please try another photo.");
   reader.onload = (e) => {
     const img = new Image();
+    img.onerror = () => showUploadError("Couldn't open that image. If it's a HEIC photo, take a new photo or pick a JPG.");
     img.onload = () => {
       // Resize to max 2048px on longest side — preserves full tree detail for AI, stays under 10MB
       const MAX = 2048;
