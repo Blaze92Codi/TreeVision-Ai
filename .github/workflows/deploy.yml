@@ -42,6 +42,10 @@ jobs:
         working-directory: worker
         run: npx tsc --noEmit
 
+      - name: Test
+        working-directory: worker
+        run: npm test
+
       - name: Apply pending D1 migrations
         working-directory: worker
         continue-on-error: true

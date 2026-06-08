@@ -9,14 +9,18 @@
     "db:migrate:local": "wrangler d1 migrations apply treevision --local",
     "db:migrate:remote": "wrangler d1 migrations apply treevision --remote",
     "r2:create": "wrangler r2 bucket create treevision-photos",
-    "tail": "wrangler tail"
+    "tail": "wrangler tail",
+    "test": "vitest run",
+    "test:watch": "vitest"
   },
   "dependencies": {
     "hono": "^4.6.14"
   },
   "devDependencies": {
+    "@cloudflare/vitest-pool-workers": "^0.8.62",
     "@cloudflare/workers-types": "^4.20241218.0",
     "typescript": "^5.7.2",
+    "vitest": "^2.1.9",
     "wrangler": "^4.0.0"
   }
 }
