@@ -104,12 +104,19 @@ create policy "anon can insert estimates"
   to anon
   with check (true);
 
--- Allow the app frontend (anon key) to SELECT only their own record by ID
--- (used to show the saved-ID confirmation in screen-55)
-create policy "anon can read own estimate by id"
+-- Staff users must sign in before reading or managing estimates.
+-- Do not add anon SELECT policies here: estimates contain customer PII,
+-- photo URLs, internal notes, and pricing data.
+create policy "authenticated staff can read estimates"
   on estimates for select
-  to anon
-  using (true);  -- tighten to: using (id = (current_setting('app.estimate_id'))::uuid) if needed
+  to authenticated
+  using (true);
+
+create policy "authenticated staff can update estimates"
+  on estimates for update
+  to authenticated
+  using (true)
+  with check (true);
 
 -- Service role (Edge Functions) has full access — bypasses RLS automatically
 
