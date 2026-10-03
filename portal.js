@@ -48,6 +48,7 @@ function bootPortal() {
     const verified = await _sb.auth.getUser();
     const permission = await _sb.rpc("is_staff");
     if (verified.error || !verified.data.user || permission.error || permission.data !== true) {
+      await _sb.auth.signOut();
       window.location.replace("login.html");
       throw new Error("Staff authorization required");
     }

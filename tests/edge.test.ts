@@ -47,3 +47,21 @@ Deno.test('public intake preserves valid submission and strips forged staff fiel
   await denied(()=>submissionRecord({analysis:{annotations:new Array(101)},contact:{name:'Customer'}}),400);
   await denied(()=>submissionRecord({analysis:{},contact:{name:'Customer'},photo:'https://internal/secret'}),400);
 });
+
+Deno.test('quote rendering retains canonical intake fields and supports historical records', async () => {
+  const { quoteDetails } = await import('../supabase/functions/_shared/quote.ts');
+  const current=quoteDetails({selected_service:'Pruning',species:'Oak',latin_name:'Quercus',condition:'Good',est_height:'30–40 ft',isa_risk_rating:'Low'});
+  assert(current.service==='Pruning' && current.commonName==='Oak' && current.latinName==='Quercus' && current.condition==='Good' && current.heightStr==='30–40 ft');
+  assert(current.hazards[0]==='Low');
+  const legacy=quoteDetails({recommended_services:['Removal'],tree_species:'Pine (Pinus)',health_summary:'Poor',estimated_height_ft:40});
+  assert(legacy.service==='Removal' && legacy.commonName==='Pine' && legacy.latinName==='Pinus' && legacy.condition==='Poor' && legacy.heightStr==='40 ft');
+});
+Deno.test('email retries deduplicate while intentional resends and changed quotes get new keys', async () => {
+  const { quoteDeliveryKey } = await import('../supabase/functions/_shared/quote.ts');
+  const estimate={id:'x',approved_at:'unchanged'};
+  const payload={to:['customer@example.com'],html:'approved quote'};
+  const original=await quoteDeliveryKey(estimate,payload);
+  assert(original===await quoteDeliveryKey(estimate,payload));
+  assert(original!==await quoteDeliveryKey({...estimate,quote_sent_at:'successful-delivery'},payload));
+  assert(original!==await quoteDeliveryKey(estimate,{...payload,html:'adjusted quote'}));
+});

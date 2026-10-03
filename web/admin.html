@@ -357,7 +357,7 @@ new MutationObserver(() => {
   document.querySelectorAll('img[data-private-photo]').forEach(async img => {
     const path = img.dataset.privatePhoto; delete img.dataset.privatePhoto;
     try {
-      const res = await fetch(path, { headers: { Authorization: 'Bearer ' + token } });
+      const res = await apiFetch(path);
       if (!res.ok) throw new Error();
       const url = URL.createObjectURL(await res.blob());
       img.onload = () => URL.revokeObjectURL(url); img.src = url;

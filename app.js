@@ -40,6 +40,7 @@ async function requireStaff() {
   const { data, error } = await db.auth.getUser();
   const permission = await db.rpc('is_staff');
   if (error || !data.user || permission.error || permission.data !== true) {
+    await db.auth.signOut();
     location.replace('/login.html');
     throw new Error('Staff authorization required');
   }

@@ -53,3 +53,43 @@ test('deployment operation stops at metadata check when Supabase is inactive', a
     if(originalStaff===undefined)delete process.env.TREEVISION_STAFF_USER_ID;else process.env.TREEVISION_STAFF_USER_ID=originalStaff;
   }
 });
+
+test('Worker admin photos transmit the saved credential through the authenticated helper', async () => {
+  const source=await readFile('../web/admin.html','utf8');
+  const script=[...source.matchAll(/<script\b[^>]*>([\s\S]*?)<\/script>/gi)].map(m=>m[1]).find(s=>s.includes('MutationObserver'));
+  let callback;
+  let resolveFetch;
+  const fetched=new Promise(resolve=>{resolveFetch=resolve;});
+  const img={dataset:{privatePhoto:'/api/tree-photo/private'}};
+  const context=vm.createContext({
+    MutationObserver:class {constructor(fn){callback=fn;} observe(){}},
+    document:{documentElement:{},addEventListener(){},querySelectorAll:()=>[img]},
+    fetch:async(path,options)=>{resolveFetch({path,options});return {ok:true,blob:async()=>({})};},
+    URL:{createObjectURL:()=> 'blob:private',revokeObjectURL(){}},
+  });
+  vm.runInContext(script,context);
+  vm.runInContext("STATE.token='saved-admin-credential'",context);
+  callback();
+  const request=await fetched;
+  assert.equal(request.path,'/api/tree-photo/private');
+  assert.equal(request.options.headers.Authorization,'Bearer saved-admin-credential');
+});
+
+test('denied staff sessions are cleared before login redirects',async()=>{
+  const source=await readFile('../portal.js','utf8');
+  const events=[];
+  const client={auth:{getSession:async()=>({data:{session:{user:{email:'user@example.com'}}}}),getUser:async()=>({data:{user:{}}}),signOut:async()=>{events.push('signout');}},rpc:async()=>({data:false})};
+  const sdk={createClient:()=>client};
+  const context=vm.createContext({supabase:sdk,window:{supabase:sdk,location:{replace:path=>events.push('redirect:'+path)}},document:{getElementById:()=>({addEventListener(){}})}});
+  vm.runInContext(source,context);
+  await new Promise(resolve=>setImmediate(resolve));
+  assert.deepEqual(events,['signout','redirect:login.html']);
+});
+
+test('dashboard rejected view retains historical declined records',async()=>{
+  const source=await readFile('../dashboard.html','utf8');
+  const declaration=source.match(/const FILTER_STATUSES = (\{[\s\S]*?\});/)[0];
+  const context=vm.createContext({});vm.runInContext(declaration,context);
+  const rejected=vm.runInContext('FILTER_STATUSES.rejected',context);
+  assert(rejected.includes('declined') && rejected.includes('rejected') && rejected.includes('expired'));
+});

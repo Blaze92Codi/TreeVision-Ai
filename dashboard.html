@@ -142,7 +142,7 @@ async function loadEstimates() {
 function updateStats() {
   document.getElementById('stat-pending').textContent  = allEstimates.filter(e => (e.status === 'pending' || e.status === 'draft' || e.status === 'sent')).length;
   document.getElementById('stat-approved').textContent = allEstimates.filter(e => e.status === 'approved').length;
-  document.getElementById('stat-rejected').textContent = allEstimates.filter(e => (e.status === 'rejected' || e.status === 'expired')).length;
+  document.getElementById('stat-rejected').textContent = allEstimates.filter(e => ['rejected','declined','expired'].includes(e.status)).length;
   document.getElementById('stat-total').textContent    = allEstimates.length;
 }
 
@@ -158,7 +158,7 @@ const FILTER_STATUSES = {
   pending:   ['pending', 'draft', 'sent'],
   approved:  ['approved'],
   scheduled: ['scheduled'],
-  rejected:  ['rejected', 'expired'],
+  rejected:  ['rejected', 'declined', 'expired'],
 };
 
 function render() {

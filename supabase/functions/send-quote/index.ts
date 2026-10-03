@@ -1,3 +1,4 @@
+import { quoteDetails, quoteDeliveryKey } from "../_shared/quote.ts";
 import { corsHeaders, methodResponse, readJson, requireStaff, consumeBudget, serverClient, responseError, RequestError } from "../_shared/security.ts";
 
 /**
@@ -78,22 +79,7 @@ Deno.serve(async (req: Request) => {
     if (!Number.isFinite(quoteLow) || !Number.isFinite(quoteHigh) || quoteLow < 0 || quoteHigh < quoteLow)
       throw new RequestError(409, "Staff-approved quote range required");
 
-    const services = Array.isArray(estimate.recommended_services)
-      ? estimate.recommended_services
-      : (estimate.recommended_services ? [estimate.recommended_services] : []);
-    const service = services[0] ?? "tree service";
-
-    const hazards = Array.isArray(estimate.hazard_flags)
-      ? estimate.hazard_flags
-      : (estimate.hazard_flags ? [estimate.hazard_flags] : []);
-
-    // tree_species stored as "Common Name (Latin name)" — split for display.
-    const speciesRaw = (estimate.tree_species || estimate.common_name || "").trim();
-    const speciesMatch = speciesRaw.match(/^(.*?)\s*\(([^)]+)\)\s*$/);
-    const commonName = speciesMatch ? speciesMatch[1].trim() : speciesRaw;
-    const latinName  = speciesMatch ? speciesMatch[2].trim() : (estimate.latin_name || "");
-
-    const heightStr = estimate.estimated_height_ft ? `${estimate.estimated_height_ft} ft` : "";
+    const { service, hazards, commonName, latinName, heightStr, condition } = quoteDetails(estimate);
 
     const escapeHtml = (s: string) =>
       String(s).replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;").replace(/"/g, "&quot;");
@@ -148,9 +134,9 @@ Deno.serve(async (req: Request) => {
         <td style="padding:10px;background:#f0fdf4;border:1px solid #d1fae5;font-size:13px;color:#6b7280;">Tree Species</td>
         <td style="padding:10px;background:#f0fdf4;border:1px solid #d1fae5;font-size:14px;">${escapeHtml(commonName)}${latinName ? " <em style='color:#6b7280;font-size:12px;'>(" + escapeHtml(latinName) + ")</em>" : ""}</td>
       </tr>` : ""}
-      ${estimate.health_summary ? `<tr>
+      ${condition ? `<tr>
         <td style="padding:10px;background:#f8fafc;border:1px solid #e5e7eb;font-size:13px;color:#6b7280;">Condition</td>
-        <td style="padding:10px;background:#f8fafc;border:1px solid #e5e7eb;font-size:14px;">${escapeHtml(estimate.health_summary)}</td>
+        <td style="padding:10px;background:#f8fafc;border:1px solid #e5e7eb;font-size:14px;">${escapeHtml(condition)}</td>
       </tr>` : ""}
       ${heightStr ? `<tr>
         <td style="padding:10px;background:#f0fdf4;border:1px solid #d1fae5;font-size:13px;color:#6b7280;">Est. Height</td>
@@ -184,20 +170,22 @@ Deno.serve(async (req: Request) => {
 </html>`;
 
     const subjectAddress = (estimate.job_address || estimate.client_address) ? " at " + (estimate.job_address || estimate.client_address) : "";
+    const emailPayload = {
+      from: fromAddress,
+      to: [(estimate.customer_email || estimate.client_email)],
+      subject: `Your Tree Service Estimate — ${service}${subjectAddress}`,
+      html: emailHtml,
+    };
+    const deliveryKey = await quoteDeliveryKey(estimate, emailPayload);
     const resendResponse = await fetch("https://api.resend.com/emails", {
       method: "POST",
       signal: AbortSignal.timeout(20000),
       headers: {
         "Authorization": `Bearer ${resendKey}`,
-        "Idempotency-Key": `quote-${estimate.id}-${estimate.approved_at || quoteLow + "-" + quoteHigh}`,
+        "Idempotency-Key": deliveryKey,
         "Content-Type": "application/json",
       },
-      body: JSON.stringify({
-        from: fromAddress,
-        to: [(estimate.customer_email || estimate.client_email)],
-        subject: `Your Tree Service Estimate — ${service}${subjectAddress}`,
-        html: emailHtml,
-      }),
+      body: JSON.stringify(emailPayload),
     });
 
     if (!resendResponse.ok) {
@@ -209,13 +197,14 @@ Deno.serve(async (req: Request) => {
 
     // Don't mutate status — caller already moved it to approved/scheduled and
     // dashboard tracks delivery via quote_sent_at timestamp.
-    await supabase
+    const deliveryAudit = await supabase
       .from("estimates")
       .update({
         quote_sent_at: new Date().toISOString(),
         approved_by: approvedBy,
       })
       .eq("id", estimateId);
+    if (deliveryAudit.error) throw new RequestError(503, "Delivery confirmation could not be recorded. Retry this request.");
 
     return new Response(
       JSON.stringify({
