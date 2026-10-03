@@ -24,7 +24,7 @@ function loadSupabase(cb) {
     cb(); return;
   }
   const s = document.createElement("script");
-  s.src = "https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2";
+  s.src = "https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2.117.2";
   s.onload = cb;
   s.onerror = () => { document.body.innerHTML = '<p style="padding:2rem;color:#c00">Failed to load Supabase SDK. Check your connection.</p>'; };
   document.head.appendChild(s);
@@ -44,6 +44,13 @@ function bootPortal() {
     if (!data.session) {
       window.location.replace("login.html");
       throw new Error("Not authenticated");
+    }
+    const verified = await _sb.auth.getUser();
+    const permission = await _sb.rpc("is_staff");
+    if (verified.error || !verified.data.user || permission.error || permission.data !== true) {
+      await _sb.auth.signOut();
+      window.location.replace("login.html");
+      throw new Error("Staff authorization required");
     }
     return data.session;
   }
@@ -68,7 +75,7 @@ function bootPortal() {
     const userEmailEl = document.getElementById("portalUserEmail");
     if (userEmailEl) userEmailEl.textContent = session.user.email || "";
     initPortal(_sb);
-  });
+  }).catch(() => {});
 
   /* ── Sign-out ────────────────────────────────────────────────────────────── */
   const signOutBtn = document.getElementById("signOutBtn");
@@ -84,6 +91,14 @@ function bootPortal() {
    PORTAL INIT — called only after auth passes
 ══════════════════════════════════════════════════════════════════════════ */
 function initPortal(_sb) {
+async function staffToken() {
+  const { data, error } = await _sb.auth.getSession();
+  if (error || !data.session) throw new Error("Please sign in again");
+  return data.session.access_token;
+}
+const escapeHtml = (value) => String(value ?? "").replace(/[&<>"']/g,
+  c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
+
 
 /* ── In-memory demo state (Dashboard / New Lead tabs) ───────────────────── */
 const state = {
@@ -173,8 +188,8 @@ async function loadApprovalsFromDB() {
   approvalList.innerHTML = '<p style="padding:1rem;color:#666">Loading estimates…</p>';
   try {
     const res = await fetch(
-      `${CONFIG.SUPABASE_URL}/rest/v1/estimates?select=id,customer_name,customer_email,service_type,approved_quote_low,approved_quote_high,status,created_at&status=in.(pending,approved,scheduled)&order=created_at.desc&limit=50`,
-      { headers: { apikey: CONFIG.SUPABASE_KEY, Authorization: "Bearer " + CONFIG.SUPABASE_KEY, Accept: "application/json" } }
+      `${CONFIG.SUPABASE_URL}/rest/v1/estimates?select=id,customer_name,customer_email,selected_service,approved_quote_low,approved_quote_high,status,created_at&status=in.(pending,draft,approved,scheduled)&order=created_at.desc&limit=50`,
+      { headers: { apikey: CONFIG.SUPABASE_KEY, Authorization: "Bearer " + await staffToken(), Accept: "application/json" } }
     );
     if (!res.ok) throw new Error("HTTP " + res.status);
     const rows = await res.json();
@@ -189,18 +204,18 @@ async function loadApprovalsFromDB() {
       return `
         <div class="approval-row" id="row-${est.id}">
           <div>
-            <strong>${est.customer_name || "Unknown"}</strong>
-            <small>${est.service_type || "Tree service"} · <em>${est.customer_email || "no email"}</em> · ${range}</small>
+            <strong>${escapeHtml(est.customer_name || "Unknown")}</strong>
+            <small>${escapeHtml(est.selected_service || "Tree service")} · <em>${escapeHtml(est.customer_email || "no email")}</em> · ${range}</small>
           </div>
           <span class="status-pill ${est.status === "pending" ? "warn" : ""}" style="margin-right:.5rem">${est.status}</span>
           ${canSend
-            ? `<button class="secondary-btn send-quote-btn" type="button" data-id="${est.id}" data-email="${est.customer_email || ''}">Send Quote</button>`
+            ? `<button class="secondary-btn send-quote-btn" type="button" data-id="${est.id}" data-email="${escapeHtml(est.customer_email || '')}">Send Quote</button>`
             : `<button class="secondary-btn" type="button" disabled>Awaiting Approval</button>`}
         </div>`;
     }).join("");
     approvalList.querySelectorAll(".send-quote-btn").forEach((b) => b.addEventListener("click", () => handleSendQuote(b)));
   } catch (err) {
-    approvalList.innerHTML = `<p style="padding:1rem;color:#c00">Failed to load: ${err.message}</p>`;
+    approvalList.innerHTML = `<p style="padding:1rem;color:#c00">Failed to load: ${escapeHtml(err.message)}</p>`;
   }
 }
 
@@ -212,7 +227,7 @@ async function handleSendQuote(btn) {
   try {
     const res = await fetch(CONFIG.SEND_QUOTE_URL, {
       method: "POST",
-      headers: { "Content-Type": "application/json", Authorization: "Bearer " + CONFIG.SUPABASE_KEY },
+      headers: { "Content-Type": "application/json", Authorization: "Bearer " + await staffToken() },
       body: JSON.stringify({ estimate_id: id, approvedBy: "Manager" }),
     });
     const data = await res.json().catch(() => ({}));

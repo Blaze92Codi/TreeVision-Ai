@@ -73,6 +73,13 @@ create table if not exists estimates (
   approved_by           text                     -- name/email of the approving manager
 );
 
+-- A legacy deployment may already have client_* columns instead. Ensure
+-- prerequisites for indexes/triggers before the additive security migration.
+alter table estimates add column if not exists customer_email text;
+alter table estimates add column if not exists status text default 'pending';
+alter table estimates add column if not exists created_at timestamptz default now();
+alter table estimates add column if not exists updated_at timestamptz default now();
+
 -- ── Indexes ──────────────────────────────────────────────────────────────────
 create index if not exists estimates_status_idx      on estimates (status);
 create index if not exists estimates_created_at_idx  on estimates (created_at desc);
@@ -98,22 +105,4 @@ create trigger estimates_updated_at
 -- Enable RLS so anon/authenticated users can only insert (submit), not read/update.
 alter table estimates enable row level security;
 
--- Allow the app frontend (anon key) to INSERT new estimates
-create policy "anon can insert estimates"
-  on estimates for insert
-  to anon
-  with check (true);
-
--- Allow the app frontend (anon key) to SELECT only their own record by ID
--- (used to show the saved-ID confirmation in screen-55)
-create policy "anon can read own estimate by id"
-  on estimates for select
-  to anon
-  using (true);  -- tighten to: using (id = (current_setting('app.estimate_id'))::uuid) if needed
-
--- Service role (Edge Functions) has full access — bypasses RLS automatically
-
--- ── Storage bucket ───────────────────────────────────────────────────────────
--- Run this in Studio → Storage → New bucket, OR via CLI:
---   supabase storage create tree-photos --public
--- Alternatively, the config.toml [[storage.buckets]] block handles this on `supabase start`
+-- Access policies and private storage are installed by the security migration.

@@ -2,12 +2,7 @@
    Dynamic Tree Service — Shared app bootstrap
    Loaded on every page after the Supabase UMD bundle.
 
-   Back-office access (dashboard / schedule / crew) opens if EITHER:
-     • a real Supabase login session exists  (login.html → company email + password), OR
-     • the shared crew password is entered    (fallback so you can't get locked out).
-   Change the crew password via STAFF_PASSWORD below.
-   NOTE: the crew password is a front-end convenience, not data security.
-   Protect real customer data with Supabase Row-Level Security.
+   Back-office access requires a verified, allowlisted staff account.
 ═══════════════════════════════════════════════════════════════ */
 
 /* ---- Global CONFIG (referenced by client.html / dashboard.html inline scripts) ---- */
@@ -17,7 +12,6 @@ const CONFIG = {
   SUPABASE_URL:   "https://hydlxwjtdkzcnxxukakt.supabase.co",
   SUPABASE_KEY:   "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Imh5ZGx4d2p0ZGt6Y254eHVrYWt0Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3Nzk2ODcyNjQsImV4cCI6MjA5NTI2MzI2NH0.vXLOWjXh_6z8sSoBVqKA6wwwEKKMozjhRoIIUffwnzI",
 
-  ANTHROPIC_API_KEY: "",
 
   // ← Paste the owner's Calendly link to switch the booking step from the
   //    built-in demo scheduler to a live Calendly popup. No other change needed.
@@ -40,90 +34,22 @@ try {
   }
 } catch (e) { /* ignore */ }
 
-/* ═══════════════════════════════════════════════════════════════
-   Back-office access guard
-═══════════════════════════════════════════════════════════════ */
-(function () {
-  var STAFF_PASSWORD = 'treecrew2026';
-  var GUARDED = ['dashboard', 'schedule', 'crew'];   // NOT 'login' — the real login page must stay reachable
-  var page = (location.pathname.split('/').pop() || 'index').toLowerCase().replace(/\.html$/, '');
-  if (GUARDED.indexOf(page) === -1) return;
-
-  /* Hide page content immediately to prevent a flash before access is verified. */
-  try {
-    var lock = document.createElement('style');
-    lock.id = 'dts-lock';
-    lock.textContent = 'body{display:none !important;}';
-    (document.head || document.documentElement).appendChild(lock);
-  } catch (e) {}
-
-  function reveal() {
-    var l = document.getElementById('dts-lock'); if (l) l.remove();
-    var o = document.getElementById('dts-login'); if (o) o.remove();
+// The database remains the authority; a UI guard cannot grant data access.
+async function requireStaff() {
+  if (!db) throw new Error('Staff login unavailable');
+  const { data, error } = await db.auth.getUser();
+  const permission = await db.rpc('is_staff');
+  if (error || !data.user || permission.error || permission.data !== true) {
+    await db.auth.signOut();
+    location.replace('/login.html');
+    throw new Error('Staff authorization required');
   }
-
-  /* 1) crew-password fallback already used this session? */
-  if (sessionStorage.getItem('dts_staff') === '1') { reveal(); return; }
-
-  /* 2) otherwise check for a real Supabase login session */
-  hasSession().then(function (ok) { if (ok) reveal(); else mountLogin(); });
-
-  function hasSession() {
-    return new Promise(function (res) {
-      try {
-        if (!db || !db.auth || !db.auth.getSession) { res(false); return; }
-        db.auth.getSession()
-          .then(function (r) { res(!!(r && r.data && r.data.session)); })
-          .catch(function () { res(false); });
-      } catch (e) { res(false); }
-    });
-  }
-
-  function mountLogin() {
-    if (document.getElementById('dts-login')) return;
-    var ov = document.createElement('div');
-    ov.id = 'dts-login';
-    ov.setAttribute('style', 'position:fixed;inset:0;z-index:2147483647;background:linear-gradient(160deg,#0b2616,#052e16);display:flex;align-items:center;justify-content:center;font-family:Inter,-apple-system,Segoe UI,Roboto,sans-serif;padding:24px');
-    ov.innerHTML =
-      '<div style="width:100%;max-width:360px;background:#0f3d22;border:1px solid #1d6b3a;border-radius:18px;padding:30px 26px;box-shadow:0 20px 60px rgba(0,0,0,.4);text-align:center">' +
-        '<div style="font-size:30px;margin-bottom:8px">🌲</div>' +
-        '<div style="color:#eafff1;font-size:18px;font-weight:700;margin-bottom:4px">Staff sign-in</div>' +
-        '<div style="color:#8fd3a6;font-size:13px;margin-bottom:18px">Dynamic Tree Service — crew access</div>' +
-        '<input id="dts-pw" type="password" placeholder="Crew password" autocomplete="current-password" ' +
-          'style="width:100%;box-sizing:border-box;padding:13px 14px;border-radius:10px;border:1px solid #2a7d49;background:#08230f;color:#fff;font-size:15px;outline:none" />' +
-        '<div id="dts-err" style="color:#ff9b9b;font-size:12.5px;height:16px;margin:8px 0 4px"></div>' +
-        '<button id="dts-go" style="width:100%;padding:13px;border:none;border-radius:10px;cursor:pointer;' +
-          'background:linear-gradient(90deg,#5EEAD4,#2DD4BF);color:#053;font-size:15px;font-weight:700">Enter →</button>' +
-        '<div style="display:flex;align-items:center;gap:10px;color:#3f6b50;font-size:11px;margin:16px 0 12px">' +
-          '<span style="flex:1;height:1px;background:#1d6b3a"></span>or<span style="flex:1;height:1px;background:#1d6b3a"></span></div>' +
-        '<button id="dts-email" style="width:100%;padding:12px;border:1px solid #2a7d49;border-radius:10px;cursor:pointer;' +
-          'background:transparent;color:#cfeede;font-size:14px;font-weight:600">Sign in with company email →</button>' +
-        '<div style="color:#5f9d77;font-size:11px;margin-top:14px">Customers don\'t need this — ' +
-          '<a href="/" style="color:#9ff0c2">back to site</a></div>' +
-      '</div>';
-    document.documentElement.appendChild(ov);   // sibling of <body>, so the body lock doesn't hide it
-
-    var input = ov.querySelector('#dts-pw');
-    var err = ov.querySelector('#dts-err');
-    var go = ov.querySelector('#dts-go');
-    var em = ov.querySelector('#dts-email');
-    function submit() {
-      if (input.value === STAFF_PASSWORD) {
-        sessionStorage.setItem('dts_staff', '1');
-        ov.style.transition = 'opacity .25s ease';
-        ov.style.opacity = '0';
-        setTimeout(reveal, 260);
-      } else {
-        err.textContent = 'Incorrect password — try again.';
-        input.value = ''; input.focus();
-      }
-    }
-    go.addEventListener('click', submit);
-    input.addEventListener('keydown', function (e) { if (e.key === 'Enter') submit(); });
-    em.addEventListener('click', function () { location.href = '/login.html'; });
-    setTimeout(function () { input.focus(); }, 50);
-  }
-})();
+  return data.user;
+}
+if (['dashboard', 'schedule', 'crew', 'crm', 'account'].includes(
+    (location.pathname.split('/').pop() || '').replace(/\.html$/, ''))) {
+  requireStaff().catch(() => {});
+}
 
 /* ═══════════════════════════════════════════════════════════════
    Demo booking overlay (auto-upgrades to Calendly when CALENDLY_URL is set)

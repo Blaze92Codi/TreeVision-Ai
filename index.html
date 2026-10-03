@@ -26,7 +26,7 @@
   </ul>
 </nav>
 
-<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2.117.2"></script>
 <script src="app.js"></script>
 
 <div id="app">
@@ -665,28 +665,9 @@ const DEMO_RESULT = {
   standard_note: "Crown cleaning and selective reduction per ANSI A300 Part 1. Live crown removal to remain within 20% given tree's mature age and fair condition rating."
 };
 
-function isDemoMode() {
-  const hasProxy = CONFIG.PROXY_URL && CONFIG.PROXY_URL.startsWith('http');
-  const hasKey   = CONFIG.ANTHROPIC_API_KEY && !CONFIG.ANTHROPIC_API_KEY.includes('YOUR_');
-  return !hasProxy && !hasKey;
-}
-
-function apiEndpoint() {
-  if (CONFIG.PROXY_URL && CONFIG.PROXY_URL.startsWith('http')) return CONFIG.PROXY_URL;
-  return 'https://api.anthropic.com/v1/messages';
-}
-
-function apiHeaders() {
-  const h = { 'Content-Type': 'application/json' };
-  if (CONFIG.PROXY_URL && CONFIG.PROXY_URL.startsWith('http')) {
-    // Supabase requires anon key for Edge Function routing
-    if (CONFIG.SUPABASE_KEY) h['Authorization'] = 'Bearer ' + CONFIG.SUPABASE_KEY;
-  } else {
-    h['x-api-key'] = CONFIG.ANTHROPIC_API_KEY;
-    h['anthropic-version'] = '2023-06-01';
-  }
-  return h;
-}
+function isDemoMode() { return !CONFIG.PROXY_URL; }
+function apiEndpoint() { return CONFIG.PROXY_URL; }
+function apiHeaders() { return { 'Content-Type': 'application/json' }; }
 
 /* ═══════════════════════════════════════════ ANALYSIS ═ */
 async function startAnalysis() {
@@ -1135,28 +1116,8 @@ function setupScheduling() {
 }
 
 /* ═══════════════════════════════════════════ PHOTO STORAGE ═ */
-async function uploadPhotoToStorage() {
-  if (!STATE.photoDataUrl || !CONFIG.SUPABASE_URL) return null;
-  try {
-    // Convert data URL to blob
-    const res = await fetch(STATE.photoDataUrl);
-    const blob = await res.blob();
-    const filename = `estimate_${Date.now()}.jpg`;
-    const uploadUrl = `${CONFIG.SUPABASE_URL}/storage/v1/object/tree-photos/${filename}`;
-    const resp = await fetch(uploadUrl, {
-      method: 'POST',
-      headers: {
-        'Authorization': `Bearer ${CONFIG.SUPABASE_KEY}`,
-        'Content-Type': 'image/jpeg',
-        'x-upsert': 'false',
-      },
-      body: blob,
-    });
-    if (!resp.ok) return null;
-    // Return public URL
-    return `${CONFIG.SUPABASE_URL}/storage/v1/object/public/tree-photos/${filename}`;
-  } catch { return null; }
-}
+// Photos are uploaded by the guarded save handler into private storage.
+async function uploadPhotoToStorage() { return null; }
 
 /* ═══════════════════════════════════════════ SAVE ═════ */
 async function saveEstimate() {
@@ -1176,7 +1137,7 @@ async function saveEstimate() {
       body: JSON.stringify({
         analysis: STATE.analysis,
         service: pkg.name,
-        photo_url: STATE.photoStorageUrl || null,
+        photo: STATE.photoDataUrl || null,
         contact: {
           name:    document.getElementById('ct-name').value.trim(),
           phone:   document.getElementById('ct-phone').value.trim(),

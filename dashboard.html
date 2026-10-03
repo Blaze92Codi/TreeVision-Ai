@@ -23,7 +23,7 @@
   </ul>
 </nav>
 
-<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2.117.2"></script>
 <script src="app.js"></script>
 <script src="tree-annotations.js"></script>
 
@@ -107,11 +107,32 @@ let currentFilter = 'pending';
 /* ── Load ── */
 async function loadEstimates() {
   document.getElementById('loading-msg').textContent = 'Loading…';
+  await requireStaff();
   const { data, error } = await db.from('estimates')
       .select('*')
-      .not('client_name', 'is', null).order('created_at', { ascending: false });
+      .order('created_at', { ascending: false });
   if (error) { document.getElementById('loading-msg').textContent = 'Error: ' + error.message; return; }
-  allEstimates = data || [];
+  allEstimates = await Promise.all((data || []).map(async e => {
+    e.client_name = e.customer_name || e.client_name;
+    e.client_email = e.customer_email || e.client_email;
+    e.client_address = e.job_address || e.client_address;
+    e.health_summary = e.condition || e.health_summary;
+    e.tree_species = e.species || e.tree_species;
+    e.price_range_low = e.quote_low ?? e.price_range_low;
+    e.price_range_high = e.quote_high ?? e.price_range_high;
+    e.scope_description = e.internal_notes || e.scope_description;
+    const paths = e.photo_urls?.length ? e.photo_urls : (e.photo_url ? [e.photo_url] : []);
+    e.photo_urls = await Promise.all(paths.map(async path => {
+      // Accept only paths in our private bucket, including legacy public URLs.
+      const prefix = CONFIG.SUPABASE_URL + '/storage/v1/object/public/tree-photos/';
+      if (path.startsWith(prefix)) path = path.slice(prefix.length);
+      if (!/^[a-zA-Z0-9_/-]+\.(jpg|jpeg|png|webp)$/.test(path) || path.includes('..')) return '';
+      const result = await db.storage.from('tree-photos').createSignedUrl(path, 300);
+      return result.data?.signedUrl || '';
+    }));
+    e.photo_url = e.photo_urls[0] || '';
+    return e;
+  }));
   document.getElementById('loading-msg').textContent = '';
   document.getElementById('last-refresh').textContent = 'Updated ' + new Date().toLocaleTimeString();
   updateStats();
@@ -119,9 +140,9 @@ async function loadEstimates() {
 }
 
 function updateStats() {
-  document.getElementById('stat-pending').textContent  = allEstimates.filter(e => (e.status === 'draft' || e.status === 'sent')).length;
+  document.getElementById('stat-pending').textContent  = allEstimates.filter(e => (e.status === 'pending' || e.status === 'draft' || e.status === 'sent')).length;
   document.getElementById('stat-approved').textContent = allEstimates.filter(e => e.status === 'approved').length;
-  document.getElementById('stat-rejected').textContent = allEstimates.filter(e => (e.status === 'declined' || e.status === 'expired')).length;
+  document.getElementById('stat-rejected').textContent = allEstimates.filter(e => ['rejected','declined','expired'].includes(e.status)).length;
   document.getElementById('stat-total').textContent    = allEstimates.length;
 }
 
@@ -134,10 +155,10 @@ function setFilter(f) {
 // Filter UI labels ↔ DB status values. The DB uses draft/sent for
 // records awaiting review and declined/expired for rejected.
 const FILTER_STATUSES = {
-  pending:   ['draft', 'sent'],
+  pending:   ['pending', 'draft', 'sent'],
   approved:  ['approved'],
   scheduled: ['scheduled'],
-  rejected:  ['declined', 'expired'],
+  rejected:  ['rejected', 'declined', 'expired'],
 };
 
 function render() {
@@ -176,7 +197,7 @@ function renderCard(e) {
   const savedHigh  = e.approved_quote_high ?? e.price_range_high ?? '';
   const savedNotes = e.manager_notes || '';
 
-  const isPending  = (e.status === 'draft'    || e.status === 'sent');
+  const isPending  = (e.status === 'pending'    || e.status === 'sent');
   const isApproved = (e.status === 'approved' || e.status === 'scheduled');
 
   const adjustFormHtml = `
@@ -188,18 +209,18 @@ function renderCard(e) {
       <div class="review-row">
         <div>
           <div class="review-label">Approved quote low ($)</div>
-          <input class="review-input" type="number" min="0" step="1" id="qlo-${e.id}" value="${savedLow}" style="width:120px;">
+          <input class="review-input" type="number" min="0" step="1" id="qlo-${e.id}" value="${esc(savedLow)}" style="width:120px;">
         </div>
         <div>
           <div class="review-label">Approved quote high ($)</div>
-          <input class="review-input" type="number" min="0" step="1" id="qhi-${e.id}" value="${savedHigh}" style="width:120px;">
+          <input class="review-input" type="number" min="0" step="1" id="qhi-${e.id}" value="${esc(savedHigh)}" style="width:120px;">
         </div>
       </div>
       <div class="review-actions">
         ${isPending ? `
           <button class="btn-approve"  onclick="saveAdjustment('${e.id}','approved')">✓ Approve &amp; confirm quote</button>
           <button class="btn-schedule" onclick="saveAdjustment('${e.id}','scheduled')">📅 Mark as scheduled</button>
-          <button class="btn-reject"   onclick="saveAdjustment('${e.id}','declined')">✕ Reject</button>
+          <button class="btn-reject"   onclick="saveAdjustment('${e.id}','rejected')">✕ Reject</button>
         ` : isApproved ? `
           <button class="btn-approve"  onclick="saveAdjustment('${e.id}',null)">💾 Save quote adjustment</button>
           <button class="btn-schedule" onclick="saveAdjustment('${e.id}','${e.status === 'approved' ? 'scheduled' : 'approved'}')">${e.status === 'approved' ? '📅 Mark as scheduled' : '↩ Move back to approved'}</button>
@@ -210,7 +231,7 @@ function renderCard(e) {
       </div>
     </div>`;
 
-  const footerHtml = (e.status === 'draft' || e.status === 'sent') ? `
+  const footerHtml = (e.status === 'pending' || e.status === 'draft' || e.status === 'sent') ? `
     <div class="est-footer">
       ${adjustFormHtml}
     </div>` : e.status !== 'pending' ? `
@@ -318,7 +339,9 @@ async function sendQuoteEmail(estimateId, approvedBy) {
   const url = (typeof CONFIG !== 'undefined' && CONFIG.SUPABASE_URL)
     ? CONFIG.SUPABASE_URL + '/functions/v1/send-quote'
     : SUPABASE_URL + '/functions/v1/send-quote';
-  const key = (typeof CONFIG !== 'undefined' && CONFIG.SUPABASE_KEY) || SUPABASE_ANON;
+  await requireStaff();
+  const { data: authData } = await db.auth.getSession();
+  const key = authData.session.access_token;
   const res = await fetch(url, {
     method: 'POST',
     headers: { 'Content-Type': 'application/json', Authorization: 'Bearer ' + key },
@@ -343,7 +366,7 @@ async function sendQuote(id, el) {
 }
 
 async function resetToPending(id) {
-  await db.from('estimates').update({ status: 'draft', approved_at: null, manager_notes: null }).eq('id', id);
+  await db.from('estimates').update({ status: 'pending', approved_at: null, manager_notes: null }).eq('id', id);
   await loadEstimates();
 }
 
