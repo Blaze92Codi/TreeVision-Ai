@@ -67,7 +67,7 @@ function bootPortal() {
   requireAuth().then((session) => {
     const userEmailEl = document.getElementById("portalUserEmail");
     if (userEmailEl) userEmailEl.textContent = session.user.email || "";
-    initPortal(_sb);
+    initPortal(_sb, session);
   });
 
   /* ── Sign-out ────────────────────────────────────────────────────────────── */
@@ -83,7 +83,7 @@ function bootPortal() {
 /* ══════════════════════════════════════════════════════════════════════════
    PORTAL INIT — called only after auth passes
 ══════════════════════════════════════════════════════════════════════════ */
-function initPortal(_sb) {
+function initPortal(_sb, session) {
 
 /* ── In-memory demo state (Dashboard / New Lead tabs) ───────────────────── */
 const state = {
@@ -174,7 +174,13 @@ async function loadApprovalsFromDB() {
   try {
     const res = await fetch(
       `${CONFIG.SUPABASE_URL}/rest/v1/estimates?select=id,customer_name,customer_email,service_type,approved_quote_low,approved_quote_high,status,created_at&status=in.(pending,approved,scheduled)&order=created_at.desc&limit=50`,
-      { headers: { apikey: CONFIG.SUPABASE_KEY, Authorization: "Bearer " + CONFIG.SUPABASE_KEY, Accept: "application/json" } }
+      {
+        headers: {
+          apikey: CONFIG.SUPABASE_KEY,
+          Authorization: "Bearer " + session.access_token,
+          Accept: "application/json",
+        },
+      }
     );
     if (!res.ok) throw new Error("HTTP " + res.status);
     const rows = await res.json();
