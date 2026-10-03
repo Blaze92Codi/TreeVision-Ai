@@ -1,10 +1,4 @@
-import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
-import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
-
-const corsHeaders = {
-  "Access-Control-Allow-Origin": "*",
-  "Access-Control-Allow-Headers": "authorization, x-client-info, apikey, content-type",
-};
+import { corsHeaders, methodResponse, readJson, requireStaff, consumeBudget, serverClient, responseError, RequestError } from "../_shared/security.ts";
 
 /**
  * send-quote Edge Function
@@ -23,10 +17,8 @@ const corsHeaders = {
  *   QUOTE_FROM_EMAIL    — verified sender address
  *   COMPANY_NAME        — company name for email branding
  */
-serve(async (req: Request) => {
-  if (req.method === "OPTIONS") {
-    return new Response("ok", { headers: corsHeaders });
-  }
+Deno.serve(async (req: Request) => {
+  const early = methodResponse(req); if (early) return early;
 
   try {
     const resendKey = Deno.env.get("RESEND_API_KEY");
@@ -35,14 +27,14 @@ serve(async (req: Request) => {
     const fromAddress = Deno.env.get("QUOTE_FROM_EMAIL") ?? "quotes@treevision.app";
     const companyName = Deno.env.get("COMPANY_NAME") ?? "Dynamic Tree Service";
 
-    const supabase = createClient(
-      Deno.env.get("SUPABASE_URL")!,
-      Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!
-    );
-
-    const body = await req.json();
+    const supabase = serverClient();
+    const staff = await requireStaff(req, supabase);
+    const body = await readJson(req, 4096);
     const estimateId = body.estimate_id || body.jobId;
-    const approvedBy = body.approvedBy || "Manager";
+    const approvedBy = staff.email || staff.id;
+    if (typeof estimateId !== "string" || !/^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(estimateId))
+      throw new RequestError(400, "Invalid estimate id");
+    await consumeBudget(supabase, "send-quote");
 
     if (!estimateId) {
       return new Response(
@@ -64,7 +56,7 @@ serve(async (req: Request) => {
       );
     }
 
-    if (!estimate.client_email) {
+    if (!(estimate.customer_email || estimate.client_email)) {
       return new Response(
         JSON.stringify({ error: "Estimate has no customer email — cannot send quote" }),
         { status: 400, headers: { ...corsHeaders, "Content-Type": "application/json" } }
@@ -80,9 +72,11 @@ serve(async (req: Request) => {
       );
     }
 
-    // Manager-approved range takes priority, fall back to AI's price range
-    const quoteLow  = estimate.approved_quote_low  ?? estimate.price_range_low  ?? 0;
-    const quoteHigh = estimate.approved_quote_high ?? estimate.price_range_high ?? 0;
+    // Email only the explicitly approved range, never client-controlled AI prices.
+    const quoteLow = estimate.approved_quote_low;
+    const quoteHigh = estimate.approved_quote_high;
+    if (!Number.isFinite(quoteLow) || !Number.isFinite(quoteHigh) || quoteLow < 0 || quoteHigh < quoteLow)
+      throw new RequestError(409, "Staff-approved quote range required");
 
     const services = Array.isArray(estimate.recommended_services)
       ? estimate.recommended_services
@@ -129,12 +123,12 @@ serve(async (req: Request) => {
 
   <div style="background:#ffffff;border:1px solid #e5e7eb;border-top:none;padding:24px;border-radius:0 0 8px 8px;">
 
-    <p style="font-size:16px;margin-top:0;">Hello${estimate.client_name ? " <strong>" + escapeHtml(estimate.client_name) + "</strong>" : ""},</p>
+    <p style="font-size:16px;margin-top:0;">Hello${(estimate.customer_name || estimate.client_name) ? " <strong>" + escapeHtml((estimate.customer_name || estimate.client_name)) + "</strong>" : ""},</p>
     <p style="color:#6b7280;font-size:14px;">Thank you for choosing ${escapeHtml(companyName)}. Here is your professional estimate based on our tree assessment.</p>
 
-    ${estimate.client_address ? `
+    ${(estimate.job_address || estimate.client_address) ? `
     <p style="background:#f0fdf4;padding:10px 14px;border-left:4px solid #166534;border-radius:4px;font-weight:600;font-size:14px;margin:0 0 16px;">
-      📍 ${escapeHtml(estimate.client_address)}
+      📍 ${escapeHtml((estimate.job_address || estimate.client_address))}
     </p>` : ""}
 
     <h2 style="color:#166534;font-size:16px;border-bottom:1px solid #e5e7eb;padding-bottom:8px;">Service Estimate</h2>
@@ -189,16 +183,18 @@ serve(async (req: Request) => {
 </body>
 </html>`;
 
-    const subjectAddress = estimate.client_address ? " at " + estimate.client_address : "";
+    const subjectAddress = (estimate.job_address || estimate.client_address) ? " at " + (estimate.job_address || estimate.client_address) : "";
     const resendResponse = await fetch("https://api.resend.com/emails", {
       method: "POST",
+      signal: AbortSignal.timeout(20000),
       headers: {
         "Authorization": `Bearer ${resendKey}`,
+        "Idempotency-Key": `quote-${estimate.id}-${estimate.approved_at || quoteLow + "-" + quoteHigh}`,
         "Content-Type": "application/json",
       },
       body: JSON.stringify({
         from: fromAddress,
-        to: [estimate.client_email],
+        to: [(estimate.customer_email || estimate.client_email)],
         subject: `Your Tree Service Estimate — ${service}${subjectAddress}`,
         html: emailHtml,
       }),
@@ -225,16 +221,12 @@ serve(async (req: Request) => {
       JSON.stringify({
         success: true,
         emailId: resendData.id,
-        sentTo: estimate.client_email,
+        sentTo: (estimate.customer_email || estimate.client_email),
         estimateId,
       }),
       { status: 200, headers: { ...corsHeaders, "Content-Type": "application/json" } }
     );
   } catch (err) {
-    console.error("send-quote error:", err);
-    return new Response(
-      JSON.stringify({ error: (err as Error).message ?? "Internal server error" }),
-      { status: 500, headers: { ...corsHeaders, "Content-Type": "application/json" } }
-    );
+    return responseError(err);
   }
 });

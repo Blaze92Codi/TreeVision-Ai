@@ -30,7 +30,7 @@ jobs:
       - name: Set up Node
         uses: actions/setup-node@v4
         with:
-          node-version: '20'
+          node-version: '22'
           cache: 'npm'
           cache-dependency-path: worker/package-lock.json
 
@@ -42,9 +42,14 @@ jobs:
         working-directory: worker
         run: npx tsc --noEmit
 
+      - name: Security regression checks
+        run: |
+          npm ci --prefix tests --ignore-scripts
+          npm test --prefix tests
+          cd worker && npx tsx --test ../tests/worker.test.ts
+
       - name: Apply pending D1 migrations
         working-directory: worker
-        continue-on-error: true
         run: |
           echo "Applying D1 migrations using database_id from wrangler.toml..."
           npx wrangler d1 migrations apply treevision --remote

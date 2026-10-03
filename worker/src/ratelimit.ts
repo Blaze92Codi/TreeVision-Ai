@@ -19,37 +19,20 @@ export async function checkAndRecord(
   const hourKey = now.toISOString().slice(0, 13); // YYYY-MM-DDTHH
   const dayKey  = now.toISOString().slice(0, 10); // YYYY-MM-DD
 
-  // Read existing counts
-  const rows = await db
-    .prepare("SELECT window_start, count FROM rate_limits WHERE ip_hash = ? AND window_start IN (?, ?)")
-    .bind(ipHash, hourKey, dayKey)
-    .all<{ window_start: string; count: number }>();
-
-  const hourCount = rows.results.find(r => r.window_start === hourKey)?.count ?? 0;
-  const dayCount  = rows.results.find(r => r.window_start === dayKey)?.count  ?? 0;
-
-  if (hourCount >= cfg.perHour) {
-    return { allowed: false, reason: "Hourly limit reached. Try again later.", retryAfterSec: 3600 };
-  }
-  if (dayCount >= cfg.perDay) {
-    return { allowed: false, reason: "Daily limit reached. Try again tomorrow.", retryAfterSec: 86400 };
-  }
-
-  // Bump counters
-  await db.batch([
-    db.prepare(
-      "INSERT INTO rate_limits (ip_hash, window_start, count) VALUES (?, ?, 1) " +
-      "ON CONFLICT(ip_hash, window_start) DO UPDATE SET count = count + 1"
-    ).bind(ipHash, hourKey),
-    db.prepare(
-      "INSERT INTO rate_limits (ip_hash, window_start, count) VALUES (?, ?, 1) " +
-      "ON CONFLICT(ip_hash, window_start) DO UPDATE SET count = count + 1"
-    ).bind(ipHash, dayKey),
-    // Best-effort cleanup of windows older than 2 days
+  // Each UPSERT checks and increments atomically; concurrent requests cannot
+  // all pass a stale count. A rejected request may consume one other window.
+  const results = await db.batch<{ count: number }>([
+    db.prepare("INSERT INTO rate_limits (ip_hash, window_start, count) VALUES (?, ?, 1) " +
+      "ON CONFLICT(ip_hash, window_start) DO UPDATE SET count = count + 1 " +
+      "WHERE count < ? RETURNING count").bind(ipHash, hourKey, cfg.perHour),
+    db.prepare("INSERT INTO rate_limits (ip_hash, window_start, count) VALUES (?, ?, 1) " +
+      "ON CONFLICT(ip_hash, window_start) DO UPDATE SET count = count + 1 " +
+      "WHERE count < ? RETURNING count").bind(ipHash, dayKey, cfg.perDay),
     db.prepare("DELETE FROM rate_limits WHERE window_start < ?").bind(
-      new Date(Date.now() - 2 * 86400_000).toISOString().slice(0, 10)
-    ),
+      new Date(Date.now() - 2 * 86400_000).toISOString().slice(0, 10)),
   ]);
+  if (!results[0].results.length || !results[1].results.length)
+    return { allowed: false, reason: "Intake limit reached.", retryAfterSec: 3600 };
 
   return { allowed: true };
 }

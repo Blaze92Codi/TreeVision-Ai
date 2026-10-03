@@ -1,0 +1,1 @@
+{"private":true,"type":"module","scripts":{"test":"node --test database.test.mjs static.test.mjs"},"devDependencies":{"@electric-sql/pglite":"0.3.14","@supabase/supabase-js":"2.117.2","@types/node":"^22.20.5"}}

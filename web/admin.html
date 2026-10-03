@@ -352,6 +352,19 @@ code { font-family: ui-monospace, SFMono-Regular, Menlo, monospace; font-size: .
 </div>
 
 <script>
+// Fetch staff photos with the authorization header; never put staff credentials in URLs.
+new MutationObserver(() => {
+  document.querySelectorAll('img[data-private-photo]').forEach(async img => {
+    const path = img.dataset.privatePhoto; delete img.dataset.privatePhoto;
+    try {
+      const res = await fetch(path, { headers: { Authorization: 'Bearer ' + token } });
+      if (!res.ok) throw new Error();
+      const url = URL.createObjectURL(await res.blob());
+      img.onload = () => URL.revokeObjectURL(url); img.src = url;
+    } catch { img.alt = 'Photo unavailable'; }
+  });
+}).observe(document.documentElement, { subtree: true, childList: true });
+
 const STATE = { token: null, leads: [], contacts: [], currentTab: 'leads' };
 const STORAGE_KEY = 'treevision_admin_token';
 
@@ -600,7 +613,7 @@ function renderEstimateDetail(target, data) {
 
   const treesHtml = trees.length ? trees.map(t => `
     <div class="tree-card">
-      <img class="tree-card-thumb" src="/api/tree-photo/${encodeURIComponent(t.id)}" alt="" onerror="this.outerHTML='<div class=&quot;tree-card-thumb-fb&quot;>🌳</div>'">
+      <img class="tree-card-thumb" data-private-photo="/api/tree-photo/${encodeURIComponent(t.id)}" alt="" onerror="this.outerHTML='<div class=&quot;tree-card-thumb-fb&quot;>🌳</div>'">
       <div class="tree-card-body">
         <div class="tree-name">${escapeHtml(t.label || t.species || 'Tree')}</div>
         <div class="tree-meta">${escapeHtml(t.species || '')}${t.species && t.est_height_ft ? ' · ' : ''}${escapeHtml(t.est_height_ft || '')}<br>

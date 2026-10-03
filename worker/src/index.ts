@@ -1,6 +1,5 @@
 import { Hono } from "hono";
 import { cors } from "hono/cors";
-import { logger } from "hono/logger";
 import { HTTPException } from "hono/http-exception";
 import type { Bindings, PkgKey, Annotation, EstimateRow, TreeRow, ContactRow } from "./types";
 import { analyzeTreePhoto } from "./analyze";
@@ -14,7 +13,20 @@ import {
 
 const app = new Hono<{ Bindings: Bindings }>();
 
-app.use("*", logger());
+// Customer share tokens are intentional capabilities; UUIDs alone grant nothing.
+app.use("/api/*", async (c, next) => {
+  c.header("Cache-Control", "no-store");
+  c.header("Referrer-Policy", "no-referrer");
+  const match = decodeURIComponent(new URL(c.req.url).pathname).match(/^\/api\/estimate\/([^/]+)(?:\/|$)/);
+  if (match && match[1] !== "by-token" && c.req.method !== "OPTIONS") {
+    const auth = c.req.header("authorization") || "";
+    const estimate = await loadEstimate(c.env, match[1]);
+    const staff = !!c.env.ADMIN_TOKEN && auth === `Bearer ${c.env.ADMIN_TOKEN}`;
+    if (!estimate || (!staff && (!estimate.share_token || auth !== `Bearer ${estimate.share_token}`)))
+      throw new HTTPException(403, { message: "Estimate access required" });
+  }
+  await next();
+});
 app.use("/api/*", async (c, next) => {
   const origin = c.env.ALLOWED_ORIGINS || "*";
   return cors({
@@ -154,6 +166,8 @@ function shapeTree(t: TreeRow) {
 app.post("/api/estimate", async c => {
   const ip = clientIp(c);
   const ipHash = await hashIp(ip);
+  const budget = await checkAndRecord(c.env.DB, ipHash, { perHour: 10, perDay: 30 });
+  if (!budget.allowed) throw new HTTPException(429, { message: "Intake limit reached" });
   const id = uuid();
   const token = shortToken();
   await c.env.DB.prepare(
@@ -511,13 +525,21 @@ app.post("/api/estimate/:id/submit", async c => {
 // ────────────────────────────────────────────────────────────
 app.get("/api/tree-photo/:id", async c => {
   const id = c.req.param("id");
-  const row = await c.env.DB.prepare("SELECT photo_key FROM trees WHERE id = ?").bind(id).first<{ photo_key: string }>();
-  if (!row) throw new HTTPException(404, { message: "Not found" });
+  const row = await c.env.DB.prepare(
+    "SELECT t.photo_key, e.share_token FROM trees t JOIN estimates e ON e.id = t.estimate_id WHERE t.id = ?"
+  ).bind(id).first<{ photo_key: string; share_token: string }>();
+  const auth = c.req.header("authorization") || "";
+  const staff = !!c.env.ADMIN_TOKEN && auth === `Bearer ${c.env.ADMIN_TOKEN}`;
+  const capability = c.req.query("token");
+  if (!row || (!staff && (!row.share_token || (capability !== row.share_token && auth !== `Bearer ${row.share_token}`))))
+    throw new HTTPException(403, { message: "Photo access required" });
   const obj = await c.env.PHOTOS.get(row.photo_key);
   if (!obj) throw new HTTPException(404, { message: "Photo not found" });
   const headers = new Headers();
   obj.writeHttpMetadata(headers);
-  headers.set("cache-control", "private, max-age=86400");
+  headers.set("cache-control", "no-store");
+  headers.set("referrer-policy", "no-referrer");
+  headers.set("x-content-type-options", "nosniff");
   return new Response(obj.body, { headers });
 });
 
@@ -811,8 +833,8 @@ app.post("/api/admin/accuracy-test", async c => {
 // ────────────────────────────────────────────────────────────
 app.onError((err, c) => {
   if (err instanceof HTTPException) return c.json({ error: err.message }, err.status);
-  console.error("Unhandled error", err);
-  return c.json({ error: err.message || "Internal error" }, 500);
+  console.error("Unhandled worker request failure");
+  return c.json({ error: "Internal error" }, 500);
 });
 
 export default {

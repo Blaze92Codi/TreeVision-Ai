@@ -1,6 +1,7 @@
 <!DOCTYPE html>
 <html lang="en">
 <head>
+<meta name="referrer" content="no-referrer">
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0">
 <title>TreeVision AI — Estimate Your Property</title>
@@ -598,6 +599,11 @@ const STATE = {
   reviewExtras: null,   // notes / standard_note from full_analysis
 };
 
+async function intakeFetch(path, options = {}) {
+  const headers = new Headers(options.headers);
+  if (STATE.estimate?.share_token) headers.set('Authorization', 'Bearer ' + STATE.estimate.share_token);
+  return fetch(path, { ...options, headers });
+}
 const STORAGE_KEY_TOKEN = 'treevision_estimate_token';
 
 /* ════════════════════════════════════════════════════
@@ -742,7 +748,7 @@ function renderCart() {
 
   const treeCards = STATE.trees.map(t => `
     <div class="tree-card">
-      <img class="tree-card-thumb" src="/api/tree-photo/${encodeURIComponent(t.id)}" alt="" onerror="this.outerHTML='<div class=&quot;tree-card-thumb-fallback&quot; aria-hidden=&quot;true&quot;>🌳</div>'">
+      <img class="tree-card-thumb" src="/api/tree-photo/${encodeURIComponent(t.id)}?token=${encodeURIComponent(STATE.estimate.share_token)}" alt="" onerror="this.outerHTML='<div class=&quot;tree-card-thumb-fallback&quot; aria-hidden=&quot;true&quot;>🌳</div>'">
       <div class="tree-card-body">
         <div class="tree-card-label">${escapeHtml(t.label || t.species || 'Tree')}</div>
         <div class="tree-card-meta">
@@ -806,7 +812,7 @@ function serviceName(key) {
 async function removeTree(id) {
   if (!confirm('Remove this tree from your estimate?')) return;
   try {
-    const res = await fetch(`/api/estimate/${STATE.estimate.id}/tree/${id}`, { method: 'DELETE' });
+    const res = await intakeFetch(`/api/estimate/${STATE.estimate.id}/tree/${id}`, { method: 'DELETE' });
     const data = await res.json();
     if (!res.ok) throw new Error(data.error || 'Could not remove');
     STATE.trees = STATE.trees.filter(t => t.id !== id);
@@ -1002,7 +1008,7 @@ async function startAnalysis() {
     form.append('photo', STATE.pending.photoBlob, 'tree.jpg');
     if (label) form.append('label', label);
 
-    const res = await fetch(`/api/estimate/${STATE.estimate.id}/tree`, { method: 'POST', body: form });
+    const res = await intakeFetch(`/api/estimate/${STATE.estimate.id}/tree`, { method: 'POST', body: form });
     const data = await res.json();
     if (!res.ok) throw new Error(data.error || `Request failed (${res.status})`);
 
@@ -1082,7 +1088,7 @@ function renderReview() {
   document.getElementById('review-subtitle').textContent = `Tree ${STATE.trees.length + 1}: ${t.species || 'Tree'}`;
 
   const annotations = Array.isArray(t.annotations) ? t.annotations : [];
-  const photoSrc = `/api/tree-photo/${encodeURIComponent(t.id)}`;
+  const photoSrc = `/api/tree-photo/${encodeURIComponent(t.id)}?token=${encodeURIComponent(STATE.estimate.share_token)}`;
 
   // Legend: only categories present, each with the specific labels Claude gave
   const present = CAT_ORDER.filter(type => annotations.some(a => a.type === type));
@@ -1237,7 +1243,7 @@ async function commitTree() {
   try {
     // If user changed the service, PATCH it
     if (STATE.reviewServiceKey && STATE.reviewServiceKey !== t.selected_pkg) {
-      const res = await fetch(`/api/estimate/${STATE.estimate.id}/tree/${t.id}`, {
+      const res = await intakeFetch(`/api/estimate/${STATE.estimate.id}/tree/${t.id}`, {
         method: 'PATCH',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ selected_pkg: STATE.reviewServiceKey }),
@@ -1267,7 +1273,7 @@ async function cancelTreeReview() {
   // Delete the just-created tree (since user didn't commit it).
   // Capture the returned totals so the cart doesn't show stale bundle math.
   try {
-    const res = await fetch(`/api/estimate/${STATE.estimate.id}/tree/${STATE.reviewTree.id}`, { method: 'DELETE' });
+    const res = await intakeFetch(`/api/estimate/${STATE.estimate.id}/tree/${STATE.reviewTree.id}`, { method: 'DELETE' });
     const data = await res.json().catch(() => ({}));
     if (data.totals) {
       STATE.estimate.total_low = data.totals.total_low;
@@ -1312,7 +1318,7 @@ async function submitContact() {
   const btn = document.getElementById('contact-submit');
   btn.disabled = true; btn.textContent = 'Saving…';
   try {
-    const res = await fetch(`/api/estimate/${STATE.estimate.id}/contact`, {
+    const res = await intakeFetch(`/api/estimate/${STATE.estimate.id}/contact`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify(payload),
@@ -1321,7 +1327,7 @@ async function submitContact() {
     if (!res.ok) throw new Error(data.error || 'Could not save');
     STATE.contact = payload;
     // Lock the estimate + send confirmation email
-    await fetch(`/api/estimate/${STATE.estimate.id}/submit`, { method: 'POST' });
+    await intakeFetch(`/api/estimate/${STATE.estimate.id}/submit`, { method: 'POST' });
     STATE.estimate.status = 'submitted';
     // Reset the link: once submitted, this device shouldn't auto-reopen the
     // finished estimate. The current session continues in memory (so scheduling
