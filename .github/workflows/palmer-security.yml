@@ -1,0 +1,14 @@
+name: Palmer security baseline
+on: [push, pull_request, workflow_dispatch]
+permissions:
+  contents: read
+jobs:
+  baseline:
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683
+        with:
+          persist-credentials: false
+      - run: node --test security/check.test.mjs
+      - run: node security/check.mjs
