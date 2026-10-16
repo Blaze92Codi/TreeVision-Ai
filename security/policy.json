@@ -1,0 +1,13 @@
+{
+  "version": 1,
+  "context": "business",
+  "county_access": false,
+  "agent_sensitive_actions_enabled": false,
+  "external_authorization_required": true,
+  "denied_means_stop": true,
+  "secrets_in_model_context": false,
+  "secrets_in_logs": false,
+  "restart_requires_owner_review": true,
+  "approved_agent_destinations": [],
+  "max_automatic_attempts": 1
+}
