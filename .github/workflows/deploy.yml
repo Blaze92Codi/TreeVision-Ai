@@ -20,9 +20,6 @@ jobs:
     timeout-minutes: 10
     permissions:
       contents: read
-    env:
-      CLOUDFLARE_API_TOKEN: ${{ secrets.CF_API_TOKEN }}
-      CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CF_ACCOUNT_ID }}
     steps:
       - name: Checkout
         uses: actions/checkout@v4
@@ -33,6 +30,11 @@ jobs:
           node-version: '22'
           cache: 'npm'
           cache-dependency-path: worker/package-lock.json
+
+      - name: Security policy and workflow checks
+        run: |
+          node security/check.mjs
+          node --test security/*.test.mjs
 
       - name: Install dependencies
         working-directory: worker
@@ -49,6 +51,9 @@ jobs:
           cd worker && npx tsx --test ../tests/worker.test.ts
 
       - name: Apply pending D1 migrations
+        env:
+          CLOUDFLARE_API_TOKEN: ${{ secrets.CF_API_TOKEN }}
+          CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CF_ACCOUNT_ID }}
         working-directory: worker
         run: |
           echo "Applying D1 migrations using database_id from wrangler.toml..."
@@ -56,6 +61,9 @@ jobs:
           echo "Migrations step complete."
 
       - name: Deploy Worker + static assets
+        env:
+          CLOUDFLARE_API_TOKEN: ${{ secrets.CF_API_TOKEN }}
+          CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CF_ACCOUNT_ID }}
         working-directory: worker
         run: npx wrangler deploy
 
