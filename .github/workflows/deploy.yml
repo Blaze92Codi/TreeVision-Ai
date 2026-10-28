@@ -53,7 +53,6 @@ jobs:
       - name: Apply pending D1 migrations
         env:
           CLOUDFLARE_API_TOKEN: ${{ secrets.CF_API_TOKEN }}
-          CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CF_ACCOUNT_ID }}
         working-directory: worker
         run: |
           echo "Applying D1 migrations using database_id from wrangler.toml..."
@@ -63,7 +62,6 @@ jobs:
       - name: Deploy Worker + static assets
         env:
           CLOUDFLARE_API_TOKEN: ${{ secrets.CF_API_TOKEN }}
-          CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CF_ACCOUNT_ID }}
         working-directory: worker
         run: npx wrangler deploy
 

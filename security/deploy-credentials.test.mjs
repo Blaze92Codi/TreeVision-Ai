@@ -18,10 +18,24 @@ test('Cloudflare secrets are supplied only to migration and deployment steps', (
     assert.equal(hasCredentials, allowed.has(name), `unexpected credentials for ${name}`);
     if (hasCredentials) {
       credentialSteps++;
-      assert.match(step, /\n        env:\n          CLOUDFLARE_API_TOKEN: \$\{\{ secrets\.CF_API_TOKEN \}\}\n          CLOUDFLARE_ACCOUNT_ID: \$\{\{ secrets\.CF_ACCOUNT_ID \}\}/);
+      assert.match(step, /\n        env:\n          CLOUDFLARE_API_TOKEN: \$\{\{ secrets\.CF_API_TOKEN \}\}/);
     }
   }
   assert.equal(credentialSteps, 2);
   assert.match(workflow, /wrangler d1 migrations apply treevision --remote/);
   assert.match(workflow, /npx wrangler deploy/);
+});
+
+test('deployment uses the verified existing Cloudflare account and D1 binding', () => {
+  const config = readFileSync(new URL('../worker/wrangler.toml', import.meta.url), 'utf8');
+  // Account IDs identify resources; API tokens remain secret and step-scoped.
+  assert.doesNotMatch(workflow, /CLOUDFLARE_ACCOUNT_ID|CF_ACCOUNT_ID/,
+    'a hidden account override must not replace the verified config target');
+  assert.match(config, /^account_id = "37852b0b701c8557b26088e70725f123"$/m);
+  assert.match(config, /^name = "treevision"$/m);
+  const database = config.split('[[d1_databases]]')[1]?.split('[[r2_buckets]]')[0];
+  assert.ok(database, 'existing D1 binding required');
+  assert.match(database, /^binding = "DB"$/m);
+  assert.match(database, /^database_name = "treevision"$/m);
+  assert.match(database, /^database_id = "50fc63d6-157b-42a3-97dc-df3dc1186137"$/m);
 });
